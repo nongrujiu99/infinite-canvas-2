@@ -266,12 +266,12 @@ export default {
         },
         export: { defaultProjectName: "无限画布", defaultNodesName: "画布元素", item: "元素" },
         createMenu: {
-            fromNode: "引用该节点生成", close: "关闭", text: "文本生成", textDescription: "脚本、广告词、品牌文案", image: "图片生成", video: "视频生成", audio: "音频参考", config: "配置节点", configDescription: "模型、尺寸、数量和输入顺序", select: "选择节点",
+            fromNode: "引用该节点生成", close: "关闭", text: "文本生成", textDescription: "脚本、广告词、品牌文案", image: "图片生成", video: "视频生成", audio: "音频参考", config: "配置节点", configDescription: "模型、尺寸、数量和输入顺序", select: "选择节点", addToCanvas: "添加到画布", emptyText: "空文本节点", emptyImage: "空图片节点", emptyVideo: "空视频节点", emptyAudio: "空音频节点", generationConfig: "生成配置",
         },
         node: {
             characterCount: "{{count}} 字",
             node: "节点",
-            untitled: "未命名节点", renameHint: "双击修改节点名称", group: "组", nodeCount: "{{count}} 个节点", generating: "生成中", failed: "生成失败", retry: "重试", missingPlugin: "缺少插件", missingPluginDescription: "节点类型“{{type}}”的插件未安装或未启用", generateImage: "用文本生图", generate: "生图", editText: "双击编辑文字", emptyImage: "空图片节点", emptyVideo: "空视频节点", emptyAudio: "空音频节点", audio: "音频", batchExpanded: "图片组已展开", batchCollapsed: "图片组已收起", textBatchExpanded: "备选文本已展开", textBatchCollapsed: "备选文本已收起", createCopy: "创建副本", setPrimary: "设为主图", setPrimaryText: "设为主文本",
+            untitled: "未命名节点", renameHint: "双击修改节点名称", group: "组", nodeCount: "{{count}} 个节点", generating: "生成中", failed: "生成失败", retry: "重试", missingPlugin: "缺少插件", missingPluginDescription: "节点类型“{{type}}”的插件未安装或未启用", generateImage: "用文本生图", generate: "生图", editText: "双击编辑文字", copyText: "复制文本", emptyImage: "空图片节点", emptyVideo: "空视频节点", emptyAudio: "空音频节点", audio: "音频", batchExpanded: "图片组已展开", batchCollapsed: "图片组已收起", textBatchExpanded: "备选文本已展开", textBatchCollapsed: "备选文本已收起", createCopy: "创建副本", setPrimary: "设为主图", setPrimaryText: "设为主文本",
         },
         videoFrames: { first: "截取首帧", last: "截取尾帧", current: "截取当前帧", firstTitle: "{{name}} 首帧", lastTitle: "{{name}} 尾帧", currentTitle: "{{name}} 当前帧", captured: "已生成图片节点", failed: "无法截取该画面，请重试" },
         sidePanel: {

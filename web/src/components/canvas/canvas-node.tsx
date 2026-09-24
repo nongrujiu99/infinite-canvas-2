@@ -8,6 +8,7 @@ import { pickImageSource } from "@/lib/image-thumbnail";
 import { previewUrlFor, subscribeImagePreviews, getImagePreviewRevision } from "@/services/image-storage";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
+import { useCopyText } from "@/hooks/use-copy-text";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText, type Position } from "@/types/canvas";
@@ -557,6 +558,7 @@ function MissingPluginContent({ theme, type }: Pick<NodeContentRendererProps, "t
 
 function TextContent({ node, theme, isEditingContent, textareaRef, mentionReferences, batchExpanded, onContentChange, onStopEditing, onToggleBatch, onSetBatchPrimary }: NodeContentRendererProps) {
  const { t } = useTranslation();
+ const copyText = useCopyText();
  const fontSize = node.metadata?.fontSize || 14;
  const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
  const texts = node.metadata?.texts || [];
@@ -565,7 +567,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  const primaryTextId = node.metadata?.primaryTextId || texts[0]?.id;
  const primaryText = texts.find((text) => text.id === primaryTextId);
  const content = primaryText?.content || node.metadata?.content || "";
- const paddingClass = isBatchRoot ? "px-4 pb-4 pt-14" : "p-4";
+ const paddingClass = isBatchRoot ? "px-4 pb-4 pt-14" : "p-4 pr-12";
 
  return (
  <BatchFrame batchCount={batchCount} batchExpanded={batchExpanded}>
@@ -604,10 +606,27 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  </div>
  )}
  </div>
+ <div className="absolute right-2.5 top-2.5 z-30 flex items-center gap-1.5">
+ <button
+ type="button"
+ className="grid size-7 place-items-center rounded-lg opacity-30 transition hover:bg-black/5 hover:opacity-90 disabled:cursor-default disabled:opacity-10 dark:hover:bg-white/10"
+ style={{ color: theme.node.text }}
+ title={t("canvas.node.copyText")}
+ aria-label={t("canvas.node.copyText")}
+ disabled={!content}
+ onClick={(event) => {
+ event.stopPropagation();
+ copyText(content);
+ }}
+ onMouseDown={(event) => event.stopPropagation()}
+ onPointerDown={(event) => event.stopPropagation()}
+ >
+ <Copy className="size-3.5" />
+ </button>
  {isBatchRoot ? (
  <button
  type="button"
- className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.12)] backdrop-blur-md transition hover:scale-[1.02]"
+ className="flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.12)] backdrop-blur-md transition hover:scale-[1.02]"
  style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
  aria-label={batchExpanded ? t("canvas.node.textBatchExpanded") : t("canvas.node.textBatchCollapsed")}
  onClick={(event) => {
@@ -621,6 +640,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  <ChevronRight className={`size-3.5 opacity-80 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
  </button>
  ) : null}
+ </div>
  </BatchFrame>
  );
 }

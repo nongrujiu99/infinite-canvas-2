@@ -25,7 +25,7 @@ import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { ActiveConnectionPath, ConnectionPath } from "@/components/canvas/canvas-connections";
 import { CanvasConfigNodePanel } from "@/components/canvas/canvas-config-node-panel";
 import { CanvasOperationNodePanel } from "@/components/canvas/canvas-operation-node-panel";
-import { CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
+import { CanvasCreateContextMenu, CanvasNodeContextMenu } from "@/components/canvas/canvas-context-menu";
 import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "@/components/canvas/canvas-node-crop-dialog";
 import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/components/canvas/canvas-node-mask-edit-dialog";
@@ -73,7 +73,7 @@ import { getNodeDefinition, useNodeRegistryVersion } from "@/lib/canvas/node-reg
 import { registerBuiltinNodes } from "@/components/canvas/nodes/builtin-nodes";
 import { CanvasRefreshShell } from "@/components/canvas/canvas-refresh-shell";
 import { CanvasTopBar } from "@/components/canvas/canvas-top-bar";
-import { ConnectionCreateMenu, NodeCreateMenu, type PendingConnectionCreate } from "@/components/canvas/canvas-create-menus";
+import { ConnectionCreateMenu, type PendingConnectionCreate } from "@/components/canvas/canvas-create-menus";
 import {
  CanvasNodeType,
  type CanvasAssistantImage,
@@ -83,6 +83,7 @@ import {
  type CanvasNodeImage,
  type CanvasNodeText,
  type CanvasNodeMetadata,
+ type CanvasOperationKind,
  type CanvasNodeTypeId,
  type ConnectionHandle,
  type ContextMenuState,
@@ -266,7 +267,7 @@ function InfiniteCanvasPage() {
  const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
- const [nodeCreatePosition, setNodeCreatePosition] = useState<Position | null>(null);
+ const [canvasCreateMenu, setCanvasCreateMenu] = useState<{ x: number; y: number; position: Position } | null>(null);
  const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
  const previewMode = searchParams.get("preview") === "1";
  const [isMiniMapOpen, setIsMiniMapOpen] = useState(previewMode);
@@ -1027,6 +1028,7 @@ function InfiniteCanvasPage() {
  setSelectedNodeIds(new Set());
  setSelectedConnectionId(null);
  setContextMenu(null);
+ setCanvasCreateMenu(null);
  setSelectionBox(null);
  setHoveredNodeId(null);
  setDialogNodeId(null);
@@ -1263,7 +1265,7 @@ function InfiniteCanvasPage() {
  const handleCanvasMouseDown = useCallback(
  (event: ReactPointerEvent<HTMLDivElement>) => {
  setContextMenu(null);
- setNodeCreatePosition(null);
+ setCanvasCreateMenu(null);
  setHoveredNodeId(null);
  setDialogNodeId(null);
  if (pendingConnectionCreateRef.current) cancelPendingConnectionCreate();
@@ -1597,6 +1599,7 @@ function InfiniteCanvasPage() {
  setSelectedNodeIds(new Set([node.id]));
  setSelectedConnectionId(null);
  setContextMenu(null);
+ setCanvasCreateMenu(null);
  setDialogNodeId(node.id);
  return true;
  },
@@ -1693,7 +1696,7 @@ function InfiniteCanvasPage() {
  setSelectedNodeIds(new Set());
  setSelectedConnectionId(null);
  setContextMenu(null);
- setNodeCreatePosition(null);
+ setCanvasCreateMenu(null);
  setSelectionBox(null);
  setConnecting(null);
  setHoveredNodeId(null);
@@ -1846,28 +1849,14 @@ function InfiniteCanvasPage() {
  [handleConfigNodeChange],
  );
 
- const runImageOperation = useCallback(
- (operation: CanvasNodeData) => {
- const sourceId = connectionsRef.current.find((connection) => connection.valid !== false && connection.toNodeId === operation.id)?.fromNodeId;
- const source = nodesRef.current.find((node) => node.id === sourceId);
- if (source?.type !== CanvasNodeType.Image || !source.metadata?.content) {
- message.warning(t("canvas.operations.missingImage"));
- return;
- }
- setActiveOperationNodeId(operation.id);
- if (operation.metadata?.operationKind === "crop") setCropNodeId(source.id);
- if (operation.metadata?.operationKind === "split") setSplitNodeId(source.id);
- if (operation.metadata?.operationKind === "mask") setMaskEditNodeId(source.id);
- if (operation.metadata?.operationKind === "upscale") setUpscaleNodeId(source.id);
- if (operation.metadata?.operationKind === "angle") setAngleNodeId(source.id);
- if (operation.metadata?.operationKind === "superResolve") setSuperResolveNodeId(source.id);
- if (operation.metadata?.operationKind === "reversePrompt") {
+ const createReversePromptFlow = useCallback(
+ (source: CanvasNodeData, anchor: CanvasNodeData, operationId?: string) => {
  const gap = 96;
  const textSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
  const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
- const centerY = operation.position.y + operation.height / 2;
+ const centerY = anchor.position.y + anchor.height / 2;
  const textNode = {
- ...createCanvasNode(CanvasNodeType.Text, { x: operation.position.x + operation.width + gap + textSpec.width / 2, y: centerY }, { content: t("canvas.projectPage.reversePreset"), prompt: t("canvas.projectPage.reversePreset"), status: NODE_STATUS_SUCCESS, fontSize: 14 }),
+ ...createCanvasNode(CanvasNodeType.Text, { x: anchor.position.x + anchor.width + gap + textSpec.width / 2, y: centerY }, { content: t("canvas.projectPage.reversePreset"), prompt: t("canvas.projectPage.reversePreset"), status: NODE_STATUS_SUCCESS, fontSize: 14 }),
  title: t("canvas.projectPage.reverseTitle"),
  };
  const configNode = {
@@ -1878,16 +1867,59 @@ function InfiniteCanvasPage() {
  }),
  title: t("canvas.projectPage.reverseConfigTitle"),
  };
- setNodes((prev) => [...prev.map((item) => item.id === operation.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS } } : item), textNode, configNode]);
+ setNodes((prev) => [...prev.map((item) => item.id === operationId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS } } : item), textNode, configNode]);
  setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: source.id, toNodeId: configNode.id }, { id: nanoid(), fromNodeId: textNode.id, toNodeId: configNode.id }]);
  setSelectedNodeIds(new Set([configNode.id]));
  setSelectedConnectionId(null);
  setDialogNodeId(configNode.id);
  setActiveOperationNodeId(null);
- }
  },
- [effectiveConfig.model, effectiveConfig.textModel, message, t],
+ [effectiveConfig.model, effectiveConfig.textModel, t],
  );
+
+ const openImageOperation = useCallback((source: CanvasNodeData, kind: CanvasOperationKind, operationId: string) => {
+ setActiveOperationNodeId(operationId);
+ if (kind === "crop") setCropNodeId(source.id);
+ if (kind === "split") setSplitNodeId(source.id);
+ if (kind === "mask") setMaskEditNodeId(source.id);
+ if (kind === "upscale") setUpscaleNodeId(source.id);
+ if (kind === "angle") setAngleNodeId(source.id);
+ if (kind === "superResolve") setSuperResolveNodeId(source.id);
+ }, []);
+
+ const runImageOperation = useCallback(
+ (operation: CanvasNodeData) => {
+ const sourceId = connectionsRef.current.find((connection) => connection.valid !== false && connection.toNodeId === operation.id)?.fromNodeId;
+ const source = nodesRef.current.find((node) => node.id === sourceId);
+ if (source?.type !== CanvasNodeType.Image || !source.metadata?.content) {
+ message.warning(t("canvas.operations.missingImage"));
+ return;
+ }
+ const kind = operation.metadata?.operationKind;
+ if (!kind) return;
+ if (kind === "reversePrompt") createReversePromptFlow(source, operation, operation.id);
+ else openImageOperation(source, kind, operation.id);
+ },
+ [createReversePromptFlow, message, openImageOperation, t],
+ );
+
+ const startImageOperationFromContext = useCallback((source: CanvasNodeData, kind: CanvasOperationKind) => {
+ setContextMenu(null);
+ if (kind === "reversePrompt") {
+ createReversePromptFlow(source, source);
+ return;
+ }
+ const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Operation];
+ const operation = {
+ ...createCanvasNode(CanvasNodeType.Operation, availableNodeCenterBelow(source, spec.width, spec.height, nodesRef.current), { operationKind: kind, status: NODE_STATUS_IDLE }),
+ title: t(`canvas.operations.${kind}`),
+ };
+ setNodes((prev) => [...prev, operation]);
+ setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: source.id, toNodeId: operation.id, fromPortId: "output", toPortId: "input" }]);
+ setSelectedNodeIds(new Set([operation.id]));
+ setSelectedConnectionId(null);
+ openImageOperation(source, kind, operation.id);
+ }, [createReversePromptFlow, openImageOperation, t]);
 
  const downloadNodeImage = useCallback((node: CanvasNodeData) => {
  if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
@@ -2354,10 +2386,11 @@ function InfiniteCanvasPage() {
  }, [projectId, renameProject, titleDraft]);
 
  const preventCanvasContextMenu = useCallback((event: ReactMouseEvent) => {
- if ((event.target as HTMLElement).closest("[data-node-id]")) return;
+ if ((event.target as HTMLElement).closest("[data-node-id],[data-connection-id],[data-canvas-no-zoom]")) return;
  event.preventDefault();
  setContextMenu(null);
- }, []);
+ setCanvasCreateMenu({ x: event.clientX, y: event.clientY, position: screenToCanvas(event.clientX, event.clientY) });
+ }, [screenToCanvas]);
 
  const handleGenerateNode = useCallback(
  async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
@@ -3062,6 +3095,7 @@ function InfiniteCanvasPage() {
  const handleNodeContextMenu = useCallback((event: ReactMouseEvent, nodeId: string) => {
  event.preventDefault();
  event.stopPropagation();
+ setCanvasCreateMenu(null);
  setSelectedNodeIds((current) => (current.has(nodeId) ? current : new Set([nodeId])));
  setSelectedConnectionId(null);
  setContextMenu({ type: "node", x: event.clientX, y: event.clientY, nodeId });
@@ -3156,16 +3190,12 @@ function InfiniteCanvasPage() {
  onViewportChange={(next) => {
  setViewport(next);
  setContextMenu(null);
+ setCanvasCreateMenu(null);
  }}
  onCanvasMouseDown={(event) => {
  if (!referencePickerNodeId) handleCanvasMouseDown(event);
  }}
  onCanvasDeselect={referencePickerNodeId ? undefined : deselectCanvas}
- onCanvasDoubleClick={(event) => {
- if (referencePickerNodeId) return;
- setContextMenu(null);
- setNodeCreatePosition(screenToCanvas(event.clientX, event.clientY));
- }}
  onContextMenu={preventCanvasContextMenu}
  onDrop={handleDrop}
  >
@@ -3183,6 +3213,7 @@ function InfiniteCanvasPage() {
  setContextMenu(null);
  }}
  onContextMenu={(event) => {
+ setCanvasCreateMenu(null);
  setSelectedConnectionId(connection.id);
  setSelectedNodeIds(new Set());
  setContextMenu({ type: "connection", x: event.clientX, y: event.clientY, connectionId: connection.id });
@@ -3253,16 +3284,6 @@ function InfiniteCanvasPage() {
  </svg>
  ) : null}
  {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} allowedTypes={allowedConnectedNodeTypes(pendingConnectionCreate.connection, nodes)} onCreate={(type, metadata) => createConnectedNode(type, pendingConnectionCreate, metadata)} onClose={cancelPendingConnectionCreate} /> : null}
- {nodeCreatePosition ? (
- <NodeCreateMenu
- position={nodeCreatePosition}
- onCreate={(type, metadata) => {
- createNode(type, nodeCreatePosition, metadata);
- setNodeCreatePosition(null);
- }}
- onClose={() => setNodeCreatePosition(null)}
- />
- ) : null}
  </InfiniteCanvas>
 
  {hasMultipleSelectedNodes && !selectionBox ? (
@@ -3304,16 +3325,32 @@ function InfiniteCanvasPage() {
 
  <CanvasZoomControls scale={viewport.k} onScaleChange={setZoomScale} onReset={resetViewport} isMiniMapOpen={isMiniMapOpen} onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)} />
 
+ {canvasCreateMenu ? (
+ <CanvasCreateContextMenu
+ position={canvasCreateMenu}
+ onClose={() => setCanvasCreateMenu(null)}
+ onCreate={(type) => {
+ createNode(type, canvasCreateMenu.position);
+ setCanvasCreateMenu(null);
+ }}
+ />
+ ) : null}
+
  {contextMenu ? (
  <CanvasNodeContextMenu
  menu={contextMenu}
  canCaptureVideoFrame={contextMenuNode?.type === CanvasNodeType.Video && Boolean(contextMenuNode.metadata?.content)}
+ canProcessImage={contextMenuNode?.type === CanvasNodeType.Image && Boolean(contextMenuNode.metadata?.content)}
  canGroup={contextMenu.type === "node" && canGroupSelection}
  canUngroup={contextMenu.type === "node" && canUngroupSelection}
  onClose={() => setContextMenu(null)}
  onCaptureVideoFrame={(position) => {
  if (contextMenu.type !== "node") return;
  void captureVideoNodeFrame(contextMenu.nodeId, position);
+ }}
+ onImageOperation={(kind) => {
+ if (contextMenu.type !== "node" || contextMenuNode?.type !== CanvasNodeType.Image || !contextMenuNode.metadata?.content) return;
+ startImageOperationFromContext(contextMenuNode, kind);
  }}
  onDuplicate={() => {
  if (contextMenu.type !== "node") return;

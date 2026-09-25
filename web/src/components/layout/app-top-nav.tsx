@@ -21,18 +21,18 @@ export function AppTopNav() {
  return (
  <>
  {!hideHeader ? (
- <header className="sticky top-0 z-20 h-14 shrink-0 border-b border-border bg-background/85 backdrop-blur-xl">
- <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-6">
+ <header className="sticky top-0 z-20 h-15 shrink-0 border-b border-border bg-background/92 backdrop-blur-xl">
+ <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-5 sm:px-8">
  <div className="flex min-w-0 items-center">
- <Link to="/" className="flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-foreground transition hover:opacity-70">
+ <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-primary">
  <span
- className="size-5 shrink-0 bg-current"
+ className="size-5 shrink-0 bg-primary"
  style={{
  mask: "url(/logo.svg) center / contain no-repeat",
  WebkitMask: "url(/logo.svg) center / contain no-repeat",
  }}
  />
- <span className="text-base font-medium">{t("meta.title")}</span>
+ <span className="text-base font-semibold tracking-[-0.015em]">{t("meta.title")}</span>
  </Link>
 
  <button
@@ -45,7 +45,7 @@ export function AppTopNav() {
  <Menu className="size-5" />
  </button>
 
- <nav className="hide-scrollbar ml-8 hidden h-14 min-w-0 items-center gap-7 overflow-x-auto md:flex">
+ <nav className="hide-scrollbar ml-9 hidden h-15 min-w-0 items-center gap-7 overflow-x-auto md:flex">
  {navigationTools.map((tool) => {
  const Icon = tool.icon;
  const active = tool.slug === activeToolSlug;
@@ -54,8 +54,8 @@ export function AppTopNav() {
  key={tool.slug}
  to={`/${tool.slug}`}
  className={cn(
- "relative flex h-14 shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-px",
- active ? "font-medium text-foreground after:bg-foreground" : "text-muted-foreground after:bg-transparent hover:text-foreground",
+ "relative flex h-15 shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
+ active ? "font-semibold text-foreground after:bg-primary" : "text-muted-foreground after:bg-transparent hover:text-foreground",
  )}
  >
  <Icon className="size-4" />

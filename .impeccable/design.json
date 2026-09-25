@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-25T00:00:00+08:00",
+  "title": "Design System: Infinite Canvas Precision Studio",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Signal Blue", "canonical": "#2563eb", "tonalRamp": ["#10204f", "#173b8f", "#1d4ed8", "#2563eb", "#5b8cff", "#8db0ff", "#c9d9ff", "#edf3ff"] },
+      "canvas-dark": { "role": "neutral", "displayName": "Night Canvas", "canonical": "#090d14", "tonalRamp": ["#090d14", "#101720", "#182230", "#263344", "#526174", "#9daabd", "#d8e0ea", "#f2f5f9"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Workspace Display", "purpose": "Project-level page titles." },
+      "body": { "displayName": "Operational Body", "purpose": "Multilingual controls, descriptions, and values." }
+    },
+    "shadows": [
+      { "name": "interactive-lift", "value": "0 16px 36px rgba(15,23,42,0.09)", "purpose": "Hovered project cards only." },
+      { "name": "floating-dock", "value": "0 12px 32px rgba(15,23,42,0.10)", "purpose": "Persistent canvas controls above the working field." }
+    ],
+    "motion": [
+      { "name": "state-standard", "value": "200ms cubic-bezier(0.28,0.11,0.24,1)", "purpose": "Hover, selection, and navigation state changes." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single decisive action in a local task group.",
+      "html": "<button class=\"ds-btn-primary\">开始生成</button>",
+      "css": ".ds-btn-primary{background:var(--primary,#2563eb);color:var(--primary-foreground,#fff);border:0;border-radius:12px;padding:9px 16px;font-size:14px;font-weight:600;transition:background 200ms cubic-bezier(.28,.11,.24,1),transform 200ms cubic-bezier(.28,.11,.24,1)}.ds-btn-primary:hover{background:#1d4ed8;transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--ring,#2563eb);outline-offset:2px}"
+    },
+    {
+      "name": "Project Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A quiet project container that gains depth only when interactive.",
+      "html": "<article class=\"ds-card\"><strong>项目名称</strong><span>13 个节点 · 6 条连线</span></article>",
+      "css": ".ds-card{display:flex;min-height:150px;flex-direction:column;gap:10px;justify-content:space-between;background:var(--card,#fff);color:var(--card-foreground,#111827);border:1px solid var(--border,#d8e0ea);border-radius:16px;padding:20px;transition:transform 200ms cubic-bezier(.28,.11,.24,1),box-shadow 200ms cubic-bezier(.28,.11,.24,1),border-color 200ms}.ds-card span{color:var(--muted-foreground,#64748b);font-size:14px}.ds-card:hover{border-color:color-mix(in srgb,var(--primary,#2563eb) 40%,var(--border,#d8e0ea));box-shadow:0 16px 36px rgba(15,23,42,.09);transform:translateY(-2px)}"
+    },
+    {
+      "name": "Compact Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A compact parameter field used inside generation configuration groups.",
+      "html": "<label class=\"ds-field\"><span>比例</span><input value=\"16:9\" readonly></label>",
+      "css": ".ds-field{display:grid;gap:5px;color:var(--muted-foreground,#64748b);font-size:11px}.ds-field input{height:32px;background:var(--card,#fff);color:var(--foreground,#111827);border:1px solid var(--input,#d5dce6);border-radius:12px;padding:0 10px;font-size:14px}.ds-field input:focus-visible{border-color:var(--ring,#2563eb);outline:2px solid color-mix(in srgb,var(--ring,#2563eb) 28%,transparent);outline-offset:1px}"
+    },
+    {
+      "name": "Active Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "A flat navigation item with a precise active underline.",
+      "html": "<a class=\"ds-nav-active\" href=\"#\">我的画布</a>",
+      "css": ".ds-nav-active{display:inline-flex;align-items:center;height:60px;color:var(--foreground,#111827);font-size:14px;font-weight:600;text-decoration:none;border-bottom:2px solid var(--primary,#2563eb)}.ds-nav-active:focus-visible{outline:2px solid var(--ring,#2563eb);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Studio",
+    "overview": "A focused multimodal creation workbench with quiet working surfaces, decisive blue interaction states, compact controls, and explicit task grouping.",
+    "keyCharacteristics": ["Cool low-noise working surfaces", "Blue reserved for active intent", "Compact controls inside clear task groups", "Flat-by-default canvas chrome"],
+    "rules": [
+      { "name": "The One Signal Rule", "body": "Blue communicates active intent or current state; it is not ambient decoration.", "section": "colors" },
+      { "name": "The Flat-by-Default Rule", "body": "Depth must explain interaction or physical layering; it is never added to decorate a resting surface.", "section": "elevation" }
+    ],
+    "dos": ["Do reserve blue for intent, selection, focus, connection, and primary execution.", "Do group parameters by task and keep the next action visible within the same node."],
+    "donts": ["Don't use purple, gradients, or glow as general decoration.", "Don't give every toolbar action a filled background; fill communicates state."]
+  }
+}

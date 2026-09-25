@@ -52,19 +52,19 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  onConfigChange(node.id, { generationSettings: { ...node.metadata?.generationSettings, [mode]: { ...settings, ...patch } } });
  const summary = inputSummaryText(mode, inputSummary, t);
  return (
- <div className="thin-scrollbar flex h-full w-full cursor-move flex-col overflow-y-auto px-3 pb-3 pt-7 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
- <div className="mb-1.5 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="thin-scrollbar flex h-full w-full cursor-move flex-col overflow-y-auto px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+ <div className="mb-2 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
  <Segmented
  size="small"
  block
- className="canvas-config-mode !rounded-md !p-0.5"
+ className="canvas-config-mode"
  value={mode}
  onChange={(value) => onModeChange(node.id, value as CanvasGenerationMode)}
  options={[
  {
  value: "image",
  label: (
- <span className="inline-flex items-center gap-1">
+ <span className="inline-flex items-center gap-2">
  <ImageIcon className="size-3.5" />
  {t("canvas.configNode.image")}
  </span>
@@ -73,7 +73,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  {
  value: "video",
  label: (
- <span className="inline-flex items-center gap-1">
+ <span className="inline-flex items-center gap-2">
  <Video className="size-3.5" />
  {t("canvas.configNode.video")}
  </span>
@@ -82,7 +82,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  {
  value: "audio",
  label: (
- <span className="inline-flex items-center gap-1">
+ <span className="inline-flex items-center gap-2">
  <Music2 className="size-3.5" />
  {t("canvas.configNode.audio")}
  </span>
@@ -91,7 +91,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  {
  value: "text",
  label: (
- <span className="inline-flex items-center gap-1">
+ <span className="inline-flex items-center gap-2">
  <MessageSquare className="size-3.5" />
  {t("canvas.configNode.text")}
  </span>
@@ -101,11 +101,11 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  />
  </div>
 
- <div className="mb-1.5 flex h-5 items-center justify-between gap-2 text-[11px]" style={{ color: theme.node.muted }}>
+ <div className="mb-2 flex h-5 items-center justify-between gap-2 px-0.5 text-[11px]" style={{ color: theme.node.muted }}>
  <span className="min-w-0 truncate">{summary}</span>
  </div>
 
- <div className="mb-2 min-h-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="mb-3 min-h-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
  <CanvasConfigComposer
  embedded
  nodeId={node.id}
@@ -123,19 +123,18 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
 
  {invalidSourceIds.length ? <div className="mb-2 text-[11px] text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
 
- <div className="mb-2 min-w-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="cursor-default rounded-xl p-2.5" style={{ background: theme.node.fill }} onMouseDown={(event) => event.stopPropagation()}>
  <ModelPicker className="canvas-compact-control h-9" config={config} value={config.model} onChange={(model) => updateSettings({ model })} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth />
- </div>
-
- <div className="mb-2 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: theme.node.stroke }}>
  <CompactGenerationSettings mode={mode} config={config} settings={settings} onChange={updateSettings} />
  </div>
+ </div>
 
- <div className="mt-auto flex h-8 min-w-0 cursor-default items-center justify-end" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="mt-3 flex min-w-0 cursor-default items-center justify-end" onMouseDown={(event) => event.stopPropagation()}>
  <Button
  type="primary"
  size="small"
- className="!h-8 !w-auto !shrink-0 !cursor-pointer !rounded-lg !px-3"
+ className="!h-9 !w-auto !shrink-0 !cursor-pointer !rounded-lg !px-4 !font-semibold"
  danger={isRunning}
  disabled={!isRunning && !canGenerate}
  onMouseDown={(event) => event.stopPropagation()}

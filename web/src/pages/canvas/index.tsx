@@ -78,13 +78,13 @@ export default function CanvasPage() {
 
  return (
  <main className="h-full overflow-auto bg-background text-foreground">
- <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
- <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6 ">
- <div>
- <p className="text-xs text-muted-foreground">{t("canvas.library")}</p>
- <h1 className="mt-3 text-3xl font-semibold">{t("canvas.title")}</h1>
+ <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-12">
+ <header className="flex flex-wrap items-center justify-between gap-6 border-b border-border pb-7">
+ <div className="min-w-0">
+ <h1 className="text-balance text-4xl font-semibold tracking-[-0.025em] sm:text-5xl">{t("canvas.title")}</h1>
+ <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{t("canvas.library")}</p>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
  {selectedIds.length ? (
  <>
  <Button disabled={!hydrated} icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects(projects.filter((project) => selectedIds.includes(project.id)), `${t("canvas.title")}-${selectedIds.length}`)}>
@@ -106,7 +106,7 @@ export default function CanvasPage() {
  <Button disabled={!hydrated} icon={<Eye className="size-4" />} onClick={openFeaturePreview}>
  {t("canvas.featurePreview.open")}
  </Button>
- <Button disabled={!hydrated} type="primary" icon={<Plus className="size-4" />} onClick={createAndEnter}>
+ <Button disabled={!hydrated} type="primary" size="large" className="!px-5 !font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
  {t("canvas.create")}
  </Button>
  </div>
@@ -115,16 +115,17 @@ export default function CanvasPage() {
  {!hydrated ? (
  <section className="flex min-h-[360px] items-center justify-center border-y border-border text-sm text-muted-foreground ">{t("canvas.loading")}</section>
  ) : projects.length ? (
- <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+ <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
  {projects.map((project) => (
  <CanvasProjectCard key={project.id} project={project} />
  ))}
  </div>
  ) : (
- <section className="flex min-h-[360px] flex-col items-center justify-center border-y border-border text-center ">
- <h2 className="text-xl font-medium">{t("canvas.empty")}</h2>
- <p className="mt-3 text-sm text-muted-foreground">{t("canvas.emptyDescription")}</p>
- <Button type="primary" className="mt-6" icon={<Plus className="size-4" />} onClick={createAndEnter}>
+ <section className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
+ <span className="mb-6 grid size-14 place-items-center rounded-2xl bg-accent text-accent-foreground"><Plus className="size-6" /></span>
+ <h2 className="text-2xl font-semibold tracking-tight">{t("canvas.empty")}</h2>
+ <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">{t("canvas.emptyDescription")}</p>
+ <Button type="primary" size="large" className="mt-7 !px-5 !font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
  {t("canvas.create")}
  </Button>
  </section>

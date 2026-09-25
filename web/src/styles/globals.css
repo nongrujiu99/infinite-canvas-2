@@ -49,72 +49,80 @@
 }
 
 :root {
-    --radius: 0.625rem;
-    --border: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --radius: 0.75rem;
+    --border: #dfe4ec;
+    --ring: #2563eb;
+    --background: #f7f8fa;
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-foreground: #111827;
+    --popover: #ffffff;
+    --popover-foreground: #111827;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #eef2f7;
+    --secondary-foreground: #1f2937;
+    --muted: #f0f3f7;
+    --muted-foreground: #5b6473;
+    --accent: #e8eefc;
+    --accent-foreground: #1746a2;
     --destructive: oklch(0.577 0.245 27.325);
-    --input: oklch(0.922 0 0);
+    --input: #d5dce6;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: #ffffff;
+    --sidebar-foreground: #111827;
+    --sidebar-primary: #2563eb;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eef3fc;
+    --sidebar-accent-foreground: #1746a2;
+    --sidebar-border: #dfe4ec;
+    --sidebar-ring: #2563eb;
+    --surface-raised: #ffffff;
+    --surface-subtle: #eef2f7;
+    --brand-soft: #e8eefc;
+    --shadow-float: 0 18px 46px rgba(15, 23, 42, 0.12);
 }
 
 .dark {
-    --background: #0a0a11;
-    --foreground: #eaeaf1;
-    --border: rgba(234, 234, 241, 0.09);
-    --ring: #8b7cf7;
-    --card: #11111a;
-    --card-foreground: #eaeaf1;
-    --popover: #15151f;
-    --popover-foreground: #eaeaf1;
-    --primary: #a78bfa;
-    --primary-foreground: #160e2c;
-    --secondary: #1c1c28;
-    --secondary-foreground: #eaeaf1;
-    --muted: #181822;
-    --muted-foreground: #9999ab;
-    --accent: #242434;
-    --accent-foreground: #eaeaf1;
+    --background: #090d14;
+    --foreground: #edf3fb;
+    --border: rgba(184, 199, 222, 0.14);
+    --ring: #5b8cff;
+    --card: #101720;
+    --card-foreground: #edf3fb;
+    --popover: #141c27;
+    --popover-foreground: #edf3fb;
+    --primary: #5b8cff;
+    --primary-foreground: #07111f;
+    --secondary: #182230;
+    --secondary-foreground: #edf3fb;
+    --muted: #131c27;
+    --muted-foreground: #9daabd;
+    --accent: #1b2a42;
+    --accent-foreground: #cbdcff;
     --destructive: oklch(0.704 0.191 22.216);
-    --input: rgba(234, 234, 241, 0.12);
+    --input: rgba(184, 199, 222, 0.18);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: #11111a;
-    --sidebar-foreground: #eaeaf1;
-    --sidebar-primary: #a78bfa;
-    --sidebar-primary-foreground: #160e2c;
-    --sidebar-accent: #242434;
-    --sidebar-accent-foreground: #eaeaf1;
-    --sidebar-border: rgba(234, 234, 241, 0.09);
-    --sidebar-ring: #8b7cf7;
+    --sidebar: #0f1620;
+    --sidebar-foreground: #edf3fb;
+    --sidebar-primary: #5b8cff;
+    --sidebar-primary-foreground: #07111f;
+    --sidebar-accent: #1b2a42;
+    --sidebar-accent-foreground: #cbdcff;
+    --sidebar-border: rgba(184, 199, 222, 0.14);
+    --sidebar-ring: #5b8cff;
+    --surface-raised: #141c27;
+    --surface-subtle: #182230;
+    --brand-soft: #1b2a42;
+    --shadow-float: 0 22px 54px rgba(0, 0, 0, 0.42);
 }
 
 @layer base {
@@ -130,6 +138,14 @@
         @apply bg-background text-foreground;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
+    }
+    ::selection {
+        background: color-mix(in srgb, var(--primary) 28%, transparent);
+        color: var(--foreground);
+    }
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
     }
     a,
     button,
@@ -150,6 +166,17 @@
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
 @layer utilities {
     .hide-scrollbar {
         -ms-overflow-style: none;
@@ -165,7 +192,7 @@
         border: 1px solid transparent;
         border-radius: 6px;
         padding: 5px 10px;
-        color: #57534e;
+        color: var(--muted-foreground);
         font-size: 14px;
         line-height: 1;
         transition:
@@ -176,40 +203,38 @@
     }
 
     .prompt-filter-tag.ant-tag-checkable:hover {
-        background: rgba(28, 25, 23, 0.06);
-        color: #1c1917;
+        background: var(--muted);
+        color: var(--foreground);
     }
 
     .prompt-filter-tag.ant-tag-checkable.is-active,
     .prompt-filter-tag.ant-tag-checkable-checked {
-        background: #111111;
-        border-color: #111111;
-        color: #ffffff;
+        background: var(--primary);
+        border-color: var(--primary);
+        color: var(--primary-foreground);
         font-weight: 600;
     }
 
     .dark .prompt-filter-tag.ant-tag-checkable {
-        color: #e7e5e4;
+        color: var(--muted-foreground);
     }
 
     .dark .prompt-filter-tag.ant-tag-checkable:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: #ffffff;
+        background: var(--muted);
+        color: var(--foreground);
     }
 
     .dark .prompt-filter-tag.ant-tag-checkable.is-active,
     .dark .prompt-filter-tag.ant-tag-checkable-checked {
-        background: rgba(250, 250, 249, 0.96);
-        border-color: rgba(255, 255, 255, 0.88);
-        box-shadow:
-            0 0 0 1px rgba(255, 255, 255, 0.18),
-            0 6px 18px rgba(0, 0, 0, 0.22);
-        color: #0c0a09 !important;
+        background: var(--primary);
+        border-color: var(--primary);
+        box-shadow: none;
+        color: var(--primary-foreground) !important;
         font-weight: 700;
     }
 
     .thin-scrollbar {
-        scrollbar-color: rgba(120, 113, 108, 0.45) transparent;
+        scrollbar-color: color-mix(in srgb, var(--muted-foreground) 48%, transparent) transparent;
         scrollbar-width: thin;
     }
 
@@ -219,7 +244,7 @@
     }
 
     .thin-scrollbar::-webkit-scrollbar-thumb {
-        background: rgba(120, 113, 108, 0.45);
+        background: color-mix(in srgb, var(--muted-foreground) 48%, transparent);
         border-radius: 999px;
     }
 
@@ -275,7 +300,7 @@
 
     .canvas-control-select.ant-select .ant-select-selector,
     .canvas-control-number.ant-input-number {
-        border-color: rgba(120, 113, 108, 0.32) !important;
+        border-color: var(--input) !important;
         box-shadow: none !important;
     }
 
@@ -330,6 +355,70 @@
         padding-inline: 0;
     }
 
+    .canvas-config-mode.ant-segmented {
+        width: 100%;
+        padding: 4px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 14px !important;
+        background: color-mix(in srgb, var(--muted) 72%, transparent) !important;
+    }
+
+    .canvas-config-mode .ant-segmented-group {
+        gap: 4px;
+    }
+
+    .canvas-config-mode .ant-segmented-item {
+        min-height: 40px;
+        border: 1px solid transparent !important;
+        border-radius: 10px !important;
+        color: var(--muted-foreground) !important;
+        font-size: 14px;
+        font-weight: 500;
+        transition:
+            background 180ms cubic-bezier(0.28, 0.11, 0.24, 1),
+            border-color 180ms cubic-bezier(0.28, 0.11, 0.24, 1),
+            color 180ms cubic-bezier(0.28, 0.11, 0.24, 1);
+    }
+
+    .canvas-config-mode .ant-segmented-item::after {
+        display: none;
+    }
+
+    .canvas-config-mode .ant-segmented-item-label {
+        min-height: 38px;
+        padding-inline: 10px;
+        line-height: 38px;
+    }
+
+    .canvas-config-mode .ant-segmented-item-label > span {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .canvas-config-mode .ant-segmented-item:hover:not(.ant-segmented-item-selected) {
+        background: color-mix(in srgb, var(--primary) 7%, transparent) !important;
+        color: var(--foreground) !important;
+    }
+
+    .canvas-config-mode .ant-segmented-item-selected {
+        border-color: color-mix(in srgb, var(--primary) 38%, transparent) !important;
+        background: color-mix(in srgb, var(--primary) 14%, var(--card)) !important;
+        box-shadow: none !important;
+        color: color-mix(in srgb, var(--primary) 78%, var(--foreground)) !important;
+        font-weight: 650 !important;
+    }
+
+    .canvas-config-mode .ant-segmented-item:has(.ant-segmented-item-input:focus-visible) {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+    }
+
+    .canvas-config-mode .ant-segmented-item svg {
+        width: 17px;
+        height: 17px;
+        stroke-width: 1.9;
+    }
+
     @container (min-width: 440px) {
         .canvas-composer-mode-button {
             padding-inline: 8px;
@@ -369,17 +458,17 @@
 
     .canvas-control-select.ant-select-focused .ant-select-selector,
     .canvas-control-number.ant-input-number-focused {
-        border-color: #a8a29e !important;
+        border-color: var(--ring) !important;
     }
 
     .dark .canvas-control-select.ant-select .ant-select-selector,
     .dark .canvas-control-number.ant-input-number {
-        border-color: rgba(214, 211, 209, 0.2) !important;
+        border-color: var(--input) !important;
     }
 
     .dark .canvas-control-select.ant-select-focused .ant-select-selector,
     .dark .canvas-control-number.ant-input-number-focused {
-        border-color: #78716c !important;
+        border-color: var(--ring) !important;
     }
 
     .canvas-image-settings-popover .ant-popover-inner {

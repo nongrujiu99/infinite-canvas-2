@@ -79,7 +79,7 @@ export function CanvasToolbar({
  // Keep extension plugin nodes synchronized with registry changes.
  useNodeRegistryVersion();
  const extensionDefs = listNodeDefinitions().filter((def) => def.showInCreateMenu !== false && getNodePluginId(def.type) !== "builtin");
- const dockStyle = { background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item, boxShadow: colorTheme === "dark" ? "0 18px 45px rgba(0,0,0,.32)" : "0 16px 40px rgba(28,25,23,.12)" };
+ const dockStyle = { background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item, boxShadow: colorTheme === "dark" ? "0 14px 36px rgba(0,0,0,.28)" : "0 12px 32px rgba(15,23,42,.10)" };
  const hoverStyle = { background: theme.toolbar.itemHover, color: theme.toolbar.activeText };
  const activeStyle = { background: theme.toolbar.activeBg, color: theme.toolbar.activeText };
  const tip = hovered ? toolLabel(hovered, t) : "";
@@ -101,7 +101,7 @@ export function CanvasToolbar({
  return (
  <div ref={rootRef} className="pointer-events-none absolute bottom-5 z-50 flex justify-center" style={{ left: 300, right: 16 }}>
  {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
- <div ref={wrapRef} className="thin-scrollbar pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto rounded-xl border px-2 shadow-lg backdrop-blur [&>*]:shrink-0" style={dockStyle}>
+ <div ref={wrapRef} className="thin-scrollbar pointer-events-auto flex h-13 max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border px-2 backdrop-blur [&>*]:shrink-0" style={dockStyle}>
  <ToolbarButton id={`tool-${canvasTool}`} label={t(`canvas.toolbar.${canvasTool}`)} active hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={() => onCanvasToolChange(canvasTool === "select" ? "pan" : "select")}>
  {canvasTool === "select" ? <MousePointer2 className="size-4.5" /> : <Hand className="size-4.5" />}
  </ToolbarButton>
@@ -353,7 +353,7 @@ function ToolbarButton({
  <Button
  type="text"
  aria-label={label}
- className="!h-8 !w-8 !min-w-8 !p-0"
+ className="!h-9 !w-9 !min-w-9 !rounded-xl !p-0"
  disabled={disabled}
  style={active ? activeStyle : hovered === id && !disabled ? hoverStyle : { color: danger ? "#f87171" : theme.toolbar.item, opacity: disabled ? 0.35 : 1 }}
  icon={children}
@@ -374,7 +374,7 @@ function Divider({ theme }: { theme: CanvasTheme }) {
 function CanvasThemeButton({ colorTheme, targetTheme, onThemeChange, children }: { colorTheme: CanvasColorTheme; targetTheme: CanvasColorTheme; onThemeChange: (theme: CanvasColorTheme) => void; children: ReactNode }) {
  const theme = canvasThemes[colorTheme];
  const active = colorTheme === targetTheme;
- const activeStyle = colorTheme === "light" ? { background: "#111111", color: "#ffffff" } : { background: theme.toolbar.activeBg, color: theme.toolbar.activeText };
+ const activeStyle = { background: theme.toolbar.activeBg, color: theme.toolbar.activeText };
  const { t } = useTranslation();
  const label = targetTheme === "dark" ? t("topNav.darkTheme") : t("topNav.lightTheme");
 

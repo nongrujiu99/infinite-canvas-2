@@ -35,16 +35,17 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 
     return (
         <article
-            className="group flex min-h-44 cursor-pointer flex-col justify-between rounded-2xl bg-[#f1eee8] p-5 transition hover:bg-[#ebe6dc] dark:bg-white/5 dark:hover:bg-white/10"
+            className={`group relative flex min-h-48 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border bg-card p-5 transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${selected ? "border-primary bg-accent/55" : "border-border"}`}
             onClick={() => !editing && open()}
         >
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-primary opacity-0 transition-opacity group-hover:opacity-100" />
             <div className="flex items-start gap-3">
                 <input
                     type="checkbox"
                     checked={selected}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) => toggleSelected(project.id, event.target.checked)}
-                    className="mt-1 size-4 accent-violet-400"
+                    className="mt-1 size-4 accent-[var(--primary)]"
                     aria-label={t("canvas.project.select", { name: project.title })}
                 />
                 {editing ? (
@@ -52,24 +53,24 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                 ) : (
                     <button
                         type="button"
-                        className="min-w-0 cursor-pointer text-left"
+                        className="min-w-0 flex-1 cursor-pointer text-left"
                         onClick={(event) => {
                             event.stopPropagation();
                             open();
                         }}
                     >
-                        <h2 className="truncate text-xl font-semibold">{project.title}</h2>
-                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                        <h2 className="truncate text-xl font-semibold tracking-[-0.015em]">{project.title}</h2>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
                             {t("canvas.project.stats", { nodes: project.nodes.length, connections: project.connections.length })}
                         </p>
                     </button>
                 )}
             </div>
-            <div className="mt-8 flex items-end justify-between gap-3">
+            <div className="mt-10 flex items-end justify-between gap-3 border-t border-border/70 pt-4">
                 <p className="text-xs text-muted-foreground">
                     {t("canvas.project.updated", { date: new Date(project.updatedAt).toLocaleString(i18n.resolvedLanguage, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) })}
                 </p>
-                <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" onClick={(event) => event.stopPropagation()}>
                     {editing ? (
                         <>
                             <Button type="text" size="small" shape="circle" icon={<Check className="size-4" />} onClick={saveTitle} aria-label={t("canvas.project.saveName")} />

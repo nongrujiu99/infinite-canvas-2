@@ -1,16 +1,16 @@
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video } from "lucide-react";
-import { Button, Input, InputNumber, Segmented, Select, Switch } from "antd";
-import type { ReactNode } from "react";
+import { Button, Input, InputNumber, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
 import { ModelPicker } from "@/components/model-picker";
-import { defaultConfig, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { defaultConfig, resolveModelChannel, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasGenerationMode, CanvasGenerationSettings, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
-import { getNodeGenerationSettings } from "@/lib/canvas/canvas-generation-helpers";
-import { computeMediaSize, computeVideoSize, inferMediaRatio, inferMediaScale, inferVideoRatio, mediaRatioOptions, mediaScaleOptions, parseVideoResolution, videoRatioOptions, VIDEO_SECONDS_MAX, VIDEO_SECONDS_MIN } from "@/lib/media-size";
+import { getCanvasImageGenerationCount, getNodeGenerationSettings } from "@/lib/canvas/canvas-generation-helpers";
+import { adaptMediaSizeToModel, adaptVideoSecondsToModel, computeMediaSize, computeVideoSize, inferMediaRatio, inferMediaScale, inferVideoRatio, mediaRatioOptionsForModel, mediaScaleOptions, parseVideoResolution, readMediaDimensions, videoRatioOptions, videoSecondsSpecForModel } from "@/lib/media-size";
 import { audioFormatOptions, audioVoiceOptions } from "@/lib/audio-generation";
 import { CanvasConfigComposer } from "./canvas-config-composer";
 import type { NodeGenerationInput } from "./canvas-node-generation";
@@ -35,6 +35,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  const { t } = useTranslation();
  const globalConfig = useEffectiveConfig();
  const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+ const [promptExpanded, setPromptExpanded] = useState(false);
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const mode = node.metadata?.generationMode || "image";
  const settings = getNodeGenerationSettings(node, mode);
@@ -50,10 +51,14 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  const canGenerate = hasComposerContent || hasModeInput;
  const updateSettings = (patch: Partial<CanvasGenerationSettings>) =>
  onConfigChange(node.id, { generationSettings: { ...node.metadata?.generationSettings, [mode]: { ...settings, ...patch } } });
+ const changeModel = (model: string) => {
+ const apiFormat = resolveModelChannel(config, model).apiFormat;
+ updateSettings(mode === "image" ? { model, size: adaptMediaSizeToModel(config.size, model, apiFormat) } : mode === "video" ? { model, seconds: adaptVideoSecondsToModel(config.videoSeconds, model) } : { model });
+ };
  const summary = inputSummaryText(mode, inputSummary, t);
  return (
- <div className="thin-scrollbar flex h-full w-full cursor-move flex-col overflow-y-auto px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
- <div className="mb-2 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="flex h-full w-full cursor-move flex-col overflow-hidden px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+ <div className="mb-2 shrink-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
  <Segmented
  size="small"
  block
@@ -101,11 +106,11 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  />
  </div>
 
- <div className="mb-2 flex h-5 items-center justify-between gap-2 px-0.5 text-[11px]" style={{ color: theme.node.muted }}>
+ <div className="mb-2 flex h-5 shrink-0 items-center justify-between gap-2 px-0.5 text-[11px]" style={{ color: theme.node.muted }}>
  <span className="min-w-0 truncate">{summary}</span>
  </div>
 
- <div className="mb-3 min-h-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="mb-3 min-h-24 flex-1 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
  <CanvasConfigComposer
  embedded
  nodeId={node.id}
@@ -118,29 +123,28 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  onStartReferenceSelection={onStartReferenceSelection}
  onReorderReferences={(inputOrder) => onConfigChange(node.id, { inputOrder })}
  invalidSourceIds={invalidSourceIds}
+ onExpand={() => setPromptExpanded(true)}
  />
  </div>
 
- {invalidSourceIds.length ? <div className="mb-2 text-[11px] text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
+ {invalidSourceIds.length ? <div className="mb-2 shrink-0 text-[11px] leading-4 text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
 
- <div className="cursor-default rounded-xl p-2.5" style={{ background: theme.node.fill }} onMouseDown={(event) => event.stopPropagation()}>
- <ModelPicker className="canvas-compact-control h-9" config={config} value={config.model} onChange={(model) => updateSettings({ model })} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth />
- <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: theme.node.stroke }}>
+ <div className="canvas-generation-settings shrink-0 cursor-default rounded-xl px-2.5 py-2" style={{ background: theme.node.fill }}>
  <CompactGenerationSettings mode={mode} config={config} settings={settings} onChange={updateSettings} />
  </div>
- </div>
 
- <div className="mt-3 flex min-w-0 cursor-default items-center justify-end" onMouseDown={(event) => event.stopPropagation()}>
+ <div className="mt-3 grid min-w-0 shrink-0 cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
+ <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth />
  <Button
  type="primary"
  size="small"
- className="!h-9 !w-auto !shrink-0 !cursor-pointer !rounded-lg !px-4 !font-semibold"
+ className="!h-9 !w-auto !shrink-0 !cursor-pointer !rounded-lg !px-3 !font-semibold"
  danger={isRunning}
  disabled={!isRunning && !canGenerate}
  onMouseDown={(event) => event.stopPropagation()}
  onClick={() => (isRunning ? onStop(node.id) : onGenerate(node.id))}
  >
- <span className="inline-flex items-center gap-1.5">
+ <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
  {isRunning ? (
  <>
  <LoaderCircle className="size-4 animate-spin" />
@@ -156,6 +160,21 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  </span>
  </Button>
  </div>
+ <Modal title={t("canvas.promptPanel.editorTitle")} open={promptExpanded} centered width={780} footer={null} onCancel={() => setPromptExpanded(false)} destroyOnHidden>
+ <CanvasConfigComposer
+ expanded
+ nodeId={node.id}
+ nodes={nodes}
+ value={node.metadata?.composerContent ?? node.metadata?.prompt ?? ""}
+ inputs={inputs}
+ connectedNodes={connectedNodes}
+ onChange={(composerContent) => onConfigChange(node.id, { composerContent })}
+ onDisconnectReference={onDisconnectReference}
+ onStartReferenceSelection={(nodeId) => { setPromptExpanded(false); onStartReferenceSelection(nodeId); }}
+ onReorderReferences={(inputOrder) => onConfigChange(node.id, { inputOrder })}
+ invalidSourceIds={invalidSourceIds}
+ />
+ </Modal>
  </div>
  );
 }
@@ -166,11 +185,16 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
  if (mode === "image") {
  const scale = inferMediaScale(config.size || "auto");
  const ratio = inferMediaRatio(config.size || "auto");
+ const ratioOptions = mediaRatioOptionsForModel(config.model, resolveModelChannel(config, config.model).apiFormat);
+ const dimensions = readMediaDimensions(config.size || "auto", scale, ratio);
+ const pixelSize = `${dimensions.width} × ${dimensions.height} px`;
+ const imageCount = getCanvasImageGenerationCount(config.count);
  const applySize = (nextScale: string, nextRatio: string) => onChange({ size: computeMediaSize(nextScale, nextRatio) });
- return <div className="grid grid-cols-3 gap-2">
- <CompactField label={t("settingsPanels.image.aspectRatio")}><Select size="small" className={fieldClass} value={ratio} options={mediaRatioOptions.map((item) => ({ value: item.value, label: item.value === "auto" ? t("settingsPanels.common.auto") : item.value }))} onChange={(value) => applySize(scale, value)} /></CompactField>
+ return <div className="grid min-w-0 grid-cols-6 items-end gap-2">
+ <CompactField label={t("settingsPanels.image.aspectRatio")}><Select size="small" className={fieldClass} value={ratio} options={ratioOptions.map((item) => ({ value: item.value, label: item.value === "auto" ? t("settingsPanels.common.auto") : item.value }))} onChange={(value) => applySize(scale, value)} /></CompactField>
  <CompactField label={t("settingsPanels.image.resolution")}><Select size="small" className={fieldClass} value={scale} options={mediaScaleOptions.map((value) => ({ value, label: value === "auto" ? t("settingsPanels.common.auto") : value.toUpperCase() }))} onChange={(value) => applySize(value, ratio === "auto" ? "1:1" : ratio)} /></CompactField>
- <CompactField label={t("settingsPanels.image.count")}><InputNumber size="small" className={fieldClass} min={1} max={15} value={Number(config.count) || 1} onChange={(value) => onChange({ count: Number(value) || 1 })} /></CompactField>
+ <CompactField label={t("settingsPanels.image.pixels")}><div className="canvas-parameter-value" title={pixelSize}>{pixelSize}</div></CompactField>
+ <CompactField label={t("settingsPanels.image.count")}><Select size="small" className={fieldClass} value={imageCount} options={[1, 2, 3, 4].map((value) => ({ value, label: String(value) }))} onChange={(count) => onChange({ count })} /></CompactField>
  <CompactField label={t("settingsPanels.image.quality")}><Select size="small" className={fieldClass} value={config.quality || "auto"} options={["auto", "high", "medium", "low"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(quality) => onChange({ quality })} /></CompactField>
  <CompactField label={t("settingsPanels.image.transparent")}><div className="flex h-6 items-center"><Switch size="small" checked={config.background === "transparent"} onChange={(checked) => onChange({ background: checked ? "transparent" : "" })} /></div></CompactField>
  </div>;
@@ -178,30 +202,36 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
  if (mode === "video") {
  const resolution = parseVideoResolution(config.vquality);
  const ratio = inferVideoRatio(config.size || "auto");
+ const secondsSpec = videoSecondsSpecForModel(config.model);
+ const seconds = Number(adaptVideoSecondsToModel(config.videoSeconds, config.model));
+ const secondsMarks = secondsSpec.values ? Object.fromEntries(secondsSpec.values.map((value) => [value, `${value}s`])) : { [secondsSpec.min]: `${secondsSpec.min}s`, [secondsSpec.max]: `${secondsSpec.max}s` };
  const applySize = (nextResolution: string, nextRatio: string) => onChange({ vquality: nextResolution, size: computeVideoSize(nextResolution, nextRatio) });
- return <div className="grid grid-cols-3 gap-2">
+ return <div className="grid min-w-0 grid-cols-5 items-end gap-2">
  <CompactField label={t("settingsPanels.video.ratio")}><Select size="small" className={fieldClass} value={ratio} options={videoRatioOptions.map((item) => ({ value: item.value, label: item.value === "auto" ? t("settingsPanels.common.auto") : item.value }))} onChange={(value) => applySize(resolution, value)} /></CompactField>
  <CompactField label={t("settingsPanels.video.quality")}><Select size="small" className={fieldClass} value={resolution} options={["480", "720", "1080"].map((value) => ({ value, label: `${value}p` }))} onChange={(value) => applySize(value, ratio)} /></CompactField>
- <CompactField label={t("settingsPanels.video.seconds")}><InputNumber size="small" className={fieldClass} min={VIDEO_SECONDS_MIN} max={VIDEO_SECONDS_MAX} value={Number(config.videoSeconds) || 6} suffix="s" onChange={(value) => onChange({ seconds: String(value || 6) })} /></CompactField>
+ <CompactField label={t("settingsPanels.video.seconds")}>
+ <Popover trigger="click" placement="bottom" overlayClassName="canvas-seconds-popover" content={<div className="w-60 px-1 pb-1 pt-3" onMouseDown={(event) => event.stopPropagation()}><Slider min={secondsSpec.min} max={secondsSpec.max} step={secondsSpec.step} marks={secondsMarks} value={seconds} tooltip={{ formatter: (value) => `${value}s` }} onChange={(value) => onChange({ seconds: String(value) })} /></div>}>
+ <button type="button" className="canvas-parameter-trigger" onMouseDown={(event) => event.stopPropagation()}><span>{seconds}s</span><span className="text-[10px] opacity-45">{secondsSpec.min}–{secondsSpec.max}s</span></button>
+ </Popover>
+ </CompactField>
  <CompactField label={t("settingsPanels.video.mode")}><Select size="small" className={fieldClass} value={config.videoMode || "frames"} options={["frames", "reference"].map((value) => ({ value, label: t(`settingsPanels.video.modes.${value}`) }))} onChange={(videoMode) => onChange({ videoMode })} /></CompactField>
  <CompactField label={t("settingsPanels.video.generateAudio")}><Select size="small" className={fieldClass} value={config.videoGenerateAudio || "false"} options={[{ value: "true", label: t("common.on") }, { value: "false", label: t("common.off") }]} onChange={(generateAudio) => onChange({ generateAudio })} /></CompactField>
- <CompactField label={t("settingsPanels.video.watermark")}><Select size="small" className={fieldClass} value={config.videoWatermark || "false"} options={[{ value: "true", label: t("common.on") }, { value: "false", label: t("common.off") }]} onChange={(watermark) => onChange({ watermark })} /></CompactField>
  </div>;
  }
- if (mode === "audio") return <div className="grid grid-cols-3 gap-2">
+ if (mode === "audio") return <div className="flex items-end gap-2">
  <CompactField label={t("settingsPanels.audio.voice")}><Select size="small" className={fieldClass} value={config.audioVoice || "alloy"} options={audioVoiceOptions} onChange={(audioVoice) => onChange({ audioVoice })} /></CompactField>
  <CompactField label={t("settingsPanels.audio.format")}><Select size="small" className={fieldClass} value={config.audioFormat || "mp3"} options={audioFormatOptions} onChange={(audioFormat) => onChange({ audioFormat })} /></CompactField>
  <CompactField label={t("settingsPanels.audio.speed")}><InputNumber size="small" className={fieldClass} min={0.25} max={4} step={0.05} value={Number(config.audioSpeed) || 1} onChange={(value) => onChange({ audioSpeed: String(value || 1) })} /></CompactField>
- <CompactField className="col-span-3" label={t("settingsPanels.audio.instructions")}><Input size="small" value={config.audioInstructions || ""} placeholder={t("settingsPanels.audio.instructionsPlaceholder")} onChange={(event) => onChange({ audioInstructions: event.target.value })} /></CompactField>
+ <CompactField className="flex-[2]" label={t("settingsPanels.audio.instructions")}><Input size="small" value={config.audioInstructions || ""} placeholder={t("settingsPanels.audio.instructionsPlaceholder")} onChange={(event) => onChange({ audioInstructions: event.target.value })} /></CompactField>
  </div>;
- return <div className="grid grid-cols-2 gap-2">
- <CompactField label={t("settingsPanels.text.reasoning")}><Select size="small" className={fieldClass} value={config.reasoningEffort || "auto"} options={["auto", "low", "medium", "high", "xhigh"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(reasoningEffort) => onChange({ reasoningEffort })} /></CompactField>
- <CompactField label={t("settingsPanels.image.count")}><InputNumber size="small" className={fieldClass} min={1} max={15} value={settings.textCount || 1} onChange={(value) => onChange({ textCount: Number(value) || 1 })} /></CompactField>
+ return <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-2">
+ <CompactField label={t("settingsPanels.text.reasoning")}><Segmented size="small" block className="canvas-config-mode canvas-reasoning-mode" value={config.reasoningEffort || "auto"} options={["auto", "low", "medium", "high", "xhigh"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(reasoningEffort) => onChange({ reasoningEffort: String(reasoningEffort) })} aria-label={t("settingsPanels.text.reasoning")} /></CompactField>
+ <CompactField label={t("settingsPanels.text.count")}><InputNumber size="small" className={fieldClass} min={1} max={15} value={settings.textCount || 1} onChange={(value) => onChange({ textCount: Number(value) || 1 })} /></CompactField>
  </div>;
 }
 
 function CompactField({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
- return <label className={`min-w-0 ${className}`}><span className="mb-1 block truncate text-[10px] opacity-55">{label}</span>{children}</label>;
+ return <label className={`min-w-0 ${className || "flex-1"}`}><span className="mb-1 block truncate whitespace-nowrap text-[10px] leading-4 opacity-60" title={label}>{label}</span>{children}</label>;
 }
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasGenerationMode): AiConfig {
@@ -213,16 +243,16 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
  quality: settings.quality || globalConfig.quality || defaultConfig.quality,
  size: settings.size || globalConfig.size || defaultConfig.size,
  background: settings.background ?? globalConfig.background ?? defaultConfig.background,
- videoSeconds: settings.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds,
+ videoSeconds: adaptVideoSecondsToModel(settings.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds, resolveModelForCapability(globalConfig, settings.model, mode)),
  vquality: settings.vquality || globalConfig.vquality || defaultConfig.vquality,
  videoGenerateAudio: settings.generateAudio || globalConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio,
- videoWatermark: settings.watermark || globalConfig.videoWatermark || defaultConfig.videoWatermark,
+ videoWatermark: "false",
  videoMode: settings.videoMode || globalConfig.videoMode || defaultConfig.videoMode,
  audioVoice: settings.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
  audioFormat: settings.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
  audioSpeed: settings.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,
  audioInstructions: settings.audioInstructions || globalConfig.audioInstructions || defaultConfig.audioInstructions,
- count: String(settings.count || (mode === "image" ? globalConfig.canvasImageCount || globalConfig.count : globalConfig.count) || defaultConfig.count),
+ count: String(mode === "image" ? getCanvasImageGenerationCount(settings.count || globalConfig.canvasImageCount || globalConfig.count) : settings.count || globalConfig.count || defaultConfig.count),
  };
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button, Input, Modal, Slider, Tooltip } from "antd";
 import { Brush, Eraser, ImagePlus, Redo2, RotateCcw, Undo2, WandSparkles, ZoomIn, ZoomOut } from "lucide-react";
@@ -6,11 +6,14 @@ import { useTranslation } from "react-i18next";
 
 import { readImageMeta } from "@/lib/image-utils";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
+import { ModelPicker } from "@/components/model-picker";
+import { resolveModelForCapability, selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 
 export type CanvasImageMaskEditPayload = {
  prompt: string;
  maskDataUrl: string;
  generate: boolean;
+ model: string;
 };
 
 type DrawMode = "paint" | "erase";
@@ -21,8 +24,16 @@ type BrushPreview = { x: number; y: number; size: number; adjusting: boolean };
 const defaultBrushSize = 100;
 const maskOverlayColor = "#2563eb";
 const maskOverlayAlpha = 0.4;
+const lastMaskModelKey = "infinite-canvas:last-mask-edit-model";
 
-export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void }) {
+function preferredMaskModel(config: AiConfig) {
+ const fallback = resolveModelForCapability(config, config.imageModel, "image");
+ if (typeof window === "undefined") return fallback;
+ const stored = window.localStorage.getItem(lastMaskModelKey);
+ return stored && selectableModelsByCapability(config, "image").includes(stored) ? stored : fallback;
+}
+
+export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +44,8 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
  const redoRef = useRef<MaskStroke[]>([]);
  const [image, setImage] = useState<{ width: number; height: number } | null>(null);
  const [prompt, setPrompt] = useState("");
+ const defaultModel = useMemo(() => preferredMaskModel(config), [config]);
+ const [model, setModel] = useState(defaultModel);
  const [brushSize, setBrushSize] = useState(defaultBrushSize);
  const [mode, setMode] = useState<DrawMode>("paint");
  const [error, setError] = useState("");
@@ -44,6 +57,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
  useEffect(() => {
  if (!open) return;
  setPrompt("");
+ setModel(defaultModel);
  setBrushSize(defaultBrushSize);
  setMode("paint");
  setError("");
@@ -55,7 +69,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
  brushAdjustRef.current = null;
  drawingRef.current = { active: false, stroke: null };
  void readImageMeta(dataUrl).then(setImage);
- }, [dataUrl, open]);
+ }, [dataUrl, defaultModel, open]);
 
  useEffect(() => {
  clearCanvas(maskCanvasRef.current);
@@ -210,7 +224,8 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
  if (!nextPrompt) return setError(t("canvas.editors.maskPromptRequired"));
  if (!canvas || !element) return;
  if (!canvasHasPaint(canvas)) return setError(t("canvas.editors.maskRequired"));
- onConfirm({ prompt: nextPrompt, maskDataUrl: buildMaskOverlay(element, canvas), generate });
+ window.localStorage.setItem(lastMaskModelKey, model);
+ onConfirm({ prompt: nextPrompt, maskDataUrl: buildMaskOverlay(element, canvas), generate, model });
  };
 
  return (
@@ -304,6 +319,22 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
  <span className="font-semibold">{brushSize}px</span>
  </div>
  <Slider min={8} max={160} step={2} value={brushSize} onChange={setBrushSize} />
+ </div>
+
+ <div className="space-y-2">
+ <div className="text-sm font-medium opacity-75">{t("canvas.editors.maskModel")}</div>
+ <ModelPicker
+ config={config}
+ value={model}
+ capability="image"
+ fullWidth
+ className="h-9 w-full rounded-lg bg-transparent"
+ onChange={(value) => {
+ setModel(value);
+ window.localStorage.setItem(lastMaskModelKey, value);
+ }}
+ onMissingConfig={onMissingConfig}
+ />
  </div>
 
  <div className="space-y-2">

@@ -139,7 +139,7 @@ export function getConnectionTargetAnchor(node: CanvasNodeData, current: Connect
     };
 }
 
-export type CanvasConnectionError = "sameNode" | "resourceToResource" | "operationToOperation" | "unsupportedInput" | "wrongOutput" | "occupiedInput" | "duplicate" | "cycle" | "groupTarget";
+export type CanvasConnectionError = "sameNode" | "resourceToResource" | "operationToOperation" | "unsupportedInput" | "wrongOutput" | "occupiedInput" | "emptyResource" | "outputLimit" | "duplicate" | "cycle" | "groupTarget";
 
 export type CanvasConnectionValidation =
     | { connection: Omit<CanvasConnection, "id">; error?: never }
@@ -169,6 +169,16 @@ function acceptsConfigInput(mode: CanvasGenerationMode, node: CanvasNodeData) {
 
 function configOutputType(mode: CanvasGenerationMode) {
     return mode === "text" ? CanvasNodeType.Text : mode === "video" ? CanvasNodeType.Video : mode === "audio" ? CanvasNodeType.Audio : CanvasNodeType.Image;
+}
+
+function isEmptyUploadResource(node: CanvasNodeData) {
+    return [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio].includes(node.type as CanvasNodeType) && !node.metadata?.content;
+}
+
+function configOutputLimit(node: CanvasNodeData) {
+    if (configMode(node) !== "image") return 1;
+    const count = node.metadata?.generationSettings?.image?.count ?? node.metadata?.count ?? 1;
+    return Math.max(1, Math.min(15, Math.floor(Math.abs(Number(count)) || 1)));
 }
 
 function operationOutputType(node: CanvasNodeData) {
@@ -208,9 +218,11 @@ export function validateConnection(firstNodeId: string, secondNodeId: string, no
     if (fromResource && toResource) return { error: "resourceToResource" };
     if (from.type === CanvasNodeType.Group && !toConfig) return { error: "unsupportedInput" };
     if (fromOperation && toOperation) return { error: "operationToOperation" };
+    if (toConfig && isEmptyUploadResource(from)) return { error: "emptyResource" };
     if (toConfig && from.type !== CanvasNodeType.Group && !acceptsConfigInput(configMode(to), from)) return { error: "unsupportedInput" };
     if (to.type === CanvasNodeType.Operation && from.type !== (to.metadata?.operationKind === "frame" ? CanvasNodeType.Video : CanvasNodeType.Image)) return { error: "unsupportedInput" };
     if (fromOperation && toResource && operationOutputType(from) !== resourceType(to)) return { error: "wrongOutput" };
+    if (fromConfig && toResource && connections.filter((connection) => connection.valid !== false && connection.fromNodeId === from.id).length >= configOutputLimit(from)) return { error: "outputLimit" };
     if (to.type === CanvasNodeType.Operation) {
         const inputLimit = to.metadata?.operationKind === "mask" ? 2 : 1;
         if (connections.filter((connection) => connection.valid !== false && connection.toNodeId === to.id).length >= inputLimit) return { error: "occupiedInput" };

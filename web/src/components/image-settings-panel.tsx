@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaRatioOptions, mediaScaleOptions, readMediaDimensions } from "@/lib/media-size";
-import type { AiConfig } from "@/stores/use-config-store";
+import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaRatioOptions, mediaRatioOptionsForModel, mediaScaleOptions, readMediaDimensions } from "@/lib/media-size";
+import { resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
 
 const qualityOptions = [
  { value: "auto", labelKey: "auto" },
@@ -38,6 +38,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
  const transparentBackground = config.background === "transparent";
  const selectedScale = inferMediaScale(activeSize);
  const selectedRatio = inferMediaRatio(activeSize);
+ const ratioOptions = mediaRatioOptionsForModel(config.model || config.imageModel, resolveModelChannel(config, config.model || config.imageModel).apiFormat);
  const dimensions = readMediaDimensions(activeSize, selectedScale, selectedRatio);
  const applySize = (scale: string, ratio: string) => onConfigChange("size", computeMediaSize(scale, ratio));
  const selectScale = (scale: string) => applySize(scale, selectedRatio === "auto" ? "1:1" : selectedRatio);
@@ -102,7 +103,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
  <div className="space-y-2.5">
  <SettingTitle color={theme.node.muted}>{t("settingsPanels.image.aspectRatio")}</SettingTitle>
  <div className="grid grid-cols-4 gap-2.5">
- {mediaRatioOptions.map((item) => (
+ {ratioOptions.map((item) => (
  <button
  key={item.value}
  type="button"

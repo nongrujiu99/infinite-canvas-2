@@ -62,7 +62,7 @@ export function buildCanvasFeaturePreviewProject(title = "画布全功能预览"
             bytes: previewSvg.length,
             mimeType: "image/svg+xml",
         }),
-        node(configId, CanvasNodeType.Config, "③ 生成配置", 925, 125, 460, 540, {
+        node(configId, CanvasNodeType.Config, "③ 生成配置", 925, 125, 620, 560, {
             groupId,
             status: "idle",
             generationMode: "image",

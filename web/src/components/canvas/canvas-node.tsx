@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Copy, Download, Group, Image as ImageIcon, Music2, Plus, Puzzle, RefreshCw, Star, Trash2, Video } from "lucide-react";
+import { ChevronRight, Copy, Download, Group, Image as ImageIcon, Music2, Plus, Puzzle, RefreshCw, Sparkles, Star, Trash2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
@@ -26,6 +26,7 @@ type CanvasNodeProps = {
  isRelated: boolean;
  isFocusRelated: boolean;
  isConnectionTarget: boolean;
+ isGenerationTarget?: boolean;
  referenceSelectionState?: "target" | "disabled" | "available";
  showPanel: boolean;
  mentionReferences?: CanvasResourceReference[];
@@ -85,6 +86,7 @@ type NodeContentRendererProps = {
  onViewBatchImage?: (imageId: string) => void;
  onUpload?: () => void;
  groupChildCount: number;
+ isGenerationTarget: boolean;
 };
 
 export const CanvasNode = React.memo(function CanvasNode({
@@ -94,6 +96,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  isRelated,
  isFocusRelated,
  isConnectionTarget,
+ isGenerationTarget = false,
  referenceSelectionState,
  showPanel,
  mentionReferences = [],
@@ -230,7 +233,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 
  const dx = (event.clientX - resizeRef.current.startX) / scale;
  const dy = (event.clientY - resizeRef.current.startY) / scale;
- const minWidth = data.type === CanvasNodeType.Config ? 440 : 220;
+ const minWidth = data.type === CanvasNodeType.Config ? 600 : 220;
  const minHeight = data.type === CanvasNodeType.Config ? 500 : 160;
  const startRight = resizeRef.current.startLeft + resizeRef.current.startWidth;
  const startBottom = resizeRef.current.startTop + resizeRef.current.startHeight;
@@ -444,6 +447,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  onViewBatchImage={(imageId) => onViewImage?.(data, imageId)}
  onUpload={() => onUpload?.(data)}
  groupChildCount={groupChildCount}
+ isGenerationTarget={isGenerationTarget}
  />
  </div>
 
@@ -725,45 +729,37 @@ function ImageNodeContent(props: NodeContentRendererProps) {
  );
 }
 
-function EmptyImageContent({ theme, onUpload }: NodeContentRendererProps) {
+function EmptyImageContent({ theme, onUpload, isGenerationTarget }: NodeContentRendererProps) {
  const { t } = useTranslation();
  return (
- <button type="button" className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }} onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
- <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ borderColor: theme.node.stroke }}>
- <Plus className="size-6 opacity-55" />
+ <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
+ {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyImage")} borderColor={theme.node.stroke} onUpload={onUpload} />}
+ <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyImage")}</span>
  </div>
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t("canvas.node.emptyImage")}</span>
- </button>
  );
 }
 
-function VideoNodeContent({ node, theme, onUpload, onRetry }: NodeContentRendererProps) {
+function VideoNodeContent({ node, theme, onUpload, onRetry, isGenerationTarget }: NodeContentRendererProps) {
  const { t } = useTranslation();
  if (!node.metadata?.content)
  return (
- <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
- <button type="button" className="flex flex-col items-center gap-3" onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
- <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ borderColor: theme.node.stroke }}>
- <Plus className="size-6 opacity-55" />
- </div>
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t("canvas.node.emptyVideo")}</span>
- </button>
- {node.metadata?.videoTaskId ? <button type="button" className="rounded-lg px-2 py-1 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" onMouseDown={(event) => event.stopPropagation()} onClick={() => onRetry?.(node)}>{t("canvas.nodeToolbar.queryVideoTask")}</button> : null}
+ <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
+ {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyVideo")} borderColor={theme.node.stroke} onUpload={onUpload} />}
+ <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyVideo")}</span>
+ {node.metadata?.videoTaskId ? <button type="button" className="pointer-events-auto rounded-lg px-2 py-1 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" onMouseDown={(event) => event.stopPropagation()} onClick={() => onRetry?.(node)}>{t("canvas.nodeToolbar.queryVideoTask")}</button> : null}
  </div>
  );
  return <video src={node.metadata.content} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-video={node.id} data-canvas-no-zoom />;
 }
 
-function AudioNodeContent({ node, theme, onUpload }: NodeContentRendererProps) {
+function AudioNodeContent({ node, theme, onUpload, isGenerationTarget }: NodeContentRendererProps) {
  const { t } = useTranslation();
  if (!node.metadata?.content)
  return (
- <button type="button" className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }} onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
- <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ borderColor: theme.node.stroke }}>
- <Plus className="size-6 opacity-55" />
+ <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
+ {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyAudio")} borderColor={theme.node.stroke} onUpload={onUpload} />}
+ <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyAudio")}</span>
  </div>
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t("canvas.node.emptyAudio")}</span>
- </button>
  );
  return (
  <div className="flex h-full w-full flex-col justify-center gap-3 px-4" style={{ background: theme.node.fill, color: theme.node.text }}>
@@ -774,6 +770,18 @@ function AudioNodeContent({ node, theme, onUpload }: NodeContentRendererProps) {
  <audio src={node.metadata.content} controls className="w-full" data-canvas-no-zoom />
  </div>
  );
+}
+
+function UploadButton({ label, borderColor, onUpload }: { label: string; borderColor: string; onUpload?: () => void }) {
+ return (
+ <button type="button" className="pointer-events-auto flex size-14 items-center justify-center rounded-2xl border transition hover:scale-105" style={{ borderColor }} aria-label={label} onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
+ <Plus className="size-6 opacity-55" />
+ </button>
+ );
+}
+
+function GenerationWaitingIcon({ borderColor }: { borderColor: string }) {
+ return <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ borderColor }}><Sparkles className="size-5 opacity-45" /></div>;
 }
 
 function ImageContent({
@@ -842,12 +850,6 @@ function ImageContent({
  )}
  </div>
  {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
- {primaryImage?.content ? (
- <button type="button" className="pointer-events-none absolute left-2.5 top-2.5 z-30 flex h-8 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium opacity-0 shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02] group-hover/node:pointer-events-auto group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownloadBatchImage?.(primaryImage.id))}>
- <Download className="size-3" />
- {t("common.download")}
- </button>
- ) : null}
  {isBatchRoot ? (
  <button
  type="button"

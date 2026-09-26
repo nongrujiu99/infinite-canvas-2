@@ -107,7 +107,7 @@ export function InfiniteCanvas({ containerRef, viewport, tool, backgroundMode = 
 
  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
  const target = event.target instanceof Element ? event.target : null;
- if (target?.closest("[data-canvas-no-zoom]")) return;
+ if (target?.closest("[data-canvas-no-zoom],.ant-select-dropdown,.ant-dropdown,.ant-popover,.ant-picker-dropdown,.ant-modal")) return;
  if (target?.closest("[data-connection-create-menu]")) return;
  const isBackgroundClick = !target?.closest("[data-node-id],[data-connection-id]");
  const temporaryTool = event.ctrlKey || isSpacePressed;

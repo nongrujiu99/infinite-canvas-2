@@ -9,14 +9,18 @@ export function ConnectionPath({
  from,
  to,
  active,
+ flowing = false,
  onSelect,
+ onDoubleClick,
  onContextMenu,
 }: {
  connection: CanvasConnection;
  from: CanvasNodeData;
  to: CanvasNodeData;
  active: boolean;
+ flowing?: boolean;
  onSelect: () => void;
+ onDoubleClick?: () => void;
  onContextMenu?: (event: ReactMouseEvent<SVGPathElement>) => void;
 }) {
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -41,6 +45,11 @@ export function ConnectionPath({
  event.stopPropagation();
  onSelect();
  }}
+ onDoubleClick={(event) => {
+ event.preventDefault();
+ event.stopPropagation();
+ onDoubleClick?.();
+ }}
  onContextMenu={(event) => {
  event.preventDefault();
  event.stopPropagation();
@@ -56,6 +65,17 @@ export function ConnectionPath({
  strokeDasharray={invalid ? "7,6" : undefined}
  style={{ filter: active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
  />
+ {flowing ? (
+ <path
+ className="canvas-connection-flow"
+ d={pathD}
+ stroke={theme.node.activeStroke}
+ strokeWidth="3"
+ strokeLinecap="round"
+ fill="none"
+ style={{ filter: `drop-shadow(0 0 5px ${theme.node.activeStroke}88)`, pointerEvents: "none" }}
+ />
+ ) : null}
  </g>
  );
 }

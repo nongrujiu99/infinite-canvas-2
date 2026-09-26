@@ -92,6 +92,10 @@ export function getGenerationCount(count: string) {
     return Math.max(1, Math.min(15, Math.floor(Math.abs(Number(count)) || 1)));
 }
 
+export function getCanvasImageGenerationCount(count: string | number | undefined) {
+    return Math.max(1, Math.min(4, Math.floor(Math.abs(Number(count)) || 1)));
+}
+
 export function getInputSummary(inputs: NodeGenerationInput[]) {
     const resources = [...new Map(inputs.flatMap((input) => (input.type === "group" ? input.children : [input])).map((input) => [input.nodeId, input])).values()];
     return {
@@ -114,13 +118,13 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         videoSeconds: settings.seconds || config.videoSeconds || defaultConfig.videoSeconds,
         vquality: settings.vquality || config.vquality || defaultConfig.vquality,
         videoGenerateAudio: settings.generateAudio || config.videoGenerateAudio || defaultConfig.videoGenerateAudio,
-        videoWatermark: settings.watermark || config.videoWatermark || defaultConfig.videoWatermark,
+        videoWatermark: mode === "video" ? "false" : settings.watermark || config.videoWatermark || defaultConfig.videoWatermark,
         videoMode: settings.videoMode || config.videoMode || defaultConfig.videoMode,
         audioVoice: settings.audioVoice || config.audioVoice || defaultConfig.audioVoice,
         audioFormat: settings.audioFormat || config.audioFormat || defaultConfig.audioFormat,
         audioSpeed: settings.audioSpeed || config.audioSpeed || defaultConfig.audioSpeed,
         audioInstructions: settings.audioInstructions || config.audioInstructions || defaultConfig.audioInstructions,
-        count: String(settings.count || (mode === "image" ? config.canvasImageCount || config.count : config.count) || defaultConfig.count),
+        count: String(mode === "image" ? getCanvasImageGenerationCount(settings.count || config.canvasImageCount || config.count) : settings.count || config.count || defaultConfig.count),
     };
 }
 

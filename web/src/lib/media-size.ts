@@ -12,6 +12,29 @@ export const mediaRatioOptions = [
     { value: "auto", width: 0, height: 0 },
 ] as const;
 
+const geminiCompatibleRatioValues = new Set(["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "auto"]);
+
+export function usesAspectRatioImageParams(model: string, apiFormat: "openai" | "gemini") {
+    const name = model.split("::").pop()?.toLowerCase() || "";
+    return apiFormat === "gemini" || name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
+}
+
+export function mediaRatioOptionsForModel(model: string, apiFormat: "openai" | "gemini") {
+    return usesAspectRatioImageParams(model, apiFormat) ? mediaRatioOptions.filter((item) => geminiCompatibleRatioValues.has(item.value)) : mediaRatioOptions;
+}
+
+export function adaptMediaSizeToModel(size: string, model: string, apiFormat: "openai" | "gemini") {
+    const options = mediaRatioOptionsForModel(model, apiFormat);
+    const ratio = inferMediaRatio(size || "auto");
+    if (options.some((item) => item.value === ratio)) return size;
+    const current = parseAspectRatio(ratio);
+    if (!current) return "auto";
+    const closest = options
+        .filter((item) => item.value !== "auto")
+        .reduce((best, item) => Math.abs(item.width / item.height - current.width / current.height) < Math.abs(best.width / best.height - current.width / current.height) ? item : best);
+    return computeMediaSize(inferMediaScale(size), closest.value);
+}
+
 export const imageSizePresets: Record<string, Record<string, string>> = {
     "1k": { "1:1": "1024x1024", "2:3": "1024x1536", "3:2": "1536x1024", "4:3": "1024x768", "3:4": "768x1024", "16:9": "1536x864", "9:16": "864x1536", "21:9": "2016x864", "9:21": "864x2016" },
     "2k": { "1:1": "2048x2048", "2:3": "1360x2048", "3:2": "2048x1360", "4:3": "2048x1536", "3:4": "1536x2048", "16:9": "2048x1152", "9:16": "1152x2048", "21:9": "2688x1152", "9:21": "1152x2688" },
@@ -45,6 +68,27 @@ export const videoRatioOptions = [
 
 export const VIDEO_SECONDS_MIN = 4;
 export const VIDEO_SECONDS_MAX = 30;
+
+export type VideoSecondsSpec = { min: number; max: number; step: number | null; values?: number[] };
+
+export function videoSecondsSpecForModel(model: string): VideoSecondsSpec {
+    const name = model.split("::").pop()?.toLowerCase() || "";
+    if (name.includes("sora-2")) return { min: 4, max: 12, step: null, values: [4, 8, 12] };
+    if (name.includes("veo-2")) return { min: 5, max: 8, step: 1 };
+    if (name.includes("veo")) return { min: 4, max: 8, step: null, values: [4, 6, 8] };
+    if (name.includes("grok-imagine-video")) return { min: 1, max: 15, step: 1 };
+    if (name.includes("seedance-2-5") || name.includes("seedance-2.5")) return { min: 4, max: 30, step: 1 };
+    if (name.includes("seedance-2")) return { min: 4, max: 15, step: 1 };
+    if (name.includes("seedance-1")) return { min: 2, max: 12, step: 1 };
+    return { min: VIDEO_SECONDS_MIN, max: VIDEO_SECONDS_MAX, step: 1 };
+}
+
+export function adaptVideoSecondsToModel(value: string, model: string) {
+    const spec = videoSecondsSpecForModel(model);
+    const seconds = Math.max(spec.min, Math.min(spec.max, Math.floor(Number(value) || 6)));
+    if (!spec.values?.length) return String(seconds);
+    return String(spec.values.reduce((closest, option) => Math.abs(option - seconds) < Math.abs(closest - seconds) ? option : closest));
+}
 
 export function normalizeMediaScale(value: string | undefined) {
     const scale = String(value || "").trim().toLowerCase();

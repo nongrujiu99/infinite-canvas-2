@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { Button, Image } from "antd";
-import { FileText, Group, Image as ImageIcon, Music2, Video, X } from "lucide-react";
+import { FileText, Group, Image as ImageIcon, Maximize2, Music2, Video, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
@@ -24,6 +24,8 @@ type CanvasConfigComposerProps = {
  onStartReferenceSelection?: (nodeId: string) => void;
  onReorderReferences?: (nodeIds: string[]) => void;
  invalidSourceIds?: string[];
+ expanded?: boolean;
+ onExpand?: () => void;
 };
 
 type Token =
@@ -36,7 +38,7 @@ type MentionState = {
 
 export const CONFIG_REFERENCE_PATTERN = /@\[node:([^\]]+)\]/g;
 
-export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNodes = [], onChange, onClose, embedded = false, onDisconnectReference, onStartReferenceSelection, onReorderReferences, invalidSourceIds = [] }: CanvasConfigComposerProps) {
+export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNodes = [], onChange, onClose, embedded = false, onDisconnectReference, onStartReferenceSelection, onReorderReferences, invalidSourceIds = [], expanded = false, onExpand }: CanvasConfigComposerProps) {
  const { t } = useTranslation();
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const editorRef = useRef<HTMLDivElement>(null);
@@ -120,29 +122,32 @@ export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNo
  return (
  <div
  data-canvas-no-zoom
- className={embedded ? "rounded-xl border px-2 py-1.5" : "rounded-2xl border p-3 shadow-2xl backdrop-blur"}
+ className={expanded ? "flex h-[58dvh] min-h-[420px] flex-col rounded-xl border p-3" : embedded ? "flex h-full min-h-0 flex-col rounded-xl border px-2 py-1.5" : "rounded-2xl border p-3 shadow-2xl backdrop-blur"}
  style={{ background: embedded ? theme.node.fill : theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
  onMouseDown={stopCanvasInteraction}
  onPointerDown={stopCanvasInteraction}
  onWheel={(event) => event.stopPropagation()}
  >
- {!embedded ? <div className="mb-2 flex items-center justify-between gap-2">
+ {!embedded && !expanded ? <div className="mb-2 flex items-center justify-between gap-2">
  <div className="flex min-w-0 items-baseline gap-2">
  <div className="shrink-0 text-xs font-semibold">{t("canvas.composer.title")}</div>
  <div className="truncate text-[11px] opacity-55">{t("canvas.composer.description")}</div>
  </div>
  <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<X className="size-3.5" />} onClick={onClose} />
  </div>
- : <div className="mb-1 text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.composer.title")}</div>}
- <CanvasNodeReferenceBar nodeId={nodeId} nodes={nodes} connectedNodes={connectedNodes} compact={embedded} invalidSourceIds={invalidSourceIds} onDisconnect={onDisconnectReference} onStartSelection={onStartReferenceSelection} onReorder={onReorderReferences} />
- <div className="relative rounded-xl">
+ : <div className="mb-1 flex h-7 shrink-0 items-center justify-between gap-2">
+ <span className="text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.composer.title")}</span>
+ {onExpand ? <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !rounded-lg !p-0 opacity-60 hover:opacity-100" icon={<Maximize2 className="size-3.5" />} onClick={onExpand} aria-label={t("canvas.promptPanel.expandEditor")} title={t("canvas.promptPanel.expandEditor")} /> : null}
+ </div>}
+ <div className="shrink-0"><CanvasNodeReferenceBar nodeId={nodeId} nodes={nodes} connectedNodes={connectedNodes} compact={embedded && !expanded} invalidSourceIds={invalidSourceIds} onDisconnect={onDisconnectReference} onStartSelection={onStartReferenceSelection} onReorder={onReorderReferences} /></div>
+ <div className={`relative rounded-xl ${embedded || expanded ? "min-h-0 flex-1" : ""}`} onDoubleClick={(event) => { event.stopPropagation(); editorRef.current?.focus(); }}>
  {!value.trim() ? <div className={embedded ? "pointer-events-none absolute left-1 top-1 text-xs leading-5" : "pointer-events-none absolute left-3 top-2 text-sm leading-7"} style={{ color: theme.node.placeholder }}>{t("canvas.composer.placeholder")}</div> : null}
  <div
  ref={editorRef}
  contentEditable
  suppressContentEditableWarning
- className={embedded ? "thin-scrollbar min-h-16 max-h-24 w-full overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-1 py-1 text-xs leading-5 outline-none" : "thin-scrollbar min-h-28 max-h-72 w-full overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-3 py-2 text-sm leading-7 outline-none"}
- style={{ color: theme.node.text }}
+ className={expanded ? "thin-scrollbar h-full min-h-80 w-full overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border px-3 py-2 text-sm leading-6 outline-none" : embedded ? "thin-scrollbar h-full min-h-20 w-full overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-1 py-1 text-xs leading-5 outline-none" : "thin-scrollbar min-h-28 max-h-72 w-full overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-3 py-2 text-sm leading-7 outline-none"}
+ style={{ color: theme.node.text, borderColor: expanded ? theme.toolbar.border : undefined }}
  onInput={() => {
  if (!composingRef.current) syncFromEditor();
  }}

@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
-import { imageSizePresets, inferMediaScale } from "@/lib/media-size";
+import { adaptMediaSizeToModel, imageSizePresets, inferMediaRatio, inferMediaScale, usesAspectRatioImageParams } from "@/lib/media-size";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -203,6 +203,20 @@ function resolveRequestSize(quality: string | undefined, size: string) {
     throw new Error(apiText("invalidImageSizeFormat"));
 }
 
+function resolveOpenAiImageSizeParams(config: AiConfig, requestSize: string | undefined) {
+    if (!usesAspectRatioImageParams(config.model, config.apiFormat)) return requestSize ? { size: requestSize } : {};
+    const adaptedSize = adaptMediaSizeToModel(config.size, config.model, config.apiFormat);
+    const aspectRatio = inferMediaRatio(adaptedSize);
+    const scale = inferMediaScale(adaptedSize);
+    const imageSize = supportsGeminiImageSize(config.model)
+        ? scale === "auto" ? GEMINI_IMAGE_SIZE_BY_QUALITY[normalizeQuality(config.quality) || ""] : scale.toUpperCase()
+        : undefined;
+    return {
+        ...(aspectRatio !== "auto" ? { aspect_ratio: aspectRatio } : {}),
+        ...(imageSize ? { image_size: imageSize } : {}),
+    };
+}
+
 function resolveGeminiImageConfig(config: AiConfig) {
     const value = config.size.trim();
     const dimensions = parseImageDimensions(value);
@@ -239,7 +253,7 @@ function resolveGeminiImageSize(quality: string, dimensions: { width: number; he
 
 function supportsGeminiImageSize(model: string) {
     const value = model.toLowerCase();
-    return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro");
+    return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro") || value.includes("nano-banana-2") || value.includes("nano-banana-pro");
 }
 
 function resolveImageSource(item: Record<string, unknown>) {
@@ -755,6 +769,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
+    const sizeParams = resolveOpenAiImageSizeParams(requestConfig, requestSize);
     const background = normalizeBackground(config.background);
     try {
         const response = await axios.post<ImageApiResponse>(
@@ -764,7 +779,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 prompt: withSystemPrompt(requestConfig, prompt),
                 n,
                 ...(quality ? { quality } : {}),
-                ...(requestSize ? { size: requestSize } : {}),
+                ...sizeParams,
                 ...(background ? { background } : {}),
                 // gpt-image models reject response_format; they always return b64.
                 ...(/gpt-image/.test(requestConfig.model) ? {} : { response_format: "b64_json" }),
@@ -818,6 +833,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
+    const sizeParams = resolveOpenAiImageSizeParams(requestConfig, requestSize);
     const background = normalizeBackground(config.background);
     const formData = new FormData();
     formData.set("model", requestConfig.model);
@@ -831,9 +847,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (quality) {
         formData.set("quality", quality);
     }
-    if (requestSize) {
-        formData.set("size", requestSize);
-    }
+    Object.entries(sizeParams).forEach(([key, value]) => formData.set(key, value));
     if (background) {
         formData.set("background", background);
     }

@@ -327,6 +327,98 @@
         line-height: 1 !important;
     }
 
+    .canvas-generation-settings .ant-select,
+    .canvas-generation-settings .ant-select .ant-select-selector,
+    .canvas-generation-settings .ant-input,
+    .canvas-generation-settings .ant-input-number {
+        --ant-select-background-color: var(--secondary);
+        --ant-select-border-color: var(--input);
+        border-color: var(--input) !important;
+        background: var(--secondary) !important;
+        box-shadow: none !important;
+        color: var(--foreground) !important;
+    }
+
+    .canvas-generation-settings .ant-select .ant-select-selection-item,
+    .canvas-generation-settings .ant-select .ant-select-selection-placeholder,
+    .canvas-generation-settings .ant-input,
+    .canvas-generation-settings .ant-input-number-input {
+        color: var(--foreground) !important;
+    }
+
+    .canvas-generation-settings .ant-select:hover,
+    .canvas-generation-settings .ant-select:hover .ant-select-selector,
+    .canvas-generation-settings .ant-input:hover,
+    .canvas-generation-settings .ant-input-number:hover {
+        --ant-select-border-color: color-mix(in srgb, var(--primary) 55%, var(--input));
+        border-color: color-mix(in srgb, var(--primary) 55%, var(--input)) !important;
+    }
+
+    .canvas-generation-settings .ant-select.ant-select-focused,
+    .canvas-generation-settings .ant-input:focus,
+    .canvas-generation-settings .ant-input-number-focused {
+        --ant-select-background-color: var(--secondary);
+        --ant-select-border-color: var(--primary);
+        border-color: var(--primary) !important;
+        background: var(--secondary) !important;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent) !important;
+    }
+
+    .canvas-parameter-value {
+        display: flex;
+        height: 24px;
+        min-width: 0;
+        align-items: center;
+        overflow: hidden;
+        border: 1px solid var(--input);
+        border-radius: 8px;
+        background: var(--secondary);
+        padding-inline: 8px;
+        color: var(--foreground);
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .canvas-parameter-trigger {
+        display: flex;
+        height: 24px;
+        width: 100%;
+        min-width: 0;
+        cursor: pointer;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        overflow: hidden;
+        border: 1px solid var(--input);
+        border-radius: 8px;
+        background: var(--secondary);
+        padding-inline: 8px;
+        color: var(--foreground);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .canvas-parameter-trigger:hover {
+        border-color: color-mix(in srgb, var(--primary) 55%, var(--input));
+    }
+
+    .canvas-parameter-trigger:focus-visible {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+        outline: none;
+    }
+
+    .canvas-seconds-popover .ant-popover-inner {
+        border: 1px solid var(--border);
+        background: var(--popover);
+        color: var(--popover-foreground);
+    }
+
     .canvas-composer-icon.ant-btn {
         flex: 0 0 32px;
         width: 32px;
@@ -385,14 +477,22 @@
     }
 
     .canvas-config-mode .ant-segmented-item-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
         min-height: 38px;
         padding-inline: 10px;
-        line-height: 38px;
+        line-height: 1 !important;
     }
 
     .canvas-config-mode .ant-segmented-item-label > span {
+        display: flex;
+        align-items: center;
         justify-content: center;
+        height: 100%;
         width: 100%;
+        line-height: 1;
     }
 
     .canvas-config-mode .ant-segmented-item:hover:not(.ant-segmented-item-selected) {
@@ -414,9 +514,32 @@
     }
 
     .canvas-config-mode .ant-segmented-item svg {
+        display: block;
+        flex: none;
         width: 17px;
         height: 17px;
         stroke-width: 1.9;
+    }
+
+    .canvas-config-mode.canvas-reasoning-mode.ant-segmented {
+        padding: 2px !important;
+        border-radius: 8px !important;
+    }
+
+    .canvas-config-mode.canvas-reasoning-mode .ant-segmented-group {
+        gap: 2px;
+    }
+
+    .canvas-config-mode.canvas-reasoning-mode .ant-segmented-item {
+        min-height: 22px;
+        border-radius: 6px !important;
+        font-size: 11px;
+    }
+
+    .canvas-config-mode.canvas-reasoning-mode .ant-segmented-item-label {
+        height: 22px;
+        min-height: 22px;
+        padding-inline: 6px;
     }
 
     @container (min-width: 440px) {
@@ -677,4 +800,23 @@
     padding: 0.5rem 0.8rem;
     border-radius: 0.6rem;
     font-size: 0.75rem;
+}
+
+.canvas-connection-flow {
+    stroke-dasharray: 3 18;
+    animation: canvas-connection-flow 900ms linear infinite;
+}
+
+@keyframes canvas-connection-flow {
+    to {
+        stroke-dashoffset: -21;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .canvas-connection-flow {
+        animation: none;
+        stroke-dasharray: 3 10;
+        opacity: 0.65;
+    }
 }

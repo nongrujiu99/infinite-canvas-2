@@ -95,6 +95,7 @@ export type CanvasNodeMetadata = {
     audioSpeed?: string;
     audioInstructions?: string;
     references?: string[];
+    maskSourceNodeId?: string;
     inputOrder?: string[];
     naturalWidth?: number;
     naturalHeight?: number;
@@ -128,7 +129,7 @@ export type CanvasConnection = {
     fromPortId?: "output";
     toPortId?: "input";
     valid?: boolean;
-    invalidReason?: "sameNode" | "resourceToResource" | "operationToOperation" | "unsupportedInput" | "wrongOutput" | "occupiedInput" | "duplicate" | "cycle" | "groupTarget";
+    invalidReason?: "sameNode" | "resourceToResource" | "operationToOperation" | "unsupportedInput" | "wrongOutput" | "occupiedInput" | "emptyResource" | "outputLimit" | "duplicate" | "cycle" | "groupTarget";
 };
 
 export type CanvasAssistantReference = {

@@ -1,11 +1,11 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Cpu, Search, Star, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { decodeChannelModel, modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerProps = {
  config: AiConfig;
@@ -16,17 +16,20 @@ type ModelPickerProps = {
  fullWidth?: boolean;
  placeholder?: string;
  onMissingConfig?: () => void;
+ contained?: boolean;
 };
 
 const FAVORITES_KEY = "infinite-canvas:model-favorites:v1";
 const RECENTS_KEY = "infinite-canvas:model-recents:v1";
 type RecentModel = { model: string; count: number; lastUsed: number };
+type ModelView = "favorites" | "recent" | "all";
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, contained = false }: ModelPickerProps) {
  const { t } = useTranslation();
  const pickerId = useId();
  const [open, setOpen] = useState(false);
  const [query, setQuery] = useState("");
+ const [view, setView] = useState<ModelView>("all");
  const [favorites, setFavorites] = useState<string[]>(() => readLocalList(FAVORITES_KEY));
  const [recents, setRecents] = useState<RecentModel[]>(() => readRecentModels());
  const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
@@ -35,10 +38,11 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  return normalized ? options.filter((model) => `${model} ${modelOptionLabel(config, model)}`.toLowerCase().includes(normalized)) : options;
  }, [config, options, query]);
  const favoriteOptions = filteredOptions.filter((model) => favorites.includes(model));
- const recentOptions = recents.map((item) => item.model).filter((model) => filteredOptions.includes(model) && !favorites.includes(model));
- const allOptions = filteredOptions.filter((model) => !favorites.includes(model) && !recentOptions.includes(model));
+ const recentOptions = recents.map((item) => item.model).filter((model) => filteredOptions.includes(model));
+ const visibleOptions = view === "favorites" ? favoriteOptions : view === "recent" ? recentOptions : filteredOptions;
  const current = value || "";
  const pickerPlaceholder = placeholder || t("settingsPanels.model.select");
+ const currentMeta = modelOptionMeta(config, current);
 
  useEffect(() => {
  const closeOtherPicker = (event: Event) => {
@@ -77,32 +81,42 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  title={current ? modelOptionLabel(config, current) : pickerPlaceholder}
  >
  <ModelIcon model={current} />
- <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? modelOptionLabel(config, current) : pickerPlaceholder}</span>
+ <span className="canvas-model-picker-text flex min-w-0 flex-1 items-baseline gap-1.5 text-left">
+ <span className="min-w-0 flex-1 truncate font-medium">{current ? currentMeta.name : pickerPlaceholder}</span>
+ {currentMeta.channel ? <span className="max-w-[38%] shrink-0 truncate text-xs text-muted-foreground">· {currentMeta.channel}</span> : null}
+ </span>
  </SelectTrigger>
  <SelectContent
  data-canvas-no-zoom
- className="z-[1200] w-80 max-w-[calc(100vw-24px)] rounded-xl border border-border/70 bg-popover p-1 shadow-xl"
+ className="z-[1200] h-[min(var(--radix-select-content-available-height),24rem)] w-[26rem] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-border/70 bg-popover p-0 shadow-xl"
+ viewportClassName="!h-auto !w-full !min-w-0 min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+ portalled={!contained}
  position="popper"
  align="start"
- side="bottom"
+ side={contained ? "top" : "bottom"}
+ avoidCollisions={!contained}
  sideOffset={6}
  onPointerDown={(event) => event.stopPropagation()}
  onMouseDown={(event) => event.stopPropagation()}
- >
- <div className="sticky top-0 z-10 mb-1 flex items-center gap-2 rounded-lg border bg-popover px-2" onPointerDown={(event) => event.stopPropagation()}>
- <Search className="size-3.5 opacity-55" />
- <input value={query} autoFocus placeholder={t("settingsPanels.model.search")} className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.stopPropagation()} />
- {query ? <button type="button" className="grid size-6 place-items-center opacity-55 hover:opacity-100" onClick={() => setQuery("")}><X className="size-3.5" /></button> : null}
+ header={<div className="m-2 mb-1.5 space-y-1.5" onPointerDown={(event) => event.stopPropagation()}>
+ <div className="flex h-10 items-center gap-2 rounded-xl border bg-transparent px-2.5">
+ <Search className="size-4 text-muted-foreground" />
+ <input value={query} autoFocus placeholder={t("settingsPanels.model.search")} className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.stopPropagation()} />
+ {query ? <button type="button" className="grid size-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground" aria-label={t("settingsPanels.model.clearSearch")} onClick={() => setQuery("")}><X className="size-3.5" /></button> : null}
  </div>
- {filteredOptions.length ? (
- <>
- {favoriteOptions.length ? <ModelSection title={t("settingsPanels.model.favorites")} models={favoriteOptions} config={config} favorites={favorites} onToggleFavorite={(model) => toggleFavorite(model, favorites, setFavorites)} /> : null}
- {recentOptions.length ? <SelectGroup><SelectLabel className="flex items-center justify-between"><span>{t("settingsPanels.model.recent")}</span><button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setRecents([]); localStorage.removeItem(RECENTS_KEY); }}><Trash2 className="size-3" />{t("settingsPanels.model.clearRecent")}</button></SelectLabel>{recentOptions.map((model) => <ModelItem key={`recent:${model}`} config={config} model={model} favorite={favorites.includes(model)} onToggleFavorite={() => toggleFavorite(model, favorites, setFavorites)} onRemoveRecent={() => { const next = recents.filter((item) => item.model !== model); setRecents(next); localStorage.setItem(RECENTS_KEY, JSON.stringify(next)); }} />)}</SelectGroup> : null}
- {allOptions.length ? <ModelSection title={t("settingsPanels.model.allCompatible")} models={allOptions} config={config} favorites={favorites} onToggleFavorite={(model) => toggleFavorite(model, favorites, setFavorites)} /> : null}
- </>
+ <div className="grid h-8 grid-cols-3 rounded-lg border border-border/60 bg-muted/25 p-0.5" role="tablist" aria-label={t("settingsPanels.model.filterModels")}>
+ {(["recent", "favorites", "all"] as ModelView[]).map((item) => <button key={item} type="button" role="tab" aria-selected={view === item} className={cn("rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", view === item && "bg-accent text-accent-foreground")} onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView(item); }}>{t(`settingsPanels.model.${item === "all" ? "all" : item}`)}</button>)}
+ </div>
+ </div>}
+ >
+ {visibleOptions.length ? (
+ <SelectGroup>
+ {view === "recent" ? <SelectLabel className="flex items-center justify-end px-2 pb-1 pt-1"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground" onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setRecents([]); localStorage.removeItem(RECENTS_KEY); }}><Trash2 className="size-3" />{t("settingsPanels.model.clearRecent")}</button></SelectLabel> : null}
+ {visibleOptions.map((model) => <ModelItem key={`${view}:${model}`} config={config} model={model} favorite={favorites.includes(model)} onToggleFavorite={() => toggleFavorite(model, favorites, setFavorites)} onRemoveRecent={view === "recent" ? () => { const next = recents.filter((item) => item.model !== model); setRecents(next); localStorage.setItem(RECENTS_KEY, JSON.stringify(next)); } : undefined} />)}
+ </SelectGroup>
  ) : (
  <SelectItem value="__empty__" disabled>
- {query ? t("settingsPanels.model.noSearchResults") : emptyModelLabel(config, capability)}
+ {query ? t("settingsPanels.model.noSearchResults") : view === "favorites" ? t("settingsPanels.model.noFavorites") : view === "recent" ? t("settingsPanels.model.noRecent") : emptyModelLabel(config, capability)}
  </SelectItem>
  )}
  </SelectContent>
@@ -110,16 +124,13 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  );
 }
 
-function ModelSection({ title, models, config, favorites, onToggleFavorite }: { title: string; models: string[]; config: AiConfig; favorites: string[]; onToggleFavorite: (model: string) => void }) {
- return <SelectGroup><SelectLabel>{title}</SelectLabel>{models.map((model) => <ModelItem key={`${title}:${model}`} config={config} model={model} favorite={favorites.includes(model)} onToggleFavorite={() => onToggleFavorite(model)} />)}</SelectGroup>;
-}
-
 function ModelItem({ config, model, favorite, onToggleFavorite, onRemoveRecent }: { config: AiConfig; model: string; favorite: boolean; onToggleFavorite: () => void; onRemoveRecent?: () => void }) {
- return <SelectItem value={model} textValue={modelOptionLabel(config, model)}>
+ const meta = modelOptionMeta(config, model);
+ return <SelectItem value={model} textValue={modelOptionLabel(config, model)} className="group/model min-h-12 rounded-xl py-1.5 pl-2 pr-9 [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1">
  <ModelLabel config={config} model={model} />
- <span className="ml-auto inline-flex items-center gap-1">
- <span role="button" tabIndex={0} className="grid size-6 place-items-center opacity-55 hover:opacity-100" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onToggleFavorite(); }}><Star className={`size-3.5 ${favorite ? "fill-current" : ""}`} /></span>
- {onRemoveRecent ? <span role="button" tabIndex={0} className="grid size-6 place-items-center opacity-55 hover:opacity-100" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onRemoveRecent(); }}><X className="size-3.5" /></span> : null}
+ <span className="ml-2 inline-flex shrink-0 items-center gap-0.5">
+ <span role="button" tabIndex={0} aria-label={favorite ? `${tLabel("removeFavorite")} ${meta.name}` : `${tLabel("addFavorite")} ${meta.name}`} className={cn("grid size-7 place-items-center rounded-lg transition hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", favorite ? "text-primary" : "text-muted-foreground opacity-0 group-focus-within/model:opacity-100 group-hover/model:opacity-100")} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onToggleFavorite(); }} onKeyDown={(event) => activateOnKeyboard(event, onToggleFavorite)}><Star className={`size-3.5 ${favorite ? "fill-current" : ""}`} /></span>
+ {onRemoveRecent ? <span role="button" tabIndex={0} aria-label={`${tLabel("removeRecent")} ${meta.name}`} className="grid size-7 place-items-center rounded-lg text-muted-foreground opacity-0 transition hover:bg-background/70 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-focus-within/model:opacity-100 group-hover/model:opacity-100" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onRemoveRecent(); }} onKeyDown={(event) => activateOnKeyboard(event, onRemoveRecent)}><X className="size-3.5" /></span> : null}
  </span>
  </SelectItem>;
 }
@@ -161,12 +172,32 @@ function emptyModelLabel(config: AiConfig, capability?: ModelCapability) {
 }
 
 function ModelLabel({ config, model }: { config: AiConfig; model: string }) {
+ const meta = modelOptionMeta(config, model);
  return (
- <span className="flex min-w-0 items-center gap-2">
+ <span className="flex min-w-0 flex-1 items-center gap-2.5">
  <ModelIcon model={model} />
- <span className="truncate">{modelOptionLabel(config, model)}</span>
+ <span className="min-w-0 flex-1">
+ <span className="block truncate font-medium leading-5">{meta.name}</span>
+ {meta.channel ? <span className="block truncate text-xs leading-4 text-muted-foreground">{meta.channel}</span> : null}
+ </span>
  </span>
  );
+}
+
+function modelOptionMeta(config: AiConfig, model: string) {
+ const decoded = decodeChannelModel(model);
+ return { name: modelOptionName(model), channel: decoded ? config.channels.find((channel) => channel.id === decoded.channelId)?.name || "" : "" };
+}
+
+function tLabel(key: "addFavorite" | "removeFavorite" | "removeRecent") {
+ return i18n.t(`settingsPanels.model.${key}`);
+}
+
+function activateOnKeyboard(event: ReactKeyboardEvent, action: () => void) {
+ if (event.key !== "Enter" && event.key !== " ") return;
+ event.preventDefault();
+ event.stopPropagation();
+ action();
 }
 
 function ModelIcon({ model }: { model: string }) {

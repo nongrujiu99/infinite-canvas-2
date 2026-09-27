@@ -13,31 +13,31 @@ web
 
 ## Product Purpose
 
-Infinite Canvas is an open-source creative workbench that keeps canvas composition, multimodal AI generation, reference editing, prompt libraries, reusable assets, and a local coding agent in one continuous workspace. Success means moving from source material to connected generation workflows and reusable results without changing tools.
+Infinite Canvas is a creative workbench that keeps canvas composition, multimodal AI generation, reference editing, prompt libraries, and reusable assets in one continuous workspace. Success means moving from source material to connected generation workflows and reusable results without changing tools.
 
 ## Positioning
 
-The product combines a typed node canvas with browser-direct model providers, local-first project storage, extensible canvas plugins, and a local Canvas Agent that can read and operate the active creative graph.
+The product combines a typed node canvas with browser-direct model providers and local-first project storage.
 
 ## Operating Context
 
 - Desktop-first, long-running creative sessions with dense canvases and many nodes.
-- Users repeatedly switch between canvas elements, assets, prompts, generation configuration, and local Agent assistance.
+- Users repeatedly switch between canvas elements, assets, prompts, and generation configuration.
 - Projects, assets, generation history, and API credentials are primarily stored in the browser; WebDAV synchronization is optional.
 
 ## Capabilities and Constraints
 
 - React, Vite, React Router, TypeScript, Ant Design, Tailwind, and Zustand.
 - The browser talks directly to user-configured OpenAI-compatible endpoints.
-- The canvas must keep drag, zoom, selection, typed connections, generation, dialogs, import/export, plugins, and local Agent behavior intact.
+- The canvas must keep drag, zoom, selection, typed connections, generation, dialogs, and import/export behavior intact.
 - The project is still in development and does not promise historical local-data compatibility.
 - No built-in cloud account or cloud asset storage may be implied.
 
 ## Brand Commitments
 
 - Product name: 无限画布 / Infinite Canvas.
-- Open-source, tool-first voice; interface copy remains concise and factual.
-- This redesign preserves product behavior and terminology while making the visual system bolder and more coherent.
+- Tool-first voice; interface copy remains concise and factual.
+- Interface changes preserve product behavior and terminology.
 
 ## Evidence on Hand
 

@@ -134,7 +134,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  </div>
 
  <div className="mt-3 grid min-w-0 shrink-0 cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
- <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth />
+ <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth contained />
  <Button
  type="primary"
  size="small"
@@ -240,8 +240,8 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
  ...globalConfig,
  model: resolveModelForCapability(globalConfig, settings.model, mode),
  reasoningEffort: settings.reasoningEffort || globalConfig.reasoningEffort || defaultConfig.reasoningEffort,
- quality: settings.quality || globalConfig.quality || defaultConfig.quality,
- size: settings.size || globalConfig.size || defaultConfig.size,
+ quality: settings.quality || (mode === "image" ? defaultConfig.quality : globalConfig.quality || defaultConfig.quality),
+ size: settings.size || (mode === "image" ? defaultConfig.size : globalConfig.size || defaultConfig.size),
  background: settings.background ?? globalConfig.background ?? defaultConfig.background,
  videoSeconds: adaptVideoSecondsToModel(settings.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds, resolveModelForCapability(globalConfig, settings.model, mode)),
  vquality: settings.vquality || globalConfig.vquality || defaultConfig.vquality,

@@ -19,8 +19,6 @@ type CanvasProject = {
   updatedAt: string;
   nodes: CanvasNodeData[];
   connections: CanvasConnection[];
-  chatSessions: CanvasAssistantSession[];
-  activeChatId: string | null;
   backgroundMode: "lines" | "dots" | "blank";
   viewport: { x: number; y: number; k: number };
 };
@@ -33,7 +31,7 @@ The viewport stores screen translation in `x` and `y`, and scale in `k`.
 ```ts
 type CanvasNodeData = {
   id: string;
-  type: "image" | "text" | "config" | "video";
+  type: "image" | "text" | "config" | "video" | "audio" | "group" | "operation";
   title: string;
   position: { x: number; y: number };
   width: number;
@@ -50,24 +48,10 @@ type CanvasConnection = {
 
 Node positions and sizes use canvas-world coordinates. Edges store only node IDs; their paths are calculated while rendering. Deleting a node removes its connected edges.
 
-Common metadata includes content, prompt, status, generation mode, model, size, count, natural dimensions, image results, input order, `storageKey`, MIME type, byte size, and for in-progress OpenAI-style videos a `videoTaskId` used to resume status polling after refresh. A multi-image generation remains one image node: `images` creates all requested slots before generation starts and records each slot's `status`, `errorDetails`, and completed image data. `primaryImageId` selects the result mirrored by the node-level `content` and image metadata; the first successful slot becomes primary immediately. Persisted image and video `content` values are normally session-scoped `blob:` URLs, with `storageKey` as the persistent identity. If CORS prevents reading an otherwise displayable image, `content` may remain a potentially expiring remote URL and `storageKey` is omitted.
-
-## Assistant sessions
-
-```ts
-type CanvasAssistantSession = {
-  id: string;
-  title: string;
-  messages: CanvasAssistantMessage[];
-  createdAt: string;
-  updatedAt: string;
-};
-```
-
-Message references and generated images use the same blob-storage rules. They are converted to data URLs temporarily only when an AI endpoint requires base64.
+Common metadata includes content, prompt, status, generation mode, per-mode generation settings, natural dimensions, result alternatives, input order, `storageKey`, MIME type, byte size, and a saved task ID for resumable asynchronous video polling. Direct multi-image generation stores requested slots in one image node through `images`; image-mode generation-config nodes instead create or reuse downstream image nodes for the configured count. `primaryImageId` selects the active result in a multi-image node. Persisted image and video `content` values are normally session-scoped `blob:` URLs, with `storageKey` as the persistent identity. If CORS prevents reading an otherwise displayable image, `content` may remain a potentially expiring remote URL and `storageKey` is omitted.
 
 ## Media lifecycle
 
 `uploadImage()` accepts a Blob, data URL, or remote URL. It downloads remote data once, verifies that the Blob decodes as an image, stores it in `image_files` under an `image:<id>` key, and returns an in-memory object URL plus metadata. If CORS blocks byte access but the browser can still display the remote image, it returns that URL without a storage key. Opening a project resolves each stored key into a fresh object URL.
 
-Cleanup is reference-based. After deleting nodes, canvases, assets, or assistant sessions, the application collects every still-referenced storage key, removes unreferenced blobs, revokes their object URLs, and removes them from the in-memory cache. This prevents deleting a file still shared by another canvas feature.
+Cleanup is reference-based. After deleting nodes, canvases, or assets, the application collects every still-referenced storage key, removes unreferenced blobs, revokes their object URLs, and removes them from the in-memory cache. This prevents deleting a file still shared by another canvas feature.

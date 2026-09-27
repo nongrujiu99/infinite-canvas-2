@@ -4,10 +4,9 @@ import { ensureImagePreview, resolveImageUrl, uploadImage } from "@/services/ima
 import { resolveMediaUrl } from "@/services/file-storage";
 import { imageMetadata, referenceUrl } from "@/lib/canvas/canvas-node-factory";
 import type { NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
-import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import type { CanvasImageAngleParams } from "@/components/canvas/canvas-node-angle-dialog";
 import type { ReferenceImage } from "@/types/image";
-import { CanvasNodeType, type CanvasAssistantSession, type CanvasConnection, type CanvasGenerationMode, type CanvasGenerationSettings, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasGenerationMode, type CanvasGenerationSettings, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function imageExtension(dataUrl: string) {
     return dataUrl.match(/^data:image[/]([^;]+)/)?.[1] || dataUrl.match(/image[/]([^;]+)/)?.[1] || "png";
@@ -66,28 +65,6 @@ export async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
     );
 }
 
-export async function hydrateAssistantImages(sessions: CanvasAssistantSession[]) {
-    const hydrateItem = async <T extends { dataUrl?: string; storageKey?: string }>(item: T) => {
-        if (item.storageKey) return { ...item, dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl) };
-        if (item.dataUrl?.startsWith("data:image/")) {
-            const image = await uploadImage(item.dataUrl);
-            return { ...item, dataUrl: image.url, storageKey: image.storageKey };
-        }
-        return item;
-    };
-    return Promise.all(
-        sessions.map(async (session) => ({
-            ...session,
-            messages: await Promise.all(
-                session.messages.map(async (message) => ({
-                    ...message,
-                    references: await Promise.all((message.references || []).map(hydrateItem)),
-                })),
-            ),
-        })),
-    );
-}
-
 export function getGenerationCount(count: string) {
     return Math.max(1, Math.min(15, Math.floor(Math.abs(Number(count)) || 1)));
 }
@@ -106,14 +83,14 @@ export function getInputSummary(inputs: NodeGenerationInput[]) {
     };
 }
 
-export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode): AiConfig {
+export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasGenerationMode): AiConfig {
     const settings = getNodeGenerationSettings(node, mode);
     return {
         ...config,
         model: resolveModelForCapability(config, settings.model, mode),
         reasoningEffort: settings.reasoningEffort || config.reasoningEffort || defaultConfig.reasoningEffort,
-        quality: settings.quality || config.quality || defaultConfig.quality,
-        size: settings.size || config.size || defaultConfig.size,
+        quality: settings.quality || (mode === "image" ? defaultConfig.quality : config.quality || defaultConfig.quality),
+        size: settings.size || (mode === "image" ? defaultConfig.size : config.size || defaultConfig.size),
         background: settings.background ?? config.background ?? defaultConfig.background,
         videoSeconds: settings.seconds || config.videoSeconds || defaultConfig.videoSeconds,
         vquality: settings.vquality || config.vquality || defaultConfig.vquality,

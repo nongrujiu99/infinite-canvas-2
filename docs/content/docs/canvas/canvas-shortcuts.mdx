@@ -7,14 +7,16 @@ description: Common mouse and keyboard controls
 
 ## View
 
-- Drag empty canvas space to pan.
+- Drag empty canvas space with the pan tool to move the view.
+- Drag empty canvas space with the selection tool to box-select nodes.
+- Hold `Control` or Space to temporarily invert the selection or pan tool.
+- Drag with the middle mouse button to pan temporarily.
 - Use the mouse wheel or zoom slider to zoom.
 - Use Reset View to restore the default zoom and centered position.
 
 ## Selection
 
-- `Ctrl / Cmd` + drag: box-select multiple nodes.
-- `Shift / Ctrl / Cmd` + click: add or remove a node from the selection.
+- `Shift / Cmd` + click: add or remove a node from the selection.
 - `Ctrl / Cmd` + `A`: select all nodes.
 - `Esc`: clear the selection and close the active overlay.
 
@@ -28,4 +30,14 @@ description: Common mouse and keyboard controls
 - `Ctrl / Cmd` + `Z`: undo.
 - `Ctrl / Cmd` + `Shift` + `Z`, or `Ctrl / Cmd` + `Y`: redo.
 
-Drag image files onto the canvas to upload them, or insert saved items from My Assets. Undo and redo cover nodes, edges, the viewport, background mode, and assistant sessions; they do not cover the project name, account state, global AI settings, or the My Assets library.
+## Files and assets
+
+- Drop image, video, MP3, or WAV files to add media to the canvas.
+- Use the import action to select media from the computer.
+- Use My Assets to insert a saved text, image, or video asset.
+
+## Undo and redo scope
+
+History includes nodes, connections, the viewport, and the background mode. Project names, global AI settings, and My Assets changes are outside canvas history.
+
+Drag image files onto the canvas to upload them, or insert saved items from My Assets. Undo and redo cover nodes, edges, the viewport, and background mode; they do not cover the project name, account state, global AI settings, or the My Assets library.

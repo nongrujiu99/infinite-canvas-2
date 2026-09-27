@@ -64,10 +64,12 @@ function SelectContent({
  children,
  position = "item-aligned",
  align = "center",
+ header,
+ portalled = true,
+ viewportClassName,
  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
- return (
- <SelectPrimitive.Portal>
+}: React.ComponentProps<typeof SelectPrimitive.Content> & { header?: React.ReactNode; portalled?: boolean; viewportClassName?: string }) {
+ const content = (
  <SelectPrimitive.Content
  data-slot="select-content"
  data-align-trigger={position === "item-aligned"}
@@ -76,20 +78,22 @@ function SelectContent({
  align={align}
  {...props}
  >
+ {header}
  <SelectScrollUpButton />
  <SelectPrimitive.Viewport
  data-position={position}
  className={cn(
  "data-[position=popper]:h-(--radix-select-trigger-height) data-[position=popper]:w-full data-[position=popper]:min-w-(--radix-select-trigger-width)",
- position === "popper" && ""
+ position === "popper" && "",
+ viewportClassName,
  )}
  >
  {children}
  </SelectPrimitive.Viewport>
  <SelectScrollDownButton />
  </SelectPrimitive.Content>
- </SelectPrimitive.Portal>
  )
+ return portalled ? <SelectPrimitive.Portal>{content}</SelectPrimitive.Portal> : content
 }
 
 function SelectLabel({

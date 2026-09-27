@@ -95,8 +95,7 @@ export function buildCanvasFeaturePreviewProject(title = "画布全功能预览"
                 "• 提示词反推直接创建文本与生成配置，不再创建独立处理节点",
                 "• 左侧面板：画布元素 / 我的素材 / 提示词库",
                 "• 底部工具栏：节点、上传、背景、选择/移动、清空",
-                "• 右下：缩放与 Minimap；顶部：导入导出、插件、撤销重做",
-                "• 右侧 Agent 面板会在预览模式自动打开",
+                "• 右下：缩放与 Minimap；顶部：导入导出、撤销重做",
                 "",
                 "AI 生成按钮会使用你在设置中配置的真实模型与 API。",
             ].join("\n"),
@@ -108,24 +107,10 @@ export function buildCanvasFeaturePreviewProject(title = "画布全功能预览"
         { id: `${prefix}-c2`, fromNodeId: imageId, toNodeId: configId, fromPortId: "output", toPortId: "input" },
     ];
 
-    const now = new Date().toISOString();
-    const sessionId = `${prefix}-session`;
     return {
         title,
         nodes,
         connections,
-        chatSessions: [
-            {
-                id: sessionId,
-                title: "功能预览说明",
-                createdAt: now,
-                updatedAt: now,
-                messages: [
-                    { id: `${prefix}-m1`, role: "assistant", text: "这是新版节点系统预览。素材节点只承载内容，生成参数集中在生成配置节点，图片处理能力使用独立功能节点；真实 AI 生成会使用设置中自动发现的兼容模型。" },
-                ],
-            },
-        ],
-        activeChatId: sessionId,
         backgroundMode: "dots",
         showImageInfo: true,
         viewport: { x: 50, y: 30, k: 0.72 },

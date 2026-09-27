@@ -30,10 +30,10 @@ export async function resolveCanvasReferenceImages(references: CanvasResourceRef
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
     return Promise.all(references.filter((reference) => reference.kind === "image").map(async (reference) => {
         const node = nodesById.get(reference.nodeId);
-        if (!node) throw new Error(i18n.t("agent.composer.mentions.resourceMissing", { title: reference.title }));
+        if (!node) throw new Error(i18n.t("canvas.references.resourceMissing", { title: reference.title }));
         const metadata = node.metadata;
         const dataUrl = await imageToDataUrl({ storageKey: metadata?.storageKey, url: reference.previewUrl });
-        if (!dataUrl.startsWith("data:image/")) throw new Error(i18n.t("agent.composer.mentions.imageReadFailed", { title: reference.title }));
+        if (!dataUrl.startsWith("data:image/")) throw new Error(i18n.t("canvas.references.imageReadFailed", { title: reference.title }));
         const meta = metadata?.naturalWidth && metadata.naturalHeight
             ? { width: metadata.naturalWidth, height: metadata.naturalHeight, mimeType: metadata.mimeType || dataUrl.match(/^data:([^;]+)/)?.[1] || "image/png" }
             : await readImageMeta(dataUrl);
@@ -142,6 +142,5 @@ function resourceKind(node: CanvasNodeData): CanvasResourceKind | null {
     if (node.type === CanvasNodeType.Video && node.metadata?.content) return "video";
     if (node.type === CanvasNodeType.Audio && node.metadata?.content) return "audio";
     if (node.type === CanvasNodeType.Text && (node.metadata?.content || node.metadata?.prompt)) return "text";
-    // Plugin nodes declare their input eligibility through definition.resource.
     return getNodeDefinition(node.type)?.resource?.(node)?.kind || null;
 }

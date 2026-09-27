@@ -1,7 +1,6 @@
 import i18n from "@/i18n";
 import { CanvasNodeType } from "@/types/canvas";
 import type { CanvasNodeMetadata } from "@/types/canvas";
-import { getNodeSpec as getRegistryNodeSpec } from "@/lib/canvas/node-registry";
 
 type CanvasNodeSpec = {
     width: number;
@@ -51,9 +50,6 @@ export const NODE_SPECS = {
     },
 } satisfies Record<CanvasNodeType, CanvasNodeSpec>;
 
-// Return built-in specs directly and resolve plugin types from the registry.
-export function getNodeSpec(type: string) {
-    if ((Object.values(CanvasNodeType) as string[]).includes(type)) return NODE_SPECS[type as CanvasNodeType];
-    const spec = getRegistryNodeSpec(type);
-    return { width: spec.width, height: spec.height, title: spec.title, metadata: spec.metadata };
+export function getNodeSpec(type: CanvasNodeType) {
+    return NODE_SPECS[type];
 }

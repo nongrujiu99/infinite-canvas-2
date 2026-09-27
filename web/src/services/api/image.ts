@@ -2,7 +2,7 @@ import axios from "axios";
 
 import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
-import { normalizePluginImages, runModelPlugin } from "./model-plugin";
+import { normalizeScriptImages, runModelScript } from "./model-script";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
@@ -746,7 +746,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         const requestSize = resolveRequestSize(quality, config.size);
         const background = normalizeBackground(config.background);
         try {
-            const result = await runModelPlugin({
+            const result = await runModelScript({
                 capability: "image",
                 script,
                 config: requestConfig,
@@ -755,7 +755,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            return normalizeScriptImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -809,7 +809,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         const background = normalizeBackground(config.background);
         const refs = await Promise.all(references.map((image) => imageToDataUrl(image)));
         try {
-            const result = await runModelPlugin({
+            const result = await runModelScript({
                 capability: "image",
                 script,
                 config: requestConfig,
@@ -818,7 +818,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
-            return normalizePluginImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
+            return normalizeScriptImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
@@ -869,7 +869,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     const script = resolveModelScript(config, config.model || config.textModel);
     if (script) {
         try {
-            const answer = await runModelPlugin<string>({
+            const answer = await runModelScript<string>({
                 capability: "text",
                 script,
                 config: requestConfig,

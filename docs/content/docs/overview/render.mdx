@@ -11,6 +11,6 @@ description: Deploy Infinite Canvas with Render
 2. Sign in and connect GitHub as prompted.
 3. Confirm the deployment.
 
-When deployment finishes, open the assigned `.onrender.com` domain.
+When deployment finishes, open the assigned domain. Billing, sleep behavior, and resource limits depend on the current Render configuration.
 
-The default configuration uses Render's free Web Service. It sleeps after a period of inactivity and wakes on the next request. Application data is primarily stored in the browser, and prompt repositories are fetched by the frontend. The free tier is suitable for evaluation and demos; use Vercel or configure WebDAV for longer-term use.
+Canvas projects and assets remain in each visitor's browser by default. AI, prompt-source, and WebDAV requests originate in the browser. Verify static asset paths, cross-origin rules, and access to external endpoints in the target environment before relying on the deployment.

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { listNodeDefinitions, useNodeRegistryVersion } from "@/lib/canvas/node-registry";
+import { listNodeDefinitions } from "@/lib/canvas/node-registry";
 import { CanvasNodeType, type CanvasNodeMetadata, type CanvasOperationKind, type ConnectionHandle, type Position } from "@/types/canvas";
 
 const OPERATION_OPTIONS: { kind: CanvasOperationKind; icon: React.ReactNode }[] = [
@@ -93,7 +93,6 @@ export function ConnectionCreateOption({ theme, icon, title, description, onClic
 export function NodeCreateMenu({ position, onCreate, onClose }: { position: Position; onCreate: (type: string, metadata?: CanvasNodeMetadata) => void; onClose: () => void }) {
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const { t } = useTranslation();
- useNodeRegistryVersion();
  const menuRef = useRef<HTMLDivElement>(null);
  const definitions = listNodeDefinitions().filter((def) => def.showInCreateMenu !== false);
  // Close automatically when clicking outside the menu.

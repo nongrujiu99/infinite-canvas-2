@@ -19,8 +19,7 @@ export enum CanvasNodeType {
     Operation = "operation",
 }
 
-// Node types are open strings: built-ins use CanvasNodeType and plugins use "<pluginId>:<name>".
-export type CanvasNodeTypeId = CanvasNodeType | (string & {});
+export type CanvasNodeTypeId = CanvasNodeType;
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
 export type CanvasGenerationMode = "text" | "image" | "video" | "audio";
@@ -109,7 +108,6 @@ export type CanvasNodeMetadata = {
     videoTaskId?: string;
     videoTaskProvider?: "openai" | "gemini";
     groupId?: string;
-    interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
 };
 
 export type CanvasNodeData = {
@@ -130,40 +128,6 @@ export type CanvasConnection = {
     toPortId?: "input";
     valid?: boolean;
     invalidReason?: "sameNode" | "resourceToResource" | "operationToOperation" | "unsupportedInput" | "wrongOutput" | "occupiedInput" | "emptyResource" | "outputLimit" | "duplicate" | "cycle" | "groupTarget";
-};
-
-export type CanvasAssistantReference = {
-    id: string;
-    type: CanvasNodeTypeId;
-    title: string;
-    dataUrl?: string;
-    storageKey?: string;
-    text?: string;
-};
-
-export type CanvasAssistantImage = {
-    id: string;
-    dataUrl: string;
-    storageKey?: string;
-    prompt: string;
-};
-
-export type CanvasAssistantMessage = {
-    id: string;
-    role: "user" | "assistant" | "system" | "tool" | "error";
-    title?: string;
-    text: string;
-    meta?: string;
-    detail?: unknown;
-    references?: CanvasAssistantReference[];
-};
-
-export type CanvasAssistantSession = {
-    id: string;
-    title: string;
-    messages: CanvasAssistantMessage[];
-    createdAt: string;
-    updatedAt: string;
 };
 
 export type ConnectionHandle = {

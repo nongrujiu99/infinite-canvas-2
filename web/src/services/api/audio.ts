@@ -4,7 +4,7 @@ import i18n from "@/i18n";
 import { audioMimeType, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue } from "@/lib/audio-generation";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig } from "@/stores/use-config-store";
-import { runModelPlugin } from "./model-plugin";
+import { runModelScript } from "./model-script";
 
 type RequestOptions = { signal?: AbortSignal };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -30,7 +30,7 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
         if (!requestConfig.baseUrl.trim()) throw new Error(apiText("baseUrlRequired"));
         if (!requestConfig.apiKey.trim()) throw new Error(apiText("apiKeyRequired"));
         try {
-            const result = await runModelPlugin({
+            const result = await runModelScript({
                 capability: "audio",
                 script,
                 config: requestConfig,
@@ -38,7 +38,7 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
                 params: { voice: normalizeAudioVoiceValue(config.audioVoice), format, speed: normalizeAudioSpeedValue(config.audioSpeed), instructions: config.audioInstructions.trim() },
                 signal: options?.signal,
             });
-            return await audioPluginBlob(result, format);
+            return await audioScriptBlob(result, format);
         } catch (error) {
             throw new Error(readAxiosError(error, apiText("audioGenerationFailed")));
         }
@@ -66,7 +66,7 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
     }
 }
 
-async function audioPluginBlob(result: unknown, format: string): Promise<Blob> {
+async function audioScriptBlob(result: unknown, format: string): Promise<Blob> {
     if (result instanceof Blob) return result.type.startsWith("audio/") ? result : new Blob([result], { type: audioMimeType(format) });
     let source = "";
     if (typeof result === "string") source = result;

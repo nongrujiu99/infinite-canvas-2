@@ -44,10 +44,6 @@ export function CanvasTopBar({
  onImportImage: () => void;
  onUndo: () => void;
  onRedo: () => void;
- onOpenPlugins?: () => void;
- agentOpen?: boolean;
- compactAgentStatus?: { connected: boolean; enabled: boolean; activity: string };
- onToggleAgent?: () => void;
 }) {
  const colorTheme = useThemeStore((state) => state.theme);
  const { t } = useTranslation();

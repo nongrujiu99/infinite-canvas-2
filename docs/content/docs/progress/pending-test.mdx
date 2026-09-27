@@ -5,6 +5,7 @@ description: Implemented changes that still need manual verification
 
 # Pending Tests
 
+- Connected generation references: when a generation-config node has a normal prompt without explicit `@` tokens, every connected image, video, audio, and text input should still be included in the request; adding explicit `@` references should continue to select only the referenced inputs.
 - Agent and plugin removal: the Canvas Library and existing projects should open without Agent connection flows, extension-node menus, plugin loading, or related local-storage entries. Built-in text, image, video, audio, generation-config, group, and processing nodes should retain creation, editing, connection, generation, undo/redo, and ZIP import/export behavior; custom model call scripts should continue working.
 - Generation-config model picker: the model layer should open upward inside the node and follow canvas zoom without changing node dimensions or aspect ratio. Search, Recent, Favorites, All, scrolling, and empty states should remain usable.
 - Generation-count default: a new generation configuration node should default to `1` in text, image, video, and audio modes without overwriting counts explicitly stored on existing nodes.

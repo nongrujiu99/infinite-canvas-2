@@ -7,7 +7,8 @@ import { useTranslation } from "react-i18next";
 import { readImageMeta } from "@/lib/image-utils";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
 import { ModelPicker } from "@/components/model-picker";
-import { resolveModelForCapability, selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
+import { preferredImageEditModel, saveImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import type { AiConfig } from "@/stores/use-config-store";
 
 export type CanvasImageMaskEditPayload = {
  prompt: string;
@@ -24,14 +25,6 @@ type BrushPreview = { x: number; y: number; size: number; adjusting: boolean };
 const defaultBrushSize = 100;
 const maskOverlayColor = "#2563eb";
 const maskOverlayAlpha = 0.4;
-const lastMaskModelKey = "infinite-canvas:last-mask-edit-model";
-
-function preferredMaskModel(config: AiConfig) {
- const fallback = resolveModelForCapability(config, config.imageModel, "image");
- if (typeof window === "undefined") return fallback;
- const stored = window.localStorage.getItem(lastMaskModelKey);
- return stored && selectableModelsByCapability(config, "image").includes(stored) ? stored : fallback;
-}
 
 export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
@@ -44,7 +37,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  const redoRef = useRef<MaskStroke[]>([]);
  const [image, setImage] = useState<{ width: number; height: number } | null>(null);
  const [prompt, setPrompt] = useState("");
- const defaultModel = useMemo(() => preferredMaskModel(config), [config]);
+ const defaultModel = useMemo(() => preferredImageEditModel(config), [config]);
  const [model, setModel] = useState(defaultModel);
  const [brushSize, setBrushSize] = useState(defaultBrushSize);
  const [mode, setMode] = useState<DrawMode>("paint");
@@ -224,7 +217,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  if (!nextPrompt) return setError(t("canvas.editors.maskPromptRequired"));
  if (!canvas || !element) return;
  if (!canvasHasPaint(canvas)) return setError(t("canvas.editors.maskRequired"));
- window.localStorage.setItem(lastMaskModelKey, model);
+ saveImageEditModel(model);
  onConfirm({ prompt: nextPrompt, maskDataUrl: buildMaskOverlay(element, canvas), generate, model });
  };
 
@@ -331,7 +324,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  className="h-9 w-full rounded-lg bg-transparent"
  onChange={(value) => {
  setModel(value);
- window.localStorage.setItem(lastMaskModelKey, value);
+ saveImageEditModel(value);
  }}
  onMissingConfig={onMissingConfig}
  />

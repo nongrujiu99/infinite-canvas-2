@@ -192,20 +192,22 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
  <span className="font-semibold">{image ? `${image.width} x ${image.height} px` : t("canvas.editors.loading")}</span>
  </div>
  </div>
- <div className="space-y-5 py-2">
+ <div className="space-y-4 py-2">
+ <div className="grid grid-cols-2 gap-2">
  <NumberField label={t("canvas.editors.rows")} value={rows} onChange={(value) => update("rows", value)} />
  <NumberField label={t("canvas.editors.columns")} value={columns} onChange={(value) => update("columns", value)} />
+ </div>
  <div className="grid grid-cols-2 gap-2">
- <Button icon={<Rows3 className="size-4" />} onClick={() => addLine("horizontal")}>
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<Rows3 className="size-4" />} onClick={() => addLine("horizontal")}>
  {t("canvas.editors.horizontalLine")}
  </Button>
- <Button icon={<PanelTop className="size-4 rotate-90" />} onClick={() => addLine("vertical")}>
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<PanelTop className="size-4 rotate-90" />} onClick={() => addLine("vertical")}>
  {t("canvas.editors.verticalLine")}
  </Button>
- <Button icon={<Trash2 className="size-4" />} disabled={!active} onClick={deleteLine}>
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<Trash2 className="size-4" />} disabled={!active} onClick={deleteLine}>
  {t("canvas.editors.deleteLine")}
  </Button>
- <Button icon={<ListRestart className="size-4" />} onClick={resetLines}>
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<ListRestart className="size-4" />} onClick={resetLines}>
  {t("canvas.editors.resetLines")}
  </Button>
  </div>
@@ -219,7 +221,7 @@ export function CanvasNodeSplitDialog({ dataUrl, open, onClose, onConfirm }: { d
  <span className="font-semibold">{pieceSize ? `${pieceSize.width} x ${pieceSize.height}` : t("canvas.editors.unknown")}</span>
  </div>
  </div>
- <Button type="primary" size="large" className="w-full" icon={<Grid2x2 className="size-4" />} onClick={() => onConfirm(confirmParams)}>
+ <Button type="primary" className="h-10 w-full rounded-xl font-semibold" icon={<Grid2x2 className="size-4" />} onClick={() => onConfirm(confirmParams)}>
  {t("canvas.editors.generateChildren")}
  </Button>
  </div>
@@ -233,7 +235,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
  return (
  <label className="block space-y-2">
  <span className="font-medium opacity-75">{label}</span>
- <InputNumber className="w-full" min={1} max={maxGridSize} precision={0} value={value} onChange={onChange} />
+ <InputNumber className="h-10 w-full rounded-xl bg-transparent [&_.ant-input-number-input]:h-[38px]" min={1} max={maxGridSize} precision={0} value={value} onChange={onChange} />
  </label>
  );
 }

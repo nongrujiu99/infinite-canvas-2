@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Modal, Segmented, Tooltip } from "antd";
-import { Check, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Button, Modal, Tooltip } from "antd";
+import { Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
@@ -67,6 +67,20 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
  document.addEventListener("pointerup", stop, { signal: controller.signal });
  document.addEventListener("pointercancel", stop, { signal: controller.signal });
  };
+ const selectRatioPreset = (preset: string) => {
+ setRatioPreset(preset);
+ const currentRatio = image ? (crop.width * image.width) / Math.max(1, crop.height * image.height) : null;
+ const nextFixedRatio = preset === "fixed" ? currentRatio : null;
+ setFixedRatio(nextFixedRatio);
+ const ratio = resolveRatio(preset, image, nextFixedRatio);
+ if (ratio && image) setCrop((current) => fitCropToRatio(current, ratio, image));
+ };
+ const ratioOptions = [
+ { label: t("canvas.editors.free"), value: "free" },
+ { label: t("canvas.editors.fixed"), value: "fixed" },
+ { label: t("canvas.editors.originalMode"), value: "original" },
+ ...["1:1", "4:3", "16:9", "9:16"].map((value) => ({ label: value, value })),
+ ];
 
  return (
  <Modal title={t("canvas.editors.cropTitle")} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={780} centered destroyOnHidden transitionName="" maskTransitionName="">
@@ -115,7 +129,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
  <span className="ml-2 text-xs opacity-55">{t("canvas.editors.cropHint")}</span>
  </div>
 
- <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2">
+ <div className="space-y-3 rounded-xl border p-3">
  <div className="flex flex-wrap items-center gap-3 text-sm opacity-80">
  <span>{t("canvas.editors.cropSize", { size: cropSize ? `${cropSize.width} x ${cropSize.height}` : t("canvas.editors.unknown") })}</span>
  <span>{t("canvas.editors.ratio", { ratio: cropSize ? formatRatio(cropSize.width, cropSize.height) : t("canvas.editors.unknown") })}</span>
@@ -123,35 +137,25 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
  <span>{t("canvas.editors.original", { width: image.width, height: image.height })}</span>
  ) : null}
  </div>
- <Segmented
- size="small"
- options={[
- { label: t("canvas.editors.free"), value: "free" },
- { label: t("canvas.editors.fixed"), value: "fixed" },
- { label: t("canvas.editors.originalMode"), value: "original" },
- ...["1:1", "4:3", "16:9", "9:16"],
- ]}
- value={ratioPreset}
- onChange={(value) => {
- const preset = String(value);
- setRatioPreset(preset);
- const currentRatio = image ? (crop.width * image.width) / Math.max(1, crop.height * image.height) : null;
- const nextFixedRatio = preset === "fixed" ? currentRatio : null;
- setFixedRatio(nextFixedRatio);
- const ratio = resolveRatio(preset, image, nextFixedRatio);
- if (ratio && image) setCrop((current) => fitCropToRatio(current, ratio, image));
- }}
- />
+ <div className="grid grid-cols-4 gap-2 lg:grid-cols-7">
+ {ratioOptions.map((option) => (
+ <Button key={option.value} type={ratioPreset === option.value ? "primary" : "default"} className="h-10 rounded-xl font-medium" style={ratioPreset === option.value ? undefined : { background: "transparent" }} aria-pressed={ratioPreset === option.value} onClick={() => selectRatioPreset(option.value)}>
+ {option.label}
+ </Button>
+ ))}
+ </div>
  </div>
 
- <div className="flex items-center justify-end gap-2">
- <Button onClick={() => setCrop(defaultCrop)}>{t("canvas.editors.reset")}</Button>
- <Button icon={<X className="size-4" />} onClick={onClose}>
+ <div className="flex items-center justify-between gap-2">
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<RotateCcw className="size-4" />} onClick={() => setCrop(defaultCrop)}>{t("canvas.editors.reset")}</Button>
+ <div className="flex items-center gap-2">
+ <Button className="h-10 rounded-xl font-medium" style={{ background: "transparent" }} icon={<X className="size-4" />} onClick={onClose}>
  {t("canvas.editors.cancel")}
  </Button>
- <Button type="primary" icon={<Check className="size-4" />} onClick={() => onConfirm(crop)}>
+ <Button type="primary" className="h-10 rounded-xl px-4 font-semibold" icon={<Check className="size-4" />} onClick={() => onConfirm(crop)}>
  {t("canvas.editors.confirmCrop")}
  </Button>
+ </div>
  </div>
  </div>
  </Modal>

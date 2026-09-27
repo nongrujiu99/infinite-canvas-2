@@ -1,29 +1,34 @@
 import { useEffect, useState } from "react";
-import { Button, Modal, Segmented, Slider } from "antd";
+import { Button, Modal, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
+
+import { ModelPicker } from "@/components/model-picker";
+import { preferredImageEditModel, saveImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import type { AiConfig } from "@/stores/use-config-store";
 
 export type CanvasImageAngleParams = {
  horizontalAngle: number;
  pitchAngle: number;
  cameraDistance: number;
  wideAngle: boolean;
+ model: string;
 };
 
-const defaultParams: CanvasImageAngleParams = {
+const defaultParams: Omit<CanvasImageAngleParams, "model"> = {
  horizontalAngle: 0,
  pitchAngle: 9,
  cameraDistance: 4.8,
  wideAngle: false,
 };
 
-export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageAngleParams) => void }) {
+export function CanvasNodeAngleDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageAngleParams) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
- const [params, setParams] = useState(defaultParams);
+ const [params, setParams] = useState<CanvasImageAngleParams>(() => ({ ...defaultParams, model: preferredImageEditModel(config) }));
 
  useEffect(() => {
- if (open) setParams(defaultParams);
- }, [dataUrl, open]);
+ if (open) setParams({ ...defaultParams, model: preferredImageEditModel(config) });
+ }, [config, dataUrl, open]);
 
  const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
 
@@ -42,7 +47,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
  <div className="absolute -bottom-6 left-1/2 h-10 w-24 -translate-x-1/2 rounded-full border bg-black/20 backdrop-blur" />
  </div>
  </div>
- <Button className="w-fit" icon={<RotateCcw className="size-4" />} onClick={() => setParams(defaultParams)}>
+ <Button className="h-10 w-fit rounded-lg" icon={<RotateCcw className="size-4" />} onClick={() => setParams((current) => ({ ...defaultParams, model: current.model }))}>
  {t("canvas.editors.reset")}
  </Button>
  </div>
@@ -52,20 +57,19 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
  <AngleSlider label={t("canvas.editors.distance")} value={params.cameraDistance} min={1} max={10} step={0.1} onChange={(value) => update("cameraDistance", value)} />
  <div className="grid grid-cols-[88px_1fr_72px] items-center gap-4">
  <span className="font-medium opacity-75">{t("canvas.editors.lens")}</span>
- <Segmented
- className="w-fit"
- value={params.wideAngle ? "wide" : "standard"}
- options={[
- { label: t("canvas.editors.standard"), value: "standard" },
- { label: t("canvas.editors.wide"), value: "wide" },
- ]}
- onChange={(value) => update("wideAngle", value === "wide")}
- />
+ <div className="grid grid-cols-2 gap-2">
+ <Button type={!params.wideAngle ? "primary" : "default"} className="h-10 rounded-lg font-semibold" aria-pressed={!params.wideAngle} onClick={() => update("wideAngle", false)}>{t("canvas.editors.standard")}</Button>
+ <Button type={params.wideAngle ? "primary" : "default"} className="h-10 rounded-lg font-semibold" aria-pressed={params.wideAngle} onClick={() => update("wideAngle", true)}>{t("canvas.editors.wide")}</Button>
+ </div>
+ </div>
+ <div className="grid grid-cols-[88px_1fr] items-center gap-4">
+ <span className="font-medium opacity-75">{t("canvas.editors.maskModel")}</span>
+ <ModelPicker config={config} value={params.model} capability="image" fullWidth className="h-10 w-full rounded-lg bg-transparent" onChange={(value) => { update("model", value); saveImageEditModel(value); }} onMissingConfig={onMissingConfig} />
  </div>
  </div>
  </div>
  <div className="flex justify-end">
- <Button type="primary" size="large" icon={<WandSparkles className="size-4" />} onClick={() => onConfirm(params)}>
+ <Button type="primary" className="h-10 rounded-lg px-4 font-semibold" icon={<WandSparkles className="size-4" />} onClick={() => { saveImageEditModel(params.model); onConfirm(params); }}>
  {t("canvas.editors.aiGenerate")}
  </Button>
  </div>

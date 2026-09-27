@@ -14,7 +14,7 @@ import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
-import { inferMediaRatio } from "@/lib/media-size";
+import { computeMediaSize, inferMediaRatio, inferMediaScale } from "@/lib/media-size";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -31,6 +31,7 @@ import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "@/components
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "@/components/canvas/canvas-node-crop-dialog";
 import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/components/canvas/canvas-node-mask-edit-dialog";
 import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "@/components/canvas/canvas-node-split-dialog";
+import { CanvasNodeSuperResolveDialog, type CanvasSuperResolvePayload } from "@/components/canvas/canvas-node-super-resolve-dialog";
 import { CanvasNodeUpscaleDialog, type CanvasImageUpscaleParams } from "@/components/canvas/canvas-node-upscale-dialog";
 import { buildNodeGenerationContext, buildNodeGenerationInputs, buildNodeResponseMessages, hydrateNodeGenerationContext, type NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { CanvasSelectionToolbar } from "@/components/canvas/canvas-selection-toolbar";
@@ -2232,12 +2233,70 @@ function InfiniteCanvasPage() {
  setActiveOperationNodeId(null);
  }, [activeOperationNodeId]);
 
+ const superResolveImageNode = useCallback(async (node: CanvasNodeData, payload: CanvasSuperResolvePayload) => {
+ if (!node.metadata?.content) return;
+ const operation = activeOperationNodeId ? nodesRef.current.find((item) => item.id === activeOperationNodeId) : undefined;
+ const parent = operation || node;
+ const ratio = inferMediaRatio(`${node.metadata.naturalWidth || node.width}x${node.metadata.naturalHeight || node.height}`);
+ const generationConfig = { ...buildGenerationConfig(effectiveConfig, undefined, "image"), model: payload.model, quality: payload.scale, size: computeMediaSize(payload.scale, ratio), count: "1" };
+ if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+ openConfigDialog(true);
+ return;
+ }
+ const childId = nanoid();
+ const prompt = t("canvas.editors.superResolvePrompt");
+ const reference = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
+ const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [reference]);
+ const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+ setSuperResolveNodeId(null);
+ setRunningNodeId(childId);
+ setNodes((prev) => [
+ ...prev.map((item) => item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item),
+ {
+ id: childId,
+ type: CanvasNodeType.Image,
+ title: t("canvas.editors.superResolveResult"),
+ position: { x: parent.position.x + parent.width / 2 - imageConfig.width / 2, y: parent.position.y + parent.height + 96 },
+ width: imageConfig.width,
+ height: imageConfig.height,
+ metadata: { prompt, status: NODE_STATUS_LOADING, ...generationMetadata },
+ },
+ ]);
+ setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: operation?.id || node.id, toNodeId: childId, fromPortId: "output", toPortId: "input" }]);
+ setSelectedNodeIds(new Set([childId]));
+ setSelectedConnectionId(null);
+ setDialogNodeId(childId);
+ const controller = startGenerationRequest(childId, node.id, childId);
+ try {
+ const image = await requestEdit(generationConfig, prompt, [reference], { signal: controller.signal }).then((items) => items[0]);
+ const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
+ const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
+ setNodes((prev) => prev.map((item) => item.id === childId
+ ? { ...item, ...size, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } }
+ : item.id === operation?.id
+ ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } }
+ : item));
+ } catch (error) {
+ if (!isGenerationCanceled(error)) {
+ const errorDetails = error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
+ message.error(errorDetails);
+ setNodes((prev) => prev.map((item) => item.id === childId || item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item));
+ }
+ } finally {
+ finishGenerationRequest(childId, controller);
+ setRunningNodeId(null);
+ setActiveOperationNodeId(null);
+ }
+ }, [activeOperationNodeId, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest, t]);
+
  const generateAngleNode = useCallback(
  async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
  if (!node.metadata?.content) return;
  const operation = activeOperationNodeId ? nodesRef.current.find((item) => item.id === activeOperationNodeId) : undefined;
  const parent = operation || node;
- const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+ const baseConfig = buildGenerationConfig(effectiveConfig, undefined, "image");
+ const ratio = inferMediaRatio(`${node.metadata.naturalWidth || node.width}x${node.metadata.naturalHeight || node.height}`);
+ const generationConfig = { ...baseConfig, model: params.model, size: computeMediaSize(inferMediaScale(baseConfig.size), ratio), count: "1" };
  if (!isAiConfigReady(generationConfig, generationConfig.model)) {
  openConfigDialog(true);
  return;
@@ -3010,6 +3069,16 @@ function InfiniteCanvasPage() {
  await pollVideoNodeTask(node);
  return;
  }
+ const incomingOperationId = connectionsRef.current.find((connection) => connection.valid !== false && connection.toNodeId === node.id)?.fromNodeId;
+ const incomingOperation = nodesRef.current.find((item) => item.id === incomingOperationId);
+ if (incomingOperation?.type === CanvasNodeType.Operation && incomingOperation.metadata?.operationKind === "angle") {
+ const sourceId = connectionsRef.current.find((connection) => connection.valid !== false && connection.toNodeId === incomingOperation.id)?.fromNodeId;
+ const source = nodesRef.current.find((item) => item.id === sourceId);
+ if (source?.type === CanvasNodeType.Image && source.metadata?.content) {
+ openImageOperation(source, "angle", incomingOperation.id);
+ return;
+ }
+ }
  const sourceNode = findRetrySourceNode(node.id, nodesRef.current, connectionsRef.current.filter((connection) => connection.valid !== false)) || node;
  const savedImageMetadata = node.type === CanvasNodeType.Image ? node.metadata : undefined;
  const hasSavedImageMetadata = Boolean(savedImageMetadata?.generationType);
@@ -3155,7 +3224,7 @@ function InfiniteCanvasPage() {
  setRunningNodeId(null);
  }
  },
- [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, pollVideoNodeTask, startGenerationRequest, t],
+ [completeVideoNodeTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, openImageOperation, pollVideoNodeTask, startGenerationRequest, t],
  );
 
  const deleteBatchImage = useCallback((nodeId: string, imageId: string) => {
@@ -3563,11 +3632,9 @@ function InfiniteCanvasPage() {
  <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open={Boolean(upscaleNode)} onClose={() => { setUpscaleNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void upscaleImageNode(upscaleNode!, params).catch(handleOperationFailure)} />
  ) : null}
 
- <Modal title={t("canvas.projectPage.superResolve")} open={Boolean(superResolveNode?.metadata?.content)} centered footer={null} onCancel={() => setSuperResolveNodeId(null)}>
- <div className="py-8 text-center text-base font-medium">{t("canvas.projectPage.notImplemented")}</div>
- </Modal>
+ {superResolveNode?.metadata?.content ? <CanvasNodeSuperResolveDialog dataUrl={superResolveNode.metadata.content} config={effectiveConfig} open={Boolean(superResolveNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setSuperResolveNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(payload) => void superResolveImageNode(superResolveNode, payload)} /> : null}
 
- {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => { setAngleNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
+ {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} config={effectiveConfig} open={Boolean(angleNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setAngleNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
 
  <Modal
  title={t("canvas.projectPage.imageDetails")}

@@ -1,8 +1,9 @@
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { ConfigProvider, Switch } from "antd";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
+import { OptionPill } from "@/components/settings-panel-primitives";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaRatioOptions, mediaRatioOptionsForModel, mediaScaleOptions, readMediaDimensions } from "@/lib/media-size";
 import { resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
@@ -61,7 +62,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
  if (document.activeElement instanceof HTMLInputElement && event.currentTarget.contains(document.activeElement)) document.activeElement.blur();
  }}
  >
- {showTitle ? <div className="text-lg font-semibold">{t("settingsPanels.image.title")}</div> : null}
+ {showTitle ? <div className="text-xl font-semibold">{t("settingsPanels.image.title")}</div> : null}
  <div className="space-y-2.5">
  <SettingTitle color={theme.node.muted}>{t("settingsPanels.image.quality")}</SettingTitle>
  <div className="grid grid-cols-4 gap-2.5">
@@ -171,20 +172,6 @@ export function imageSizeLabel(size: string) {
  if (ratio === "auto" || size === "auto") return i18n.t("settingsPanels.common.auto");
  if (scale === "auto") return ratio;
  return `${scale} · ${ratio}`;
-}
-
-function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
- return (
- <button
- type="button"
- className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80"
- style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
- onMouseDown={(event) => event.stopPropagation()}
- onClick={onClick}
- >
- {children}
- </button>
- );
 }
 
 function DimensionInput({ prefix, value, disabled, theme, alignToStep, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; alignToStep: boolean; onChange: (value: number | null) => void }) {

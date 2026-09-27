@@ -31,6 +31,12 @@ export function ConnectionPath({
  const curvature = Math.max(Math.abs(endX - startX) * 0.5, 50);
  const pathD = `M ${startX} ${startY} C ${startX + curvature} ${startY}, ${endX - curvature} ${endY}, ${endX} ${endY}`;
  const invalid = connection.valid === false;
+ const flowColor = useThemeStore((s) => s.theme) === "dark" ? "#22d3ee" : "#0891b2";
+ const baseStroke = invalid ? "#ef4444" : active ? theme.node.activeStroke : theme.node.muted;
+ const baseWidth = active ? 3 : 2;
+ const baseOpacity = flowing ? 0 : invalid ? 0.65 : active ? 1 : 0.82;
+ const baseDash = invalid ? "7,6" : undefined;
+ const baseFilter = active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined;
 
  return (
  <g>
@@ -58,22 +64,22 @@ export function ConnectionPath({
  />
  <path
  d={pathD}
- stroke={invalid ? "#ef4444" : active ? theme.node.activeStroke : theme.node.muted}
- strokeWidth={active ? 3 : 2}
- strokeOpacity={invalid ? 0.65 : active ? 1 : 0.82}
+ stroke={baseStroke}
+ strokeWidth={baseWidth}
+ strokeOpacity={baseOpacity}
  fill="none"
- strokeDasharray={invalid ? "7,6" : undefined}
- style={{ filter: active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
+ strokeDasharray={baseDash}
+ style={{ filter: baseFilter, pointerEvents: "none", transition: "stroke 200ms, stroke-width 200ms, stroke-opacity 200ms" }}
  />
  {flowing ? (
  <path
  className="canvas-connection-flow"
  d={pathD}
- stroke={theme.node.activeStroke}
+ stroke={flowColor}
  strokeWidth="3"
  strokeLinecap="round"
  fill="none"
- style={{ filter: `drop-shadow(0 0 5px ${theme.node.activeStroke}88)`, pointerEvents: "none" }}
+ style={{ filter: `drop-shadow(0 0 8px ${flowColor}aa)`, pointerEvents: "none" }}
  />
  ) : null}
  </g>

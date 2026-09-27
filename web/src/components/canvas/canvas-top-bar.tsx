@@ -111,13 +111,13 @@ export function CanvasTopBar({
  if (event.key === "Enter") onFinishTitleEditing();
  if (event.key === "Escape") onCancelTitleEditing();
  }}
- className="max-w-[280px] bg-transparent p-0 text-left text-lg font-semibold tracking-normal outline-none"
+ className="max-w-[280px] bg-transparent p-0 text-left text-xl font-semibold tracking-normal outline-none"
  style={{ color: theme.node.text }}
  />
  ) : (
  <button
  type="button"
- className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
+ className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-xl font-semibold tracking-normal transition hover:border-current"
  onDoubleClick={onStartTitleEditing}
  title={t("canvas.renameHint")}
  >
@@ -133,21 +133,21 @@ export function CanvasTopBar({
  </div>
  <Modal title={t("canvas.shortcuts")} open={shortcutsOpen} onCancel={() => setShortcutsOpen(false)} footer={null} centered>
  <div className="space-y-2 border-t pt-4 text-sm" style={{ borderColor: theme.node.stroke }}>
- <Shortcut keys={["Ctrl / Space", t("canvas.shortcut.drag")]} value={t("canvas.shortcut.toggleTool")} />
- <Shortcut keys={[t("canvas.shortcut.wheel")]} value={t("canvas.shortcut.zoom")} />
- <Shortcut keys={[t("canvas.shortcut.zoomSlider")]} value={t("canvas.shortcut.preciseZoom")} />
- <Shortcut keys={[t("canvas.shortcut.drag")]} value={t("canvas.shortcut.boxSelect")} />
- <Shortcut keys={["Shift / Cmd", t("canvas.shortcut.click")]} value={t("canvas.shortcut.addSelection")} />
- <Shortcut keys={["Ctrl / Cmd", "A"]} value={t("canvas.shortcut.selectAll")} />
- <Shortcut keys={["Ctrl / Cmd", "C / V"]} value={t("canvas.shortcut.copyPaste")} />
- <Shortcut keys={["Ctrl / Cmd", "G"]} value={t("canvas.shortcut.group")} />
- <Shortcut keys={["Ctrl / Cmd", "Shift", "G"]} value={t("canvas.shortcut.ungroup")} />
- <Shortcut keys={["Ctrl / Cmd", "Z"]} value={t("canvas.undo")} />
- <Shortcut keys={["Ctrl / Cmd", "Shift", "Z"]} value={t("canvas.redo")} />
- <Shortcut keys={["Ctrl / Cmd", "Y"]} value={t("canvas.redo")} />
- <Shortcut keys={["Delete / Backspace"]} value={t("canvas.shortcut.delete")} />
- <Shortcut keys={["Esc"]} value={t("canvas.shortcut.escape")} />
- <Shortcut keys={[t("canvas.shortcut.dropMedia")]} value={t("canvas.shortcut.upload")} />
+ <Shortcut keys={["Ctrl / Space", t("canvas.shortcut.drag")]} value={t("canvas.shortcut.toggleTool")} theme={theme} />
+ <Shortcut keys={[t("canvas.shortcut.wheel")]} value={t("canvas.shortcut.zoom")} theme={theme} />
+ <Shortcut keys={[t("canvas.shortcut.zoomSlider")]} value={t("canvas.shortcut.preciseZoom")} theme={theme} />
+ <Shortcut keys={[t("canvas.shortcut.drag")]} value={t("canvas.shortcut.boxSelect")} theme={theme} />
+ <Shortcut keys={["Shift / Cmd", t("canvas.shortcut.click")]} value={t("canvas.shortcut.addSelection")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "A"]} value={t("canvas.shortcut.selectAll")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "C / V"]} value={t("canvas.shortcut.copyPaste")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "G"]} value={t("canvas.shortcut.group")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "Shift", "G"]} value={t("canvas.shortcut.ungroup")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "Z"]} value={t("canvas.undo")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "Shift", "Z"]} value={t("canvas.redo")} theme={theme} />
+ <Shortcut keys={["Ctrl / Cmd", "Y"]} value={t("canvas.redo")} theme={theme} />
+ <Shortcut keys={["Delete / Backspace"]} value={t("canvas.shortcut.delete")} theme={theme} />
+ <Shortcut keys={["Esc"]} value={t("canvas.shortcut.escape")} theme={theme} />
+ <Shortcut keys={[t("canvas.shortcut.dropMedia")]} value={t("canvas.shortcut.upload")} theme={theme} />
  </div>
  </Modal>
  </>
@@ -163,7 +163,7 @@ function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
  );
 }
 
-function Shortcut({ keys, value }: { keys: string[]; value: string }) {
+function Shortcut({ keys, value, theme }: { keys: string[]; value: string; theme: typeof canvasThemes.light }) {
  return (
  <div className="grid grid-cols-[minmax(0,1fr)_120px] items-center gap-6 rounded-lg px-1 py-1.5">
  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -172,7 +172,7 @@ function Shortcut({ keys, value }: { keys: string[]; value: string }) {
  {index ? <span className="text-xs opacity-35">+</span> : null}
  <kbd
  className="min-w-9 rounded-md border px-2.5 py-1.5 text-center text-xs font-medium leading-none shadow-[inset_0_-1px_0_rgba(0,0,0,.08),0_1px_2px_rgba(0,0,0,.06)]"
- style={{ borderColor: "rgba(120,113,108,.28)", background: "linear-gradient(#fff, rgba(245,245,244,.92))", color: "rgb(68,64,60)" }}
+ style={{ borderColor: theme.node.stroke, background: theme.node.fill, color: theme.node.text }}
  >
  {key}
  </kbd>

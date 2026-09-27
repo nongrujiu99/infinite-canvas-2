@@ -62,6 +62,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  <Segmented
  size="small"
  block
+ disabled={isRunning}
  className="canvas-config-mode"
  value={mode}
  onChange={(value) => onModeChange(node.id, value as CanvasGenerationMode)}

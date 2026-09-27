@@ -12,8 +12,14 @@ colors:
   text-dark: "#edf3fb"
   muted-light: "#64748b"
   muted-dark: "#9daabd"
-  border-light: "#d8e0ea"
-  border-dark: "#263344"
+  border-light: "#dfe4ec"
+  border-dark: "rgba(184,199,222,0.14)"
+  background-light: "#f7f8fa"
+  background-dark: "#090d14"
+  success: "#22c55e"
+  warning: "#f59e0b"
+  destructive: "oklch(0.577 0.245 27.325)"
+  destructive-dark: "oklch(0.704 0.191 22.216)"
 typography:
   display:
     fontFamily: "SF Pro Display, PingFang SC, Microsoft YaHei, sans-serif"
@@ -46,6 +52,27 @@ spacing:
   control: "12px"
   surface: "20px"
   section: "32px"
+elevation:
+  interactive-lift: "0 16px 36px rgba(15,23,42,0.09)"
+  floating-dock: "0 12px 32px rgba(15,23,42,0.10)"
+  shadow-float: "0 18px 46px rgba(15,23,42,0.12)"
+  shadow-float-dark: "0 22px 54px rgba(0,0,0,0.42)"
+zIndex:
+  canvas: 0
+  node: 10
+  nodeSelected: 50
+  toolbar: 60
+  selectionToolbar: 70
+  modal: 1000
+opacity:
+  disabled: 0.55
+  muted: 0.7
+  faint: 0.45
+animation:
+  duration-fast: "150ms"
+  duration-normal: "200ms"
+  duration-slow: "280ms"
+  ease-default: "cubic-bezier(0.28, 0.11, 0.24, 1)"
 components:
   button-primary:
     background: "{colors.primary}"
@@ -121,10 +148,25 @@ The system uses tonal layering first and shadows second. Resting canvas chrome i
 
 ### Shadow Vocabulary
 
-- **Interactive lift** (`0 16px 36px rgba(15,23,42,0.09)`): Hovered project cards in light mode.
-- **Floating dock** (`0 12px 32px rgba(15,23,42,0.10)`): Persistent controls above the canvas.
+- **Interactive lift** (`{elevation.interactive-lift}`): Hovered project cards in light mode.
+- **Floating dock** (`{elevation.floating-dock}`): Persistent controls above the canvas.
+- **Float** (`{elevation.shadow-float}` / `{elevation.shadow-float-dark}`): CSS variable `--shadow-float` for elevated surfaces.
 
 **The Flat-by-Default Rule.** Depth must explain interaction or physical layering; it is never added to decorate a resting surface.
+
+## Semantic Colors
+
+- **Success** (`{colors.success}`): Positive outcomes, completed generation.
+- **Warning** (`{colors.warning}`): In-progress or caution states.
+- **Destructive** (`{colors.destructive}` / `{colors.destructive-dark}`): Errors, delete actions, and failure states.
+
+## Responsive Breakpoints
+
+The canvas workspace is inherently fluid. Library and configuration panels respond to available width using container queries where possible. Key breakpoints:
+
+- **< 440px**: Compact toolbar — icons only, labels hidden.
+- **≥ 440px**: Expanded toolbar — labels visible alongside icons.
+- **Side panel**: Resizable between 280px and 480px with drag handle.
 
 ## Shapes
 

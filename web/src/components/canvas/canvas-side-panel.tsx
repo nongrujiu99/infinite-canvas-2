@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, useState, useSyncExternalStore, type PointerEven
 import { App, Empty, Input, Popconfirm, Select, Spin, Tag } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Check, ChevronRight, Download, Eye, FileText, Image as ImageIcon, ListChecks, Music2, Plus, Search, Settings2, SlidersHorizontal, Square, Trash2, Type, Video } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
@@ -45,15 +45,16 @@ const NODE_TYPE_ICON: Record<string, typeof Square> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
- success: "#22c55e",
- loading: "#f59e0b",
- error: "#ef4444",
+ success: "var(--success)",
+ loading: "var(--warning)",
+ error: "var(--destructive)",
  idle: "transparent",
 };
 
 export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreviewNode, onInsertAsset }: Props) {
  const { t } = useTranslation();
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
+ const reduceMotion = useReducedMotion();
  const [tab, setTab] = useState<PanelTab>("canvas");
  const width = useCanvasSidePanelStore((state) => state.width);
  const panelOpen = useCanvasSidePanelStore((state) => state.panelOpen);
@@ -87,20 +88,20 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
  return (
  <motion.div
  className="relative z-[60] flex h-full shrink-0"
- initial={{ width: 0, opacity: 0 }}
+ initial={reduceMotion ? undefined : { width: 0, opacity: 0 }}
  animate={{ width: panelOpen ? width + 1 : 0, opacity: panelOpen ? 1 : 0 }}
- transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
+ transition={{ duration: resizing || reduceMotion ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
  style={{ overflow: "clip", pointerEvents: panelClosing ? "none" : undefined }}
  >
  <motion.aside
  className="relative flex h-full shrink-0 flex-col overflow-hidden border-r"
- initial={{ x: -48 }}
+ initial={reduceMotion ? undefined : { x: -48 }}
  animate={{ x: panelClosing ? -28 : 0 }}
- transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
+ transition={{ duration: resizing || reduceMotion ? 0 : PANEL_MOTION_SECONDS, ease: PANEL_EASE }}
  style={{ width, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
  data-canvas-no-zoom
  >
- <div className="flex items-center gap-5 px-4 pt-3.5">
+ <div className="flex items-center gap-5 px-4 pt-3.5" role="tablist">
  <TabButton label={t("canvas.sidePanel.canvas")} active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
  <TabButton label={t("canvas.sidePanel.assets")} active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
  <TabButton label={t("canvas.sidePanel.prompts")} active={tab === "prompts"} theme={theme} onClick={() => setTab("prompts")} />
@@ -121,10 +122,11 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, onFocusNode, onPreview
 }
 
 function TabButton({ label, active, theme, onClick }: { label: string; active: boolean; theme: CanvasTheme; onClick: () => void }) {
+ const reduceMotion = useReducedMotion();
  return (
- <button type="button" onClick={onClick} className="relative pb-1.5 text-sm font-semibold transition-opacity" style={{ color: theme.node.text, opacity: active ? 1 : 0.45 }}>
+ <button type="button" role="tab" aria-selected={active} onClick={onClick} className="relative pb-1.5 text-sm font-semibold transition-opacity" style={{ color: theme.node.text, opacity: active ? 1 : 0.45 }}>
  {label}
- {active ? <motion.span layoutId="sidePanelTabIndicator" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full" style={{ background: theme.toolbar.activeText }} transition={{ type: "spring", stiffness: 500, damping: 34 }} /> : null}
+ {active ? <motion.span layoutId="sidePanelTabIndicator" className="absolute inset-x-0 -bottom-px h-0.5 rounded-full" style={{ background: theme.toolbar.activeText }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 34 }} /> : null}
  </button>
  );
 }

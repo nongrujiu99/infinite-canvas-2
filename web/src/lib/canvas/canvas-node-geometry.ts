@@ -218,11 +218,19 @@ export function validateConnection(firstNodeId: string, secondNodeId: string, no
     if (fromResource && toResource) return { error: "resourceToResource" };
     if (from.type === CanvasNodeType.Group && !toConfig) return { error: "unsupportedInput" };
     if (fromOperation && toOperation) return { error: "operationToOperation" };
-    if (toConfig && isEmptyUploadResource(from)) return { error: "emptyResource" };
+    if (toResource && isEmptyUploadResource(to) && !fromConfig) return { error: "emptyResource" };
     if (toConfig && from.type !== CanvasNodeType.Group && !acceptsConfigInput(configMode(to), from)) return { error: "unsupportedInput" };
     if (to.type === CanvasNodeType.Operation && from.type !== (to.metadata?.operationKind === "frame" ? CanvasNodeType.Video : CanvasNodeType.Image)) return { error: "unsupportedInput" };
     if (fromOperation && toResource && operationOutputType(from) !== resourceType(to)) return { error: "wrongOutput" };
-    if (fromConfig && toResource && connections.filter((connection) => connection.valid !== false && connection.fromNodeId === from.id).length >= configOutputLimit(from)) return { error: "outputLimit" };
+    if (fromConfig && toResource) {
+        const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+        const emptyTargetCount = connections.filter((connection) => {
+            if (connection.valid === false || connection.fromNodeId !== from.id) return false;
+            const target = nodeMap.get(connection.toNodeId);
+            return target && isResourceNode(target) && isEmptyUploadResource(target);
+        }).length;
+        if (emptyTargetCount >= configOutputLimit(from)) return { error: "outputLimit" };
+    }
     if (to.type === CanvasNodeType.Operation) {
         const inputLimit = to.metadata?.operationKind === "mask" ? 2 : 1;
         if (connections.filter((connection) => connection.valid !== false && connection.toNodeId === to.id).length >= inputLimit) return { error: "occupiedInput" };

@@ -83,6 +83,8 @@
     --surface-raised: #ffffff;
     --surface-subtle: #eef2f7;
     --brand-soft: #e8eefc;
+    --success: #22c55e;
+    --warning: #f59e0b;
     --shadow-float: 0 18px 46px rgba(15, 23, 42, 0.12);
 }
 
@@ -121,6 +123,8 @@
     --surface-raised: #141c27;
     --surface-subtle: #182230;
     --brand-soft: #1b2a42;
+    --success: #22c55e;
+    --warning: #f59e0b;
     --shadow-float: 0 22px 54px rgba(0, 0, 0, 0.42);
 }
 
@@ -631,20 +635,20 @@
 }
 
 .canvas-connection-flow {
-    stroke-dasharray: 3 18;
-    animation: canvas-connection-flow 900ms linear infinite;
+    stroke-dasharray: 8 14;
+    animation: canvas-connection-flow 550ms linear infinite;
 }
 
 @keyframes canvas-connection-flow {
     to {
-        stroke-dashoffset: -21;
+        stroke-dashoffset: -22;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .canvas-connection-flow {
         animation: none;
-        stroke-dasharray: 3 10;
-        opacity: 0.65;
+        stroke-dasharray: 6 10;
+        opacity: 0.75;
     }
 }

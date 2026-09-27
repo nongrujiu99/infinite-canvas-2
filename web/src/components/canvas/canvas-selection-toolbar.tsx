@@ -58,24 +58,24 @@ export function CanvasSelectionToolbar({
  </svg>
  {showActions ? (
  <div
- className="absolute z-[70] flex h-12 -translate-x-1/2 -translate-y-full items-center overflow-visible rounded-[18px] border border-black/10 bg-white text-[15px] text-[#242529] shadow-[0_8px_28px_rgba(15,23,42,.12)]"
- style={{ left: left + width / 2, top: top - 8 }}
+ className="absolute z-[70] flex h-12 -translate-x-1/2 -translate-y-full items-center overflow-visible rounded-[18px] border"
+ style={{ left: left + width / 2, top: top - 8, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text, boxShadow: "0 8px 28px rgba(15,23,42,.12)" }}
  onMouseDown={(event) => event.stopPropagation()}
  onPointerDown={(event) => event.stopPropagation()}
  >
- {canGroup ? <SelectionAction title={t("canvas.nodeToolbar.groupTitle")} label={t("canvas.nodeToolbar.group")} icon={<Group className="size-4" />} onClick={onGroup} /> : null}
- {canUngroup ? <SelectionAction title={t("canvas.nodeToolbar.ungroupTitle")} label={t("canvas.nodeToolbar.ungroup")} icon={<Ungroup className="size-4" />} onClick={onUngroup} /> : null}
+ {canGroup ? <SelectionAction title={t("canvas.nodeToolbar.groupTitle")} label={t("canvas.nodeToolbar.group")} icon={<Group className="size-4" />} onClick={onGroup} theme={theme} /> : null}
+ {canUngroup ? <SelectionAction title={t("canvas.nodeToolbar.ungroupTitle")} label={t("canvas.nodeToolbar.ungroup")} icon={<Ungroup className="size-4" />} onClick={onUngroup} theme={theme} /> : null}
  </div>
  ) : null}
  </>
  );
 }
 
-function SelectionAction({ title, label, icon, onClick }: { title: string; label: string; icon: ReactNode; onClick: () => void }) {
+function SelectionAction({ title, label, icon, onClick, theme }: { title: string; label: string; icon: ReactNode; onClick: () => void; theme: typeof canvasThemes.light }) {
  return (
- <Tooltip title={title} placement="top" mouseEnterDelay={0.2} color="#ffffff" styles={{ root: { color: "#242529", boxShadow: "0 8px 24px rgba(15,23,42,.16)", fontSize: 13, fontWeight: 500 } }}>
- <button type="button" className="group relative flex h-12 items-center whitespace-nowrap px-1.5" onClick={onClick} aria-label={title}>
- <span className="flex h-9 items-center gap-2 rounded-lg px-2.5 transition group-hover:bg-[#f0f0f1]">
+ <Tooltip title={title} placement="top" mouseEnterDelay={0.2} color={theme.node.panel} styles={{ root: { color: theme.node.text, boxShadow: "0 8px 24px rgba(15,23,42,.16)", fontSize: 13, fontWeight: 500 } }}>
+ <button type="button" className="group relative flex h-12 items-center whitespace-nowrap px-1.5 text-sm" onClick={onClick} aria-label={title}>
+ <span className="flex h-9 items-center gap-2 rounded-lg px-2.5 transition" style={{ color: theme.node.text }} onMouseEnter={(e) => (e.currentTarget.style.background = theme.toolbar.itemHover)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
  {icon}
  <span>{label}</span>
  </span>

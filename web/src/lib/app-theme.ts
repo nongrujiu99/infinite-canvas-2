@@ -92,11 +92,11 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             },
             Popover: {
                 colorBgElevated: color.elevatedBg,
-                borderRadiusLG: 14,
+                borderRadiusLG: 16,
             },
             Card: {
                 colorBgContainer: dark ? "#101720" : "#ffffff",
-                borderRadiusLG: 14,
+                borderRadiusLG: 16,
             },
         },
     };

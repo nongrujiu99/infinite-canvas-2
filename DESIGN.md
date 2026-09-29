@@ -1,21 +1,22 @@
 ---
 name: Infinite Canvas Precision Studio
-description: A focused multimodal creation workspace built from cool neutral surfaces and decisive blue interaction states.
+description: A focused multimodal creation workspace built from logo-derived indigo, cyan signals, and cool neutral surfaces.
 colors:
-  primary: "#2563eb"
-  primary-dark: "#5b8cff"
-  canvas-light: "#f2f5f9"
-  canvas-dark: "#090d14"
+  primary: "#4f46e5"
+  primary-dark: "#818cf8"
+  signal: "#22d3ee"
+  canvas-light: "#f5f7ff"
+  canvas-dark: "#080b16"
   surface-light: "#ffffff"
-  surface-dark: "#101720"
-  text-light: "#111827"
-  text-dark: "#edf3fb"
-  muted-light: "#64748b"
-  muted-dark: "#9daabd"
-  border-light: "#dfe4ec"
-  border-dark: "rgba(184,199,222,0.14)"
-  background-light: "#f7f8fa"
-  background-dark: "#090d14"
+  surface-dark: "#111528"
+  text-light: "#17162b"
+  text-dark: "#f2f4ff"
+  muted-light: "#656b84"
+  muted-dark: "#a3a9c2"
+  border-light: "#dce0f2"
+  border-dark: "#2a304b"
+  background-light: "#f7f8ff"
+  background-dark: "#080b16"
   success: "#22c55e"
   warning: "#f59e0b"
   destructive: "oklch(0.577 0.245 27.325)"
@@ -94,24 +95,26 @@ components:
 
 **Creative North Star: "The Precision Studio"**
 
-Infinite Canvas is a high-frequency creative workbench rather than a decorative gallery. Its visual system keeps the canvas quiet and spacious while making selection, connection, configuration, and execution immediately legible. Cool neutral surfaces support long sessions; electric blue is reserved for intent and state.
+Infinite Canvas is a high-frequency creative workbench rather than a decorative gallery. Its visual system keeps the canvas quiet and spacious while making selection, connection, configuration, and execution immediately legible. Cool indigo-tinted neutrals support long sessions; Nodeter Indigo communicates intent and state, while Signal Cyan is reserved for active data flow and generation feedback.
 
 The system is dense where users make decisions and generous where they orient themselves. Controls are grouped by task, not distributed as equal-weight options, and canvas chrome stays flatter than content nodes.
 
 **Key Characteristics:**
 
 - Cool, low-noise working surfaces
-- Blue reserved for selection, focus, connection, and primary execution
+- Indigo reserved for selection, focus, structure, and primary execution
+- Cyan reserved for transient data flow and generation feedback
 - Compact controls inside clear task groups
 - Flat-by-default chrome with depth appearing on floating or interactive surfaces
 
 ## Colors
 
-The palette pairs blue interaction states with cool graphite and cloud neutrals.
+The palette derives its active colors from the Nodeter logo and pairs them with cool graphite and cloud neutrals.
 
 ### Primary
 
-- **Signal Blue:** The single action color for primary buttons, active navigation, selected nodes, focus rings, and valid connections.
+- **Nodeter Indigo:** The primary interaction color for buttons, active navigation, selected nodes, focus rings, and valid structure.
+- **Signal Cyan:** A restrained secondary signal for active data flow, generation progress, and other transient system feedback.
 
 ### Neutral
 
@@ -120,7 +123,7 @@ The palette pairs blue interaction states with cool graphite and cloud neutrals.
 - **Studio Surface:** Raised cards, node panels, menus, and configuration groups.
 - **Graphite Text:** Primary copy and labels with cool gray secondary text.
 
-**The One Signal Rule.** Blue communicates active intent or current state; it is not ambient decoration.
+**The Two-Role Rule.** Indigo communicates user intent and persistent state; cyan communicates transient flow. Neither is ambient decoration.
 
 ## Typography
 
@@ -177,8 +180,8 @@ Controls use a gently curved 12px radius. Cards and feature surfaces use 14–16
 ### Buttons
 
 - **Shape:** Compact 12px corners with icon-and-label alignment.
-- **Primary:** Signal Blue with high-contrast text and no decorative shadow.
-- **Hover / Focus:** Slight tonal shift plus a visible blue focus outline.
+- **Primary:** Nodeter Indigo with high-contrast text and no decorative shadow.
+- **Hover / Focus:** Slight tonal shift plus a visible indigo focus outline.
 - **Secondary / Ghost:** Transparent or neutral at rest, with a low-contrast hover surface.
 
 ### Cards / Containers
@@ -191,12 +194,12 @@ Controls use a gently curved 12px radius. Cards and feature surfaces use 14–16
 ### Inputs / Fields
 
 - **Style:** Cool neutral stroke, surface background, and 12px corners.
-- **Focus:** Border shifts to Signal Blue with the shared focus outline.
+- **Focus:** Border shifts to Nodeter Indigo with the shared focus outline.
 - **Error / Disabled:** Semantic color or reduced opacity without removing readable labels.
 
 ### Navigation
 
-Navigation is a flat horizontal rail. The active item uses a two-pixel blue underline and stronger weight; mobile collapses secondary destinations behind the existing menu entry.
+Navigation is a flat horizontal rail. The active item uses a two-pixel indigo underline and stronger weight; mobile collapses secondary destinations behind the existing menu entry.
 
 ### Generation Configuration Node
 
@@ -206,13 +209,14 @@ The signature node follows a fixed reading order: generation mode, references an
 
 ### Do:
 
-- **Do** reserve blue for intent, selection, focus, connection, and primary execution.
+- **Do** reserve indigo for intent, selection, focus, structure, and primary execution.
+- **Do** reserve cyan for active connection flow and generation feedback.
 - **Do** group parameters by task and keep the next action visible within the same node.
 - **Do** keep persistent canvas chrome visually lighter than selected content.
 
 ### Don't:
 
-- **Don't** use purple, gradients, or glow as general decoration.
+- **Don't** use gradients or glow as general decoration.
 - **Don't** give every toolbar action a filled background; fill communicates state.
 - **Don't** mix warm beige surfaces into the cool neutral working palette.
 - **Don't** hide keyboard focus or rely on color alone for disabled and error states.

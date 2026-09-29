@@ -19,20 +19,33 @@ export function usesAspectRatioImageParams(model: string, apiFormat: "openai" | 
     return apiFormat === "gemini" || name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
 }
 
+export function supportsGeminiImageSize(model: string) {
+    const value = model.toLowerCase();
+    return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro") || value.includes("nano-banana-2") || value.includes("nano-banana-pro");
+}
+
+export function mediaScaleOptionsForModel(model: string, apiFormat: "openai" | "gemini") {
+    return usesAspectRatioImageParams(model, apiFormat) && !supportsGeminiImageSize(model) ? (["1k", "auto"] as const) : mediaScaleOptions;
+}
+
 export function mediaRatioOptionsForModel(model: string, apiFormat: "openai" | "gemini") {
     return usesAspectRatioImageParams(model, apiFormat) ? mediaRatioOptions.filter((item) => geminiCompatibleRatioValues.has(item.value)) : mediaRatioOptions;
 }
 
 export function adaptMediaSizeToModel(size: string, model: string, apiFormat: "openai" | "gemini") {
     const options = mediaRatioOptionsForModel(model, apiFormat);
+    const scaleOptions = mediaScaleOptionsForModel(model, apiFormat);
     const ratio = inferMediaRatio(size || "auto");
-    if (options.some((item) => item.value === ratio)) return size;
+    const scale = inferMediaScale(size || "auto");
+    if (ratio === "auto" && scale === "auto") return "auto";
+    const nextScale = scaleOptions.some((option) => option === scale) ? scale : "1k";
+    if (options.some((item) => item.value === ratio)) return computeMediaSize(nextScale, ratio === "auto" ? "1:1" : ratio);
     const current = parseAspectRatio(ratio);
     if (!current) return "auto";
     const closest = options
         .filter((item) => item.value !== "auto")
         .reduce((best, item) => Math.abs(item.width / item.height - current.width / current.height) < Math.abs(best.width / best.height - current.width / current.height) ? item : best);
-    return computeMediaSize(inferMediaScale(size), closest.value);
+    return computeMediaSize(nextScale, closest.value);
 }
 
 export const imageSizePresets: Record<string, Record<string, string>> = {

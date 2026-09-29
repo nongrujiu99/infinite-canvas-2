@@ -7,7 +7,8 @@ import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
-import { adaptMediaSizeToModel, imageSizePresets, inferMediaRatio, inferMediaScale, usesAspectRatioImageParams } from "@/lib/media-size";
+import { adaptMediaSizeToModel, imageSizePresets, inferMediaRatio, inferMediaScale, supportsGeminiImageSize, usesAspectRatioImageParams } from "@/lib/media-size";
+import { supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -95,7 +96,7 @@ type GeminiPayload = {
     promptFeedback?: { blockReason?: string };
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
-type RequestOptions = { signal?: AbortSignal };
+type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string };
 
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
@@ -238,35 +239,36 @@ function closestGeminiAspectRatio(value: string) {
 }
 
 function resolveGeminiImageSize(quality: string, dimensions: { width: number; height: number } | null) {
+    if (dimensions) {
+        const size = `${dimensions.width}x${dimensions.height}`;
+        const scale = inferMediaScale(size);
+        if (Object.values(imageSizePresets[scale]).includes(size)) return scale.toUpperCase();
+        const edge = Math.max(dimensions.width, dimensions.height);
+        if (edge <= 768) return "512";
+        if (edge <= 1536) return "1K";
+        if (edge <= 3072) return "2K";
+        return "4K";
+    }
     const normalizedQuality = normalizeQuality(quality);
-    if (normalizedQuality) return GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
-    if (!dimensions) return undefined;
-    const size = `${dimensions.width}x${dimensions.height}`;
-    const scale = inferMediaScale(size);
-    if (Object.values(imageSizePresets[scale]).includes(size)) return scale.toUpperCase();
-    const edge = Math.max(dimensions.width, dimensions.height);
-    if (edge <= 768) return "512";
-    if (edge <= 1536) return "1K";
-    if (edge <= 3072) return "2K";
-    return "4K";
+    return normalizedQuality ? GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality] : undefined;
 }
 
-function supportsGeminiImageSize(model: string) {
-    const value = model.toLowerCase();
-    return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro") || value.includes("nano-banana-2") || value.includes("nano-banana-pro");
-}
-
-function resolveImageSource(item: Record<string, unknown>) {
+function resolveImageSource(item: Record<string, unknown>, baseUrl?: string) {
     if (typeof item.b64_json === "string" && item.b64_json) {
         return `data:image/png;base64,${item.b64_json}`;
     }
     if (typeof item.url === "string" && item.url) {
-        return item.url;
+        if (/^(?:https?:|data:|blob:)/i.test(item.url) || !baseUrl) return item.url;
+        try {
+            return new URL(item.url, `${baseUrl.replace(/\/+$/, "")}/`).toString();
+        } catch {
+            return item.url;
+        }
     }
     return null;
 }
 
-function parseImagePayload(payload: ImageApiResponse) {
+function parseImagePayload(payload: ImageApiResponse, baseUrl?: string) {
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || apiText("requestFailed"));
     }
@@ -276,7 +278,7 @@ function parseImagePayload(payload: ImageApiResponse) {
         || (payload as Record<string, unknown>).results as Array<Record<string, unknown>> | undefined
         || [];
     const images = imageList
-        .map(resolveImageSource)
+        .map((item) => resolveImageSource(item, baseUrl))
         .filter((value): value is string => Boolean(value))
         .map((dataUrl) => ({ id: nanoid(), dataUrl }));
 
@@ -791,7 +793,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 timeout: IMAGE_REQUEST_TIMEOUT_MS,
             },
         );
-        const images = await parseImagePayload(response.data);
+        const images = await parseImagePayload(response.data, requestConfig.baseUrl);
         return images;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
@@ -799,6 +801,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
 }
 
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    if (!supportsImageEditModel(config, config.model || config.imageModel, "reference", references.length)) throw new Error(i18n.t("canvas.editors.noCompatibleEditModel"));
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
@@ -835,29 +838,31 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     const requestSize = resolveRequestSize(quality, config.size);
     const sizeParams = resolveOpenAiImageSizeParams(requestConfig, requestSize);
     const background = normalizeBackground(config.background);
+    const modelName = requestConfig.model.toLowerCase();
+    const isGptImage = modelName.includes("gpt-image");
+    const isNanoBanana = modelName.includes("nano-banana");
+    const nativeMask = isGptImage ? options?.mask : undefined;
     const formData = new FormData();
     formData.set("model", requestConfig.model);
-    formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
-    formData.set("n", String(n));
-    // gpt-image models reject response_format; they always return b64.
-    if (!/gpt-image/.test(requestConfig.model)) {
-        formData.set("response_format", "b64_json");
+    formData.set("prompt", withSystemPrompt(requestConfig, nativeMask ? options?.maskPrompt || prompt : requestPrompt));
+    if (n > 1) formData.set("n", String(n));
+    if (isNanoBanana) {
+        formData.set("response_format", "url");
+        Object.entries(sizeParams).forEach(([key, value]) => formData.set(key, value));
+    } else if (isGptImage) {
+        if (requestSize) formData.set("size", requestSize);
+        if (quality) formData.set("quality", quality);
     }
-    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
-    if (quality) {
-        formData.set("quality", quality);
-    }
-    Object.entries(sizeParams).forEach(([key, value]) => formData.set(key, value));
-    if (background) {
+    if (isGptImage && background) {
         formData.set("background", background);
     }
-    const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    const imageField = files.length > 1 ? "image[]" : "image";
-    files.forEach((file) => formData.append(imageField, file));
+    const files = await Promise.all((nativeMask ? references.slice(0, 1) : references).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
+    files.forEach((file) => formData.append("image", file));
+    if (nativeMask) formData.set("mask", dataUrlToFile({ ...nativeMask, dataUrl: await imageToDataUrl(nativeMask) }));
 
     try {
         const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal, timeout: IMAGE_REQUEST_TIMEOUT_MS });
-        const images = await parseImagePayload(response.data);
+        const images = await parseImagePayload(response.data, requestConfig.baseUrl);
         return images;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));

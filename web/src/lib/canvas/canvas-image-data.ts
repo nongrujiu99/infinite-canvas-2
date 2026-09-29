@@ -115,6 +115,14 @@ export async function upscaleDataUrl(dataUrl: string, params: ImageUpscaleParams
     return params.algorithm === "high" ? drawStepUpscale(image, width, height) : drawResize(image, image.width, image.height, width, height, params.algorithm);
 }
 
+export async function resizeDataUrl(dataUrl: string, width: number, height: number) {
+    const image = await loadImage(dataUrl);
+    const targetWidth = Math.max(1, Math.round(width));
+    const targetHeight = Math.max(1, Math.round(height));
+    if (image.width === targetWidth && image.height === targetHeight) return dataUrl;
+    return drawResize(image, image.width, image.height, targetWidth, targetHeight, "high");
+}
+
 export function resolveUpscaleSize(width: number, height: number, targetLongEdge: number) {
     const longEdge = Math.max(1, width, height);
     const target = Math.min(MAX_UPSCALE_LONG_EDGE, Math.max(1, Math.round(targetLongEdge)));

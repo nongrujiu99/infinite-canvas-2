@@ -1,6 +1,6 @@
 import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video } from "lucide-react";
 import { Button, Input, InputNumber, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
@@ -10,10 +10,11 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasGenerationMode, CanvasGenerationSettings, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 import { getCanvasImageGenerationCount, getNodeGenerationSettings } from "@/lib/canvas/canvas-generation-helpers";
-import { adaptMediaSizeToModel, adaptVideoSecondsToModel, computeMediaSize, computeVideoSize, inferMediaRatio, inferMediaScale, inferVideoRatio, mediaRatioOptionsForModel, mediaScaleOptions, parseVideoResolution, readMediaDimensions, videoRatioOptions, videoSecondsSpecForModel } from "@/lib/media-size";
+import { adaptMediaSizeToModel, adaptVideoSecondsToModel, computeMediaSize, computeVideoSize, inferMediaRatio, inferMediaScale, inferVideoRatio, mediaRatioOptionsForModel, mediaScaleOptionsForModel, parseVideoResolution, readMediaDimensions, videoRatioOptions, videoSecondsSpecForModel } from "@/lib/media-size";
 import { audioFormatOptions, audioVoiceOptions } from "@/lib/audio-generation";
 import { CanvasConfigComposer } from "./canvas-config-composer";
 import type { NodeGenerationInput } from "./canvas-node-generation";
+import { imageEditModels, supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
 
 type CanvasConfigNodePanelProps = {
  node: CanvasNodeData;
@@ -40,6 +41,8 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  const mode = node.metadata?.generationMode || "image";
  const settings = getNodeGenerationSettings(node, mode);
  const config = buildNodeConfig(globalConfig, node, mode);
+ const requiresImageEditModel = mode === "image" && inputSummary.imageCount > 0;
+ const compatibleImageModels = useMemo(() => requiresImageEditModel ? imageEditModels(config, "reference", inputSummary.imageCount) : [], [config, inputSummary.imageCount, requiresImageEditModel]);
  const hasModeInput = mode === "text"
  ? inputSummary.textCount > 0
  : mode === "image"
@@ -48,13 +51,17 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  ? inputSummary.textCount > 0 || inputSummary.audioCount > 0
  : Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
  const hasComposerContent = Boolean((node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim());
- const canGenerate = hasComposerContent || hasModeInput;
- const updateSettings = (patch: Partial<CanvasGenerationSettings>) =>
- onConfigChange(node.id, { generationSettings: { ...node.metadata?.generationSettings, [mode]: { ...settings, ...patch } } });
- const changeModel = (model: string) => {
+ const modelCompatible = !requiresImageEditModel || compatibleImageModels.includes(config.model);
+ const canGenerate = (hasComposerContent || hasModeInput) && modelCompatible;
+ const updateSettings = useCallback((patch: Partial<CanvasGenerationSettings>) =>
+ onConfigChange(node.id, { generationSettings: { ...node.metadata?.generationSettings, [mode]: { ...settings, ...patch } } }), [mode, node.id, node.metadata?.generationSettings, onConfigChange, settings]);
+ const changeModel = useCallback((model: string) => {
  const apiFormat = resolveModelChannel(config, model).apiFormat;
  updateSettings(mode === "image" ? { model, size: adaptMediaSizeToModel(config.size, model, apiFormat) } : mode === "video" ? { model, seconds: adaptVideoSecondsToModel(config.videoSeconds, model) } : { model });
- };
+ }, [config, mode, updateSettings]);
+ useEffect(() => {
+ if (requiresImageEditModel && compatibleImageModels.length && !modelCompatible) changeModel(compatibleImageModels[0]);
+ }, [changeModel, compatibleImageModels, modelCompatible, requiresImageEditModel]);
  const summary = inputSummaryText(mode, inputSummary, t);
  return (
  <div className="flex h-full w-full cursor-move flex-col overflow-hidden px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
@@ -129,13 +136,14 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  </div>
 
  {invalidSourceIds.length ? <div className="mb-2 shrink-0 text-[11px] leading-4 text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
+ {requiresImageEditModel && !compatibleImageModels.length ? <div className="mb-2 shrink-0 text-[11px] leading-4 text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
 
  <div className="canvas-generation-settings shrink-0 cursor-default rounded-xl px-2.5 py-2" style={{ background: theme.node.fill }}>
  <CompactGenerationSettings mode={mode} config={config} settings={settings} onChange={updateSettings} />
  </div>
 
  <div className="mt-3 grid min-w-0 shrink-0 cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
- <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} onMissingConfig={() => openConfigDialog(true)} fullWidth contained />
+ <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} optionFilter={requiresImageEditModel ? (item) => supportsImageEditModel(config, item, "reference", inputSummary.imageCount) : undefined} onMissingConfig={() => openConfigDialog(true)} fullWidth contained />
  <Button
  type="primary"
  size="small"
@@ -186,14 +194,16 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
  if (mode === "image") {
  const scale = inferMediaScale(config.size || "auto");
  const ratio = inferMediaRatio(config.size || "auto");
- const ratioOptions = mediaRatioOptionsForModel(config.model, resolveModelChannel(config, config.model).apiFormat);
+ const apiFormat = resolveModelChannel(config, config.model).apiFormat;
+ const ratioOptions = mediaRatioOptionsForModel(config.model, apiFormat);
+ const scaleOptions = mediaScaleOptionsForModel(config.model, apiFormat);
  const dimensions = readMediaDimensions(config.size || "auto", scale, ratio);
  const pixelSize = `${dimensions.width} × ${dimensions.height} px`;
  const imageCount = getCanvasImageGenerationCount(config.count);
  const applySize = (nextScale: string, nextRatio: string) => onChange({ size: computeMediaSize(nextScale, nextRatio) });
  return <div className="grid min-w-0 grid-cols-6 items-end gap-2">
  <CompactField label={t("settingsPanels.image.aspectRatio")}><Select size="small" className={fieldClass} value={ratio} options={ratioOptions.map((item) => ({ value: item.value, label: item.value === "auto" ? t("settingsPanels.common.auto") : item.value }))} onChange={(value) => applySize(scale, value)} /></CompactField>
- <CompactField label={t("settingsPanels.image.resolution")}><Select size="small" className={fieldClass} value={scale} options={mediaScaleOptions.map((value) => ({ value, label: value === "auto" ? t("settingsPanels.common.auto") : value.toUpperCase() }))} onChange={(value) => applySize(value, ratio === "auto" ? "1:1" : ratio)} /></CompactField>
+ <CompactField label={t("settingsPanels.image.resolution")}><Select size="small" className={fieldClass} value={scale} options={scaleOptions.map((value) => ({ value, label: value === "auto" ? t("settingsPanels.common.auto") : value.toUpperCase() }))} onChange={(value) => applySize(value, ratio === "auto" ? "1:1" : ratio)} /></CompactField>
  <CompactField label={t("settingsPanels.image.pixels")}><div className="canvas-parameter-value" title={pixelSize}>{pixelSize}</div></CompactField>
  <CompactField label={t("settingsPanels.image.count")}><Select size="small" className={fieldClass} value={imageCount} options={[1, 2, 3, 4].map((value) => ({ value, label: String(value) }))} onChange={(count) => onChange({ count })} /></CompactField>
  <CompactField label={t("settingsPanels.image.quality")}><Select size="small" className={fieldClass} value={config.quality || "auto"} options={["auto", "high", "medium", "low"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(quality) => onChange({ quality })} /></CompactField>

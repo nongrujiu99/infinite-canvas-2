@@ -25,14 +25,7 @@ export function AppTopNav() {
  <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-5 sm:px-8">
  <div className="flex min-w-0 items-center">
  <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-primary">
- <span
- className="size-5 shrink-0 bg-primary"
- style={{
- mask: "url(/logo.svg) center / contain no-repeat",
- WebkitMask: "url(/logo.svg) center / contain no-repeat",
- }}
- />
- <span className="text-base font-semibold tracking-[-0.015em]">{t("meta.title")}</span>
+ <img src="/logo-wordmark.svg" alt={t("meta.title")} className="h-6 w-auto shrink-0" />
  </Link>
 
  <button

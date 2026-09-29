@@ -7,12 +7,13 @@ import { useTranslation } from "react-i18next";
 import { readImageMeta } from "@/lib/image-utils";
 import { useImageEditorViewport } from "@/components/canvas/use-image-editor-viewport";
 import { ModelPicker } from "@/components/model-picker";
-import { preferredImageEditModel, saveImageEditModel } from "@/lib/canvas/image-edit-preferences";
-import type { AiConfig } from "@/stores/use-config-store";
+import { preferredImageEditModel, saveImageEditModel, supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import { selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 
 export type CanvasImageMaskEditPayload = {
  prompt: string;
  maskDataUrl: string;
+ apiMaskDataUrl: string;
  generate: boolean;
  model: string;
 };
@@ -23,7 +24,7 @@ type MaskStroke = { mode: DrawMode; size: number; points: Point[] };
 type BrushPreview = { x: number; y: number; size: number; adjusting: boolean };
 
 const defaultBrushSize = 100;
-const maskOverlayColor = "#2563eb";
+const maskOverlayColor = "#4f46e5";
 const maskOverlayAlpha = 0.4;
 
 export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void; onMissingConfig: () => void }) {
@@ -37,7 +38,11 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  const redoRef = useRef<MaskStroke[]>([]);
  const [image, setImage] = useState<{ width: number; height: number } | null>(null);
  const [prompt, setPrompt] = useState("");
- const defaultModel = useMemo(() => preferredImageEditModel(config), [config]);
+ const editModels = useMemo(() => selectableModelsByCapability(config, "image").filter((item) => supportsImageEditModel(config, item, "mask")), [config]);
+ const defaultModel = useMemo(() => {
+ const preferred = preferredImageEditModel(config, "mask");
+ return editModels.includes(preferred) ? preferred : editModels[0] || "";
+ }, [config, editModels]);
  const [model, setModel] = useState(defaultModel);
  const [brushSize, setBrushSize] = useState(defaultBrushSize);
  const [mode, setMode] = useState<DrawMode>("paint");
@@ -217,8 +222,9 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  if (!nextPrompt) return setError(t("canvas.editors.maskPromptRequired"));
  if (!canvas || !element) return;
  if (!canvasHasPaint(canvas)) return setError(t("canvas.editors.maskRequired"));
+ if (generate && (!model || !supportsImageEditModel(config, model, "mask"))) return setError(t("apiErrors.maskModelUnsupported"));
  saveImageEditModel(model);
- onConfirm({ prompt: nextPrompt, maskDataUrl: buildMaskOverlay(element, canvas), generate, model });
+ onConfirm({ prompt: nextPrompt, maskDataUrl: buildMaskOverlay(element, canvas), apiMaskDataUrl: buildEditMask(canvas), generate, model });
  };
 
  return (
@@ -320,6 +326,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  config={config}
  value={model}
  capability="image"
+ optionFilter={(item) => supportsImageEditModel(config, item, "mask")}
  fullWidth
  className="h-9 w-full rounded-lg bg-transparent"
  onChange={(value) => {
@@ -353,7 +360,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  <Button icon={<ImagePlus className="size-4" />} onClick={() => submit(false)}>
  {t("canvas.editors.maskExport")}
  </Button>
- <Button type="primary" icon={<WandSparkles className="size-4" />} onClick={() => submit(true)}>
+ <Button type="primary" icon={<WandSparkles className="size-4" />} disabled={!model} onClick={() => submit(true)}>
  {t("canvas.editors.maskGenerate")}
  </Button>
  </div>
@@ -458,5 +465,18 @@ function buildMaskOverlay(image: HTMLImageElement, selectionCanvas: HTMLCanvasEl
  overlayContext.fillRect(0, 0, overlay.width, overlay.height);
  context.globalAlpha = maskOverlayAlpha;
  context.drawImage(overlay, 0, 0);
+ return canvas.toDataURL("image/png");
+}
+
+function buildEditMask(selectionCanvas: HTMLCanvasElement) {
+ const canvas = document.createElement("canvas");
+ canvas.width = selectionCanvas.width;
+ canvas.height = selectionCanvas.height;
+ const context = canvas.getContext("2d");
+ if (!context) return selectionCanvas.toDataURL("image/png");
+ context.fillStyle = "#fff";
+ context.fillRect(0, 0, canvas.width, canvas.height);
+ context.globalCompositeOperation = "destination-out";
+ context.drawImage(selectionCanvas, 0, 0);
  return canvas.toDataURL("image/png");
 }

@@ -55,6 +55,7 @@ export type CanvasNodeImage = {
     naturalHeight: number;
     bytes: number;
     mimeType: string;
+    pendingRemoteResult?: boolean;
 };
 
 export type CanvasNodeText = {
@@ -105,6 +106,7 @@ export type CanvasNodeMetadata = {
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
+    pendingRemoteResult?: boolean;
     videoTaskId?: string;
     videoTaskProvider?: "openai" | "gemini";
     groupId?: string;

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Modal, Slider } from "antd";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ModelPicker } from "@/components/model-picker";
-import { preferredImageEditModel, saveImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import { imageEditModels, preferredImageEditModel, saveImageEditModel, supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
 import type { AiConfig } from "@/stores/use-config-store";
 
 export type CanvasImageAngleParams = {
@@ -24,10 +24,11 @@ const defaultParams: Omit<CanvasImageAngleParams, "model"> = {
 
 export function CanvasNodeAngleDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageAngleParams) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
- const [params, setParams] = useState<CanvasImageAngleParams>(() => ({ ...defaultParams, model: preferredImageEditModel(config) }));
+ const [params, setParams] = useState<CanvasImageAngleParams>(() => ({ ...defaultParams, model: preferredImageEditModel(config, "angle") }));
+ const editModels = useMemo(() => imageEditModels(config, "angle"), [config]);
 
  useEffect(() => {
- if (open) setParams({ ...defaultParams, model: preferredImageEditModel(config) });
+ if (open) setParams({ ...defaultParams, model: preferredImageEditModel(config, "angle") });
  }, [config, dataUrl, open]);
 
  const update = <Key extends keyof CanvasImageAngleParams>(key: Key, value: CanvasImageAngleParams[Key]) => setParams((current) => ({ ...current, [key]: value }));
@@ -64,12 +65,15 @@ export function CanvasNodeAngleDialog({ dataUrl, config, open, onClose, onConfir
  </div>
  <div className="grid grid-cols-[88px_1fr] items-center gap-4">
  <span className="font-medium opacity-75">{t("canvas.editors.maskModel")}</span>
- <ModelPicker config={config} value={params.model} capability="image" fullWidth className="h-10 w-full rounded-lg bg-transparent" onChange={(value) => { update("model", value); saveImageEditModel(value); }} onMissingConfig={onMissingConfig} />
+ <div>
+ <ModelPicker config={config} value={params.model} capability="image" fullWidth className="h-10 w-full rounded-lg bg-transparent" optionFilter={(item) => supportsImageEditModel(config, item, "angle")} onChange={(value) => { update("model", value); saveImageEditModel(value); }} onMissingConfig={onMissingConfig} />
+ {!editModels.length ? <div className="mt-1 text-xs text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
+ </div>
  </div>
  </div>
  </div>
  <div className="flex justify-end">
- <Button type="primary" className="h-10 rounded-lg px-4 font-semibold" icon={<WandSparkles className="size-4" />} onClick={() => { saveImageEditModel(params.model); onConfirm(params); }}>
+ <Button type="primary" className="h-10 rounded-lg px-4 font-semibold" icon={<WandSparkles className="size-4" />} disabled={!params.model || !supportsImageEditModel(config, params.model, "angle")} onClick={() => { if (!params.model || !supportsImageEditModel(config, params.model, "angle")) return; saveImageEditModel(params.model); onConfirm(params); }}>
  {t("canvas.editors.aiGenerate")}
  </Button>
  </div>

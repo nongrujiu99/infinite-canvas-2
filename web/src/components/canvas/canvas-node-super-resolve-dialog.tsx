@@ -4,7 +4,7 @@ import { WandSparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ModelPicker } from "@/components/model-picker";
-import { preferredImageEditModel, saveImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import { imageEditModels, preferredImageEditModel, saveImageEditModel, supportsImageEditModel, supportsSuperResolveScale } from "@/lib/canvas/image-edit-preferences";
 import { readImageMeta } from "@/lib/image-utils";
 import { computeMediaSize, inferMediaRatio, parsePixelSize } from "@/lib/media-size";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -14,19 +14,20 @@ export type CanvasSuperResolvePayload = { model: string; scale: "1k" | "2k" | "4
 export function CanvasNodeSuperResolveDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (payload: CanvasSuperResolvePayload) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
  const [image, setImage] = useState<{ width: number; height: number } | null>(null);
- const [model, setModel] = useState(() => preferredImageEditModel(config));
+ const [model, setModel] = useState(() => preferredImageEditModel(config, "superResolve"));
+ const editModels = useMemo(() => imageEditModels(config, "superResolve"), [config]);
  const [scale, setScale] = useState<CanvasSuperResolvePayload["scale"] | null>(null);
  const ratio = image ? inferMediaRatio(`${image.width}x${image.height}`) : "auto";
  const output = useMemo(() => scale ? parsePixelSize(computeMediaSize(scale, ratio)) : null, [ratio, scale]);
  const scaleOptions = useMemo(() => (["1k", "2k", "4k"] as const).map((value) => {
  const size = parsePixelSize(computeMediaSize(value, ratio));
- return { label: value.toUpperCase(), value, disabled: Boolean(image && size && size.width * size.height <= image.width * image.height) };
- }), [image, ratio]);
+ return { label: value.toUpperCase(), value, disabled: !supportsSuperResolveScale(config, model, value) || Boolean(image && size && size.width * size.height <= image.width * image.height) };
+ }), [config, image, model, ratio]);
 
  useEffect(() => {
  if (!open) return;
  setScale(null);
- setModel(preferredImageEditModel(config));
+ setModel(preferredImageEditModel(config, "superResolve"));
  setImage(null);
  void readImageMeta(dataUrl).then(setImage);
  }, [config, dataUrl, open]);
@@ -59,10 +60,12 @@ export function CanvasNodeSuperResolveDialog({ dataUrl, config, open, onClose, o
  ))}
  </div>
  <div className="text-xs opacity-55">{t("canvas.editors.selectResolutionHint")}</div>
+ {!supportsSuperResolveScale(config, model, "4k") ? <div className="text-xs text-amber-500">{t("canvas.editors.modelMax2K")}</div> : null}
  </div>
  <div className="space-y-2">
  <div className="font-medium opacity-75">{t("canvas.editors.maskModel")}</div>
- <ModelPicker config={config} value={model} capability="image" fullWidth className="h-10 w-full rounded-lg bg-transparent" onChange={(value) => { setModel(value); saveImageEditModel(value); }} onMissingConfig={onMissingConfig} />
+ <ModelPicker config={config} value={model} capability="image" fullWidth className="h-10 w-full rounded-lg bg-transparent" optionFilter={(item) => supportsImageEditModel(config, item, "superResolve")} onChange={(value) => { setModel(value); saveImageEditModel(value); }} onMissingConfig={onMissingConfig} />
+ {!editModels.length ? <div className="text-xs text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
  </div>
  <div className="flex h-10 items-center justify-between rounded-lg border px-3 text-sm">
  <span className="opacity-60">{t("canvas.editors.outputSize")}</span>
@@ -71,7 +74,7 @@ export function CanvasNodeSuperResolveDialog({ dataUrl, config, open, onClose, o
  </div>
  </div>
  <div className="flex justify-end">
- <Button type="primary" className="h-10 rounded-lg px-4 font-semibold" icon={<WandSparkles className="size-4" />} disabled={!scale} onClick={() => { if (!scale) return; saveImageEditModel(model); onConfirm({ model, scale }); }}>
+ <Button type="primary" className="h-10 rounded-lg px-4 font-semibold" icon={<WandSparkles className="size-4" />} disabled={!scale || !model || !supportsImageEditModel(config, model, "superResolve") || !supportsSuperResolveScale(config, model, scale)} onClick={() => { if (!scale || !model || !supportsImageEditModel(config, model, "superResolve") || !supportsSuperResolveScale(config, model, scale)) return; saveImageEditModel(model); onConfirm({ model, scale }); }}>
  {t("canvas.editors.startSuperResolve")}
  </Button>
  </div>

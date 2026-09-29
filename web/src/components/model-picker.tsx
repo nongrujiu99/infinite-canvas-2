@@ -17,6 +17,7 @@ type ModelPickerProps = {
  placeholder?: string;
  onMissingConfig?: () => void;
  contained?: boolean;
+ optionFilter?: (model: string) => boolean;
 };
 
 const FAVORITES_KEY = "infinite-canvas:model-favorites:v1";
@@ -24,7 +25,7 @@ const RECENTS_KEY = "infinite-canvas:model-recents:v1";
 type RecentModel = { model: string; count: number; lastUsed: number };
 type ModelView = "favorites" | "recent" | "all";
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, contained = false }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, contained = false, optionFilter }: ModelPickerProps) {
  const { t } = useTranslation();
  const pickerId = useId();
  const [open, setOpen] = useState(false);
@@ -32,7 +33,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  const [view, setView] = useState<ModelView>("all");
  const [favorites, setFavorites] = useState<string[]>(() => readLocalList(FAVORITES_KEY));
  const [recents, setRecents] = useState<RecentModel[]>(() => readRecentModels());
- const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
+ const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model) && (!optionFilter || optionFilter(model))))), [capability, config, optionFilter, value]);
  const filteredOptions = useMemo(() => {
  const normalized = query.trim().toLowerCase();
  return normalized ? options.filter((model) => `${model} ${modelOptionLabel(config, model)}`.toLowerCase().includes(normalized)) : options;

@@ -15,6 +15,7 @@ import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-refer
 import { useTranslation } from "react-i18next";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+const TEXT_NODE_FONT_FAMILY = '"SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif';
 
 type CanvasNodeProps = {
  data: CanvasNodeData;
@@ -24,6 +25,7 @@ type CanvasNodeProps = {
  isFocusRelated: boolean;
  isConnectionTarget: boolean;
  isGenerationTarget?: boolean;
+ retryRequiresConfiguration?: boolean;
  referenceSelectionState?: "target" | "disabled" | "available";
  mentionReferences?: CanvasResourceReference[];
  renderNodeContent?: (node: CanvasNodeData) => ReactNode;
@@ -79,6 +81,7 @@ type NodeContentRendererProps = {
  onUpload?: () => void;
  groupChildCount: number;
  isGenerationTarget: boolean;
+ retryRequiresConfiguration?: boolean;
 };
 
 export const CanvasNode = React.memo(function CanvasNode({
@@ -89,6 +92,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  isFocusRelated,
  isConnectionTarget,
  isGenerationTarget = false,
+ retryRequiresConfiguration = false,
  referenceSelectionState,
  mentionReferences = [],
  renderNodeContent,
@@ -423,6 +427,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  onUpload={() => onUpload?.(data)}
  groupChildCount={groupChildCount}
  isGenerationTarget={isGenerationTarget}
+ retryRequiresConfiguration={retryRequiresConfiguration}
  />
  </div>
 
@@ -452,7 +457,7 @@ function NodeContent(props: NodeContentRendererProps) {
  if (props.isBatchRoot && props.node.type === CanvasNodeType.Image) return <ImageNodeContent {...props} />;
  if (props.node.type === CanvasNodeType.Text && props.node.metadata?.texts?.length && (props.node.metadata.status !== "error" || props.node.metadata.texts.some((text) => text.content))) return <TextContent {...props} />;
  if (props.node.metadata?.status === "loading") return <LoadingContent theme={props.theme} />;
- if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.onRetry} />;
+ if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.onRetry} retryRequiresConfiguration={props.retryRequiresConfiguration} />;
 
  const Renderer = nodeContentRenderers[props.node.type as CanvasNodeType];
  if (Renderer) return <Renderer {...props} />;
@@ -495,8 +500,9 @@ function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
  );
 }
 
-function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry">) {
+function ErrorContent({ node, theme, onRetry, retryRequiresConfiguration }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry" | "retryRequiresConfiguration">) {
  const { t } = useTranslation();
+ const reloadOnly = node.metadata?.pendingRemoteResult || node.metadata?.videoTaskId || node.metadata?.images?.some((image) => image.pendingRemoteResult);
  return (
  <div className="flex max-w-[260px] flex-col items-center gap-3 px-5 text-center">
  <div className="text-xs leading-5 text-red-300">{node.metadata?.errorDetails || t("canvas.node.failed")}</div>
@@ -511,7 +517,7 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
  onMouseDown={(event) => event.stopPropagation()}
  >
  <RefreshCw className="size-3.5" />
- {t("canvas.node.retry")}
+ {t(reloadOnly ? "canvas.node.reloadResult" : retryRequiresConfiguration ? "canvas.node.reconfigure" : "canvas.node.regenerate")}
  </button>
  </div>
  );
@@ -521,7 +527,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  const { t } = useTranslation();
  const copyText = useCopyText();
  const fontSize = node.metadata?.fontSize || 14;
- const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
+ const textStyle = { fontFamily: TEXT_NODE_FONT_FAMILY, fontSize: `${fontSize}px`, fontWeight: 400, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, boxSizing: "border-box" } as React.CSSProperties;
  const texts = node.metadata?.texts || [];
  const batchCount = texts.length;
  const isBatchRoot = batchCount > 1;
@@ -541,7 +547,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  {isEditingContent ? (
  <CanvasResourceMentionTextarea
  ref={textareaRef}
- className={`thin-scrollbar block h-full w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-none bg-transparent m-0 font-mono outline-none select-text appearance-none ${paddingClass}`}
+ className={`thin-scrollbar m-0 block h-full w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-none bg-transparent outline-none select-text appearance-none ${paddingClass}`}
  style={textStyle}
  value={content}
  references={mentionReferences}
@@ -556,13 +562,13 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  onWheel={(event) => event.stopPropagation()}
  />
  ) : content ? (
- <div className={`thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent font-mono ${paddingClass}`} style={textStyle} onWheel={(event) => event.stopPropagation()}>
+ <div className={`thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent ${paddingClass}`} style={textStyle} onWheel={(event) => event.stopPropagation()}>
  {content}
  </div>
  ) : primaryText ? (
  <TextSlotStatus text={primaryText} />
  ) : (
- <div className="p-4 font-mono" style={{ color: theme.node.placeholder }}>
+ <div className="p-4" style={{ color: theme.node.placeholder, fontFamily: TEXT_NODE_FONT_FAMILY }}>
  {t("canvas.node.editText")}
  </div>
  )}
@@ -587,7 +593,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  {isBatchRoot ? (
  <button
  type="button"
- className="flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.12)] backdrop-blur-md transition hover:scale-[1.02]"
+ className="flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(24,25,56,.12)] backdrop-blur-md transition hover:scale-[1.02]"
  style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
  aria-label={batchExpanded ? t("canvas.node.textBatchExpanded") : t("canvas.node.textBatchCollapsed")}
  onClick={(event) => {
@@ -619,7 +625,7 @@ function ExpandedTextCard({ node, text, index, onSetPrimary }: { node: CanvasNod
 
  return (
  <div
- className="absolute z-20 overflow-hidden rounded-3xl border shadow-[0_18px_50px_rgba(28,25,23,.14)]"
+ className="absolute z-20 overflow-hidden rounded-3xl border shadow-[0_18px_50px_rgba(24,25,56,.14)]"
  style={
  {
  left: x,
@@ -639,7 +645,7 @@ function ExpandedTextCard({ node, text, index, onSetPrimary }: { node: CanvasNod
  >
  {text.content ? (
  <>
- <div className="thin-scrollbar h-full overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 pt-14 font-mono text-sm leading-6" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+ <div className="thin-scrollbar h-full overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 pt-14 text-sm leading-6" style={{ color: theme.node.text, fontFamily: TEXT_NODE_FONT_FAMILY, fontWeight: 400 }} onWheel={(event) => event.stopPropagation()}>
  {text.content}
  </div>
  <button type="button" className="pointer-events-none absolute right-2.5 top-2.5 flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium opacity-0 transition duration-150 hover:bg-black/5 group-hover/node:pointer-events-auto group-hover/node:opacity-100 dark:hover:bg-white/10" style={{ color: theme.node.text }} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
@@ -806,11 +812,11 @@ function ImageContent({
  <ImageSlotStatus image={primaryImage} />
  )}
  </div>
- {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
+ {primaryImage?.status === "error" ? <BatchImageFailureActions placement="left" reloadOnly={primaryImage.pendingRemoteResult} onRetry={() => onRetryBatchImage?.(primaryImage.id)} onDelete={() => onDeleteBatchImage?.(primaryImage.id)} /> : null}
  {isBatchRoot ? (
  <button
  type="button"
- className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(28,25,23,.16)] backdrop-blur-md transition hover:scale-[1.02]"
+ className="absolute right-2.5 top-2.5 z-30 flex h-8 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold shadow-[0_6px_18px_rgba(24,25,56,.16)] backdrop-blur-md transition hover:scale-[1.02]"
  style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
  aria-label={batchExpanded ? t("canvas.node.batchExpanded") : t("canvas.node.batchCollapsed")}
  onClick={(event) => {
@@ -855,7 +861,7 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
 
  return (
  <div
- className={`absolute z-20 overflow-hidden rounded-3xl ${image.content ? "" : "border shadow-[0_18px_50px_rgba(28,25,23,.18)]"}`}
+ className={`absolute z-20 overflow-hidden rounded-3xl ${image.content ? "" : "border shadow-[0_18px_50px_rgba(24,25,56,.18)]"}`}
  style={
  {
  left: x,
@@ -895,19 +901,19 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
  </button>
  </div>
  ) : null}
- {image.status === "error" ? <BatchImageFailureActions placement="right" onRetry={onRetry} onDelete={onDelete} /> : null}
+ {image.status === "error" ? <BatchImageFailureActions placement="right" reloadOnly={image.pendingRemoteResult} onRetry={onRetry} onDelete={onDelete} /> : null}
  </div>
  );
 }
 
-function BatchImageFailureActions({ placement, onRetry, onDelete }: { placement: "left" | "right"; onRetry: () => void; onDelete: () => void }) {
+function BatchImageFailureActions({ placement, reloadOnly, onRetry, onDelete }: { placement: "left" | "right"; reloadOnly?: boolean; onRetry: () => void; onDelete: () => void }) {
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const { t } = useTranslation();
  return (
  <div className={`absolute top-3 z-30 flex items-center gap-1.5 ${placement === "left" ? "left-3" : "right-3"}`}>
  <button type="button" className="flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium shadow-sm transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }} onClick={(event) => (event.stopPropagation(), onRetry())}>
  <RefreshCw className="size-3.5" />
- {t("canvas.node.retry")}
+ {t(reloadOnly ? "canvas.node.reloadResult" : "canvas.node.regenerate")}
  </button>
  <button type="button" className="grid size-8 place-items-center rounded-lg border shadow-sm transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }} onClick={(event) => (event.stopPropagation(), onDelete())} aria-label={t("common.delete")} title={t("common.delete")}>
  <Trash2 className="size-3.5" />

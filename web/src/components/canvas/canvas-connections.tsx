@@ -31,7 +31,7 @@ export function ConnectionPath({
  const curvature = Math.max(Math.abs(endX - startX) * 0.5, 50);
  const pathD = `M ${startX} ${startY} C ${startX + curvature} ${startY}, ${endX - curvature} ${endY}, ${endX} ${endY}`;
  const invalid = connection.valid === false;
- const flowColor = useThemeStore((s) => s.theme) === "dark" ? "#22d3ee" : "#0891b2";
+ const flowColor = theme.canvas.flowStroke;
  const baseStroke = invalid ? "#ef4444" : active ? theme.node.activeStroke : theme.node.muted;
  const baseWidth = active ? 3 : 2;
  const baseOpacity = flowing ? 0 : invalid ? 0.65 : active ? 1 : 0.82;

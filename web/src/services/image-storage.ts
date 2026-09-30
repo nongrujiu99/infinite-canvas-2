@@ -36,6 +36,14 @@ type ImageReadOptions = { signal?: AbortSignal };
 
 export async function uploadImage(input: string | Blob, options?: ImageReadOptions): Promise<UploadedImage> {
     if (typeof input !== "string") return storeImage(input, options);
+    if (/^data:/i.test(input)) {
+        const match = input.match(/^data:([^;,]+);base64,(.+)$/);
+        if (!match) throw new Error(i18n.t("common.imageReadFailed"));
+        const binary = atob(match[2]);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        return storeImage(new Blob([bytes], { type: match[1] }), options);
+    }
 
     let blob: Blob;
     try {

@@ -137,7 +137,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  const batchCount = data.type === CanvasNodeType.Image ? data.metadata?.images?.length || 0 : data.type === CanvasNodeType.Text ? data.metadata?.texts?.length || 0 : 0;
  const isBatchRoot = batchCount > 1;
  const isActive = isConnectionTarget || isSelected || isFocusRelated;
- const imageBorderColor = isActive ? theme.canvas.selectionStroke : isRelated ? theme.node.muted : "transparent";
+ const imageBorderColor = isActive ? theme.canvas.selectionStroke : isRelated ? theme.node.muted : theme.node.stroke;
  const textareaRef = useRef<HTMLTextAreaElement>(null);
  const titleInputRef = useRef<HTMLInputElement>(null);
  const resizeRef = useRef({

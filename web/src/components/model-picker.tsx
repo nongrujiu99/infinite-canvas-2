@@ -18,6 +18,7 @@ type ModelPickerProps = {
  onMissingConfig?: () => void;
  contained?: boolean;
  optionFilter?: (model: string) => boolean;
+ ariaLabel?: string;
 };
 
 const FAVORITES_KEY = "infinite-canvas:model-favorites:v1";
@@ -25,7 +26,7 @@ const RECENTS_KEY = "infinite-canvas:model-recents:v1";
 type RecentModel = { model: string; count: number; lastUsed: number };
 type ModelView = "favorites" | "recent" | "all";
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, contained = false, optionFilter }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, contained = false, optionFilter, ariaLabel }: ModelPickerProps) {
  const { t } = useTranslation();
  const pickerId = useId();
  const [open, setOpen] = useState(false);
@@ -80,6 +81,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  onMouseDown={(event) => event.stopPropagation()}
  onPointerDown={(event) => event.stopPropagation()}
  title={current ? modelOptionLabel(config, current) : pickerPlaceholder}
+ aria-label={ariaLabel}
  >
  <ModelIcon model={current} />
  <span className="canvas-model-picker-text flex min-w-0 flex-1 items-baseline gap-1.5 text-left">

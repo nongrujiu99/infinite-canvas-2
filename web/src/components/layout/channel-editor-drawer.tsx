@@ -1,10 +1,10 @@
-import { App, Button, Input, Tag } from "antd";
+import { App, Button, Checkbox, Input, Tag } from "antd";
 import { ArrowLeft, CheckCircle2, RefreshCw, Save, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { fetchChannelModels } from "@/services/api/image";
-import { guessCapability, normalizeChannelModels, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { guessCapability, normalizeChannelModels, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
 type TestSummary = { total: number; counts: Record<ModelCapability, number> };
 
@@ -17,7 +17,7 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
 
  useEffect(() => {
  setDraft(channel);
- setTestSummary(channel.models.length ? summarizeModels(channel.models.map((model) => model.name)) : null);
+ setTestSummary(channel.models.length ? summarizeModels(channel.models) : null);
  }, [channel]);
 
  const validateAndSave = async () => {
@@ -35,7 +35,7 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  models: normalizeChannelModels(names.map((name) => existing.get(name) || { name, capability: guessCapability(name) })),
  };
  setDraft(next);
- setTestSummary(summarizeModels(names));
+ setTestSummary(summarizeModels(next.models));
  onSave(next);
  message.success(t("config.channelEditor.savedAndSynced", { count: names.length }));
  } catch (error) {
@@ -77,6 +77,12 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  </div>
  </div> : null}
 
+ {draft.models.some((model) => model.capability === "text") ? <fieldset className="mt-4 rounded-xl border border-border p-3">
+ <legend className="px-1 text-sm font-medium">{t("config.channelEditor.imageInputModels")}</legend>
+ <p className="mb-2 text-xs text-muted-foreground">{t("config.channelEditor.imageInputDescription")}</p>
+ <div className="grid gap-2 sm:grid-cols-2">{draft.models.filter((model) => model.capability === "text").map((model) => <Checkbox key={model.name} checked={Boolean(model.supportsImageInput)} onChange={(event) => setDraft((current) => ({ ...current, models: current.models.map((item) => item.name === model.name ? { ...item, supportsImageInput: event.target.checked } : item) }))}>{model.name}</Checkbox>)}</div>
+ </fieldset> : null}
+
  <div className="mt-5 flex flex-wrap gap-2">
  <Button type="primary" icon={<Save className="size-4" />} loading={testing} onClick={() => void validateAndSave()}>{t("config.channelEditor.testAndSave")}</Button>
  {testSummary ? <Button icon={<RefreshCw className="size-4" />} loading={testing} onClick={() => void validateAndSave()}>{t("config.channelEditor.refetchModels")}</Button> : null}
@@ -86,8 +92,8 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  );
 }
 
-function summarizeModels(names: string[]): TestSummary {
+function summarizeModels(models: ChannelModel[]): TestSummary {
  const counts: Record<ModelCapability, number> = { image: 0, video: 0, text: 0, audio: 0 };
- names.forEach((name) => { counts[guessCapability(name)] += 1; });
- return { total: names.length, counts };
+ models.forEach((model) => { counts[model.capability] += 1; });
+ return { total: models.length, counts };
 }

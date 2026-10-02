@@ -17,6 +17,7 @@
 
 - [Local Development](/docs/development/local-development)
 - [Canvas Data Structure](/docs/development/canvas-data-structure)
+- [Ecommerce Workbench Development Specification (Chinese)](/zh-CN/docs/development/ecommerce-workbench)
 
 ## Security
 

@@ -1,0 +1,921 @@
+---
+title: 电商全案工作台开发规格
+description: 面向 Codex 实施的电商主图与详情页全案工作台产品、架构、数据与验收规范
+---
+
+# 电商全案工作台开发规格
+
+> 状态：已实现并完成聚焦静态复审，待人工验收。本文同时作为实现与验收依据；开发时优先遵循根目录 `AGENTS.md`，其次遵循本文。若实现中发现本文与现有代码冲突，应先核对现有实现并向用户说明，不得静默扩大范围。
+
+## 1. 目标
+
+在现有无限画布应用中新增独立的“电商全案”工作台，用于把商品图片、商品资料和参考页面转化为一整套电商主图、详情页图片和策略规划文档。
+
+工作台负责结构化策划、全套生成、进度管理、版本管理、分类导出和发送到画布；无限画布继续负责自由组合、后续编辑和素材复用。二者共享现有模型配置、AI 请求能力和图片 Blob 存储，但业务状态与页面源码保持分离。
+
+核心体验：
+
+```text
+新建电商项目
+→ 上传商品素材并标注角色
+→ 选择分析模型与图片模型
+→ 自动分析并生成全案方案
+→ 用户确认一次方案
+→ 锁定模型、Skill 版本、方案和任务
+→ 自动直出一整套主图与详情页
+→ 导出 ZIP 或发送到任意画布
+```
+
+## 2. 已确认的产品决策
+
+以下决策视为实现约束，不在开发时重新猜测：
+
+1. 采用应用内独立页面，不把全案流程塞进画布节点，也不使用浏览器弹窗。
+2. 第一阶段围绕当前“电商全案助手”Skill 落地，不建设任意 `SKILL.md` 通用执行器。
+3. 最终图片必须由图片模型一次性完整生成，包括画面、标题和卖点文案。
+4. 禁止通过本地脚本或浏览器代码叠字、拼图、换背景、合成商品与场景、裁切后重组最终交付图。
+5. 默认在方案确认后自动生成整套；开始生成后不再逐张要求人工确认。
+6. 图片模型在整套生成开始前选择一次；开始后锁定，整套使用同一个图片模型。
+7. 不支持单张任务覆盖图片模型。失败项和用户指定的单张重做继续使用本批次原模型。
+8. 如需更换图片模型，停止当前批次并创建新的整套版本；旧版本及已完成结果保留。
+9. 主图目标为 `1200px` 宽、`1:1`；详情页目标为 `1500px` 宽、竖版且单屏高不超过 `3000px`。
+10. 模型不支持精确目标尺寸时，选择该模型支持的、宽度大于等于目标宽度且最接近目标宽度的尺寸；不得向下选择。
+11. 不对模型输出做本地缩放、裁剪或补边。项目中同时记录目标尺寸和实际尺寸。
+12. 没有符合条件的模型尺寸时，预检失败，不得静默降低尺寸。
+13. 生成完成后，用户可以自由选择新建画布、当前可识别画布或任意已有画布作为发送目标。
+14. 页面切换后生成任务应继续；浏览器刷新或关闭导致请求中断时，不自动重复请求，避免重复计费。
+15. 不做自动审图后重生成。错字、商品漂移、物理逻辑或设计问题只作为可选复核项；仅在用户明确要求后重做指定图片。
+16. 图片生成任务最大并发数固定为 `2`；超出任务按计划顺序排队，单项失败不阻塞其他任务，自动重试次数为 `0`。
+
+## 3. 第一版范围
+
+### 3.1 包含
+
+- 电商全案项目列表、新建、重命名、复制、删除和打开。
+- 商品图、包装图、商品资料、风格参考、详情页参考的导入与角色标注。
+- 淘宝主图、淘宝详情页或主图与详情页全套三种输出范围。
+- 多模态分析模型生成结构化方案。
+- 方案查看、模块启停、排序和文案/画面要求编辑。
+- 生成前预检、全案快照和整套任务创建。
+- 使用同一个锁定图片模型逐任务生成完整图片。
+- 暂停、继续、手动重试失败项、修订提示词后使用原版本模型重做指定项。
+- 主图、详情页、策略规划分类管理。
+- 当前版本 ZIP 导出。
+- 把当前版本发送到用户选择的画布。
+- 浏览器本地持久化、已完成结果恢复和本地空间清理。
+
+### 3.2 不包含
+
+- 任意本地 Skill 文件的动态加载和执行。
+- Agent 工具调用、文件系统权限或服务器端任务队列。
+- 云端账号、云端项目、云端素材或云同步承诺。
+- 本地文字图层、排版编辑器、PSD/可编辑设计稿。
+- 自动修字、自动审图、自动淘汰结果或自动循环重生成。
+- 单张任务选择不同图片模型。
+- 生成中途自动切换备用模型。
+- Amazon A+、AliExpress、Temu 等其他平台的专用规则；数据结构应避免阻塞未来扩展，但不提前实现其业务分支。
+
+## 4. Skill 逻辑映射
+
+当前 Skill 的业务主链路必须保留：
+
+```text
+输入分类
+→ Product Image Analysis
+→ Information Confidence
+→ 品类路由
+→ Buyer Demand Map
+→ Demand-to-Selling-Point Match
+→ Product Type Strategy
+→ Purchase Decision Type
+→ Page Strategy / Best Hero Direction
+→ Main Image Plan / Module Plan
+→ Page Task Table
+→ Scene Layout Plan
+→ Campaign Style Lock
+→ Style System Lock
+→ Design Strength Lock
+→ Product Identity & Physics Lock
+→ 防模板检查
+→ 每张图片独立提示词
+→ 每张图片独立整图生成
+→ 分类导出
+```
+
+### 4.1 适配原则
+
+- `SKILL.md` 和引用文件是产品规则来源，不是浏览器运行时脚本。
+- 将规则转成项目内带版本号的工作流定义、结构化 schema 和提示词组装器。
+- 不在运行时读取 `C:\Users\...\.codex\skills` 等开发机路径。
+- 每次开始分析和开始生成时记录当前 `workflowVersion`；旧项目继续使用自己的快照，不因后续规则更新而改变。
+- 完整策略保存在结构化数据中，再由结构化数据导出《策略规划.md》，不得把 Markdown 当作运行时数据库。
+
+### 4.2 信息可信度
+
+所有卖点必须归入：
+
+- `confirmed`：用户明确提供、商品图清晰可见或包装文字可读。
+- `reasonable_inference`：基于可见形态作出的保守推断，只能使用低风险场景表达。
+- `needs_confirmation`：材质、尺寸、参数、认证、功效、销量、评价、兼容性、成分比例或授权等未知信息。
+
+`needs_confirmation` 不得作为图片内文案。规划结果必须保留风险说明，但不单独生成“补拍素材清单”。
+
+### 4.3 整图直出边界
+
+允许的本地处理：
+
+- 下载或读取模型返回的图片。
+- 把图片保存进现有图片 Blob 存储。
+- 检查文件是否存在、读取实际宽高、记录 MIME 和字节数。
+- 重命名、分类并打包 ZIP。
+
+禁止的本地处理：
+
+- 在图片上叠加或修复文字。
+- 把多张图片拼成一张详情页。
+- 把商品、背景、标签或装饰分别生成后合成。
+- 本地换背景、裁切重组、补边或制作联系表。
+- 为满足目标像素而缩放最终图片。
+
+## 5. 页面与路由
+
+新增路由：
+
+```text
+/ecommerce                  电商全案项目列表
+/ecommerce/:id              电商全案项目工作台
+```
+
+在 `web/src/constant/navigation-tools.ts` 增加 `ecommerce` 导航项，在中英文国际化文件中增加“电商全案”文案。使用合适的 Lucide 商务/商品图标，保持现有顶部导航交互。
+
+不要把工作台实现成覆盖全屏的 Modal。页面应在现有 `UserLayout` 中运行，并继承 `AppProviders`、主题 token、模型配置和全局通知能力。
+
+## 6. 页面结构
+
+### 6.1 项目列表页
+
+项目卡片至少显示：
+
+- 商品名或项目名。
+- 封面商品图。
+- 输出范围。
+- 当前阶段。
+- 当前版本及图片模型。
+- 已完成任务数/总任务数。
+- 最后更新时间。
+
+支持新建、打开、重命名、复制和删除。删除项目时需要把不再被画布、素材库或其他电商项目引用的图片交给统一引用清理处理，不能直接按项目暴力删除共享 Blob。
+
+### 6.2 项目工作台
+
+桌面端采用三栏结构，视觉方向为克制、工具化、低装饰密度，沿用应用现有主题，不使用独立硬编码黑白色系。
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│ 项目名  平台/语言  素材→策划→确认→生成→完成  版本/状态       │
+├────────────┬──────────────────────────┬──────────────────┤
+│ 素材与信息   │ 当前阶段主工作区            │ 全局设置与执行控制    │
+│ 商品图       │ 商品分析 / 方案 / 结果看板   │ 输出范围             │
+│ 包装图       │ 主图任务 / 详情页任务        │ 模型                 │
+│ 资料文本     │ 单项预览与编辑              │ 尺寸预检             │
+│ 参考页面     │                          │ 进度与主操作         │
+├────────────┴──────────────────────────┴──────────────────┤
+│ 保存状态  发送到画布  导出当前版本                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+窄屏可以收起左右栏，但第一版仍以桌面端为主，不为移动端重建一套交互。
+
+### 6.3 左栏：素材与事实
+
+素材角色：
+
+- `product_identity`：商品本体参考，决定外观一致性。
+- `packaging`：包装、配件、套装内容，只能证明可见内容。
+- `style_reference`：只影响视觉语言，不得替换商品身份。
+- `detail_reference`：参考页面结构、节奏和视觉装置，不复制文案、品牌或精确布局。
+- `product_info`：用户提供的商品资料文本。
+
+图片导入后允许修改角色。规划前必须至少有一项商品图或足够明确的商品资料。白底商品图只用于锁定商品身份，提示词必须明确禁止复制为白底单品图。
+
+### 6.4 中栏：方案与任务
+
+策划阶段显示：
+
+- 商品可见事实、合理推断和待确认信息。
+- 买家需求排序及其匹配卖点。
+- 商品类型与购买决策类型。
+- 页面策略、首屏方向和视觉节奏。
+- 主图任务列表。
+- 详情页任务列表。
+- 风格、设计强度和商品一致性锁。
+
+任务卡支持：
+
+- 启用/停用。
+- 拖动排序。
+- 修改主标题、卖点短句、买家需求、画面结构和风险提醒。
+- 生成后查看大图、下载、编辑当前完整提示词并使用原版本模型创建新 attempt。
+
+不要在任务卡中提供图片模型下拉框。
+
+### 6.5 右栏：全局设置与执行
+
+生成前显示：
+
+- 平台：第一版固定淘宝，但保留数据字段。
+- 语言。
+- 输出范围：主图、详情页、全套。
+- 分析规划模型。
+- 图片生成模型。
+- 目标尺寸和解析后的实际请求尺寸。
+- 主图数量、详情页数量和总任务数。
+- 方案确认状态。
+
+生成开始后：
+
+- 模型和批次参数只读。
+- 显示完成、执行中、等待、失败、暂停数量。
+- 主操作在“暂停”“继续”“重试失败项”“导出”之间按状态变化。
+
+## 7. 用户流程
+
+### 7.1 新建与分析
+
+1. 用户新建项目并填写商品名。
+2. 上传商品图片、资料和可选参考页。
+3. 为素材确认角色。
+4. 选择分析规划模型。
+5. 点击“分析并规划”。
+6. 工作台保存分析模型快照，调用支持图片输入的文本模型，要求返回符合 schema 的 JSON。
+7. JSON 校验失败时显示原始错误并允许用户重新分析；不得用松散正则静默拼出不完整计划。
+8. 生成方案后进入 `awaiting_confirmation`。
+
+### 7.2 方案确认
+
+用户可以修改任务内容、顺序和启用状态。确认前执行防模板检查：
+
+- 每屏解决不同买家需求。
+- 每屏有匹配卖点和视觉证明。
+- 页面结构、主体尺度和视觉装置具有变化。
+- 风格锁和商品锁完整。
+- 未确认事实没有进入图片文案。
+- 主图和详情页职责没有混淆。
+
+检查结果用于阻止明显不完整的结构化方案，不调用模型自动审图，也不生成后自动返工。
+
+### 7.3 生成前预检
+
+点击“生成整套”前显示最终摘要：
+
+- 当前方案版本。
+- 工作流版本。
+- 图片模型和渠道。
+- 主图、详情页及总任务数。
+- 商品参考图数量。
+- 主图目标与请求尺寸。
+- 详情页目标与请求尺寸。
+- 所有待生成图片内的预期文案列表。
+
+预检必须确认：
+
+- 渠道 API 配置可用。
+- 选中模型属于图片能力。
+- 含商品参考图时模型支持参考图编辑/生成，并满足参考图数量要求。
+- 能解析出符合第 12 节的尺寸。
+- 所有启用任务都有标题、卖点和画面要求。
+- `needs_confirmation` 没有被写入图片文案。
+
+预检成功后创建不可变的 `EcommerceGenerationVersion` 和任务快照，再开始生成。
+
+### 7.4 整套生成
+
+- 每张图片对应一个独立任务、一个独立提示词和一次独立图片请求。
+- 所有任务使用版本快照中的同一个图片模型。
+- 页面切换不得销毁执行器或请求状态；执行器不能只存在于路由页面组件生命周期内。
+- 用户暂停时中止尚未完成的活动请求；已保存结果保留。
+- 继续时只调度未完成或明确待重试任务。
+- 请求状态不确定或浏览器刷新后，不自动重新发送；标记为 `interrupted`，等待用户继续。
+- 不做自动重试。失败项由用户点击“重试失败项”，并继续使用原模型和任务快照。
+- 成功生成后立即通过 `uploadImage` 写入图片 Blob 存储，并记录实际宽高；未成功持久化不得标记为完成。
+- 图片生成最大并发数为 `2`；版本内按计划顺序、版本间按轮询公平排队。任一任务失败后释放执行槽位并继续调度后续任务，不触发自动重试。
+
+### 7.5 完成、复核与重做
+
+图片请求成功且文件已保存即视为 `succeeded`，不把视觉质量检查当作成功条件。
+
+工作台可以显示人工复核标记：
+
+- 文案错字或乱码。
+- 商品外观漂移。
+- 不可信参数或配件。
+- 物理关系异常。
+- 页面结构重复或风格偏弱。
+
+复核标记不触发自动重生成。用户明确选择某张图片重做时：
+
+- 使用该版本原图片模型。
+- 使用当前任务的修订提示词创建新的 `attempt`。
+- 保留旧结果供对比，不覆盖历史文件。
+- 当前版本选择哪个 attempt 作为交付结果由用户决定。
+
+### 7.6 更换模型
+
+整套开始后不允许切换当前版本模型。需要新模型时：
+
+1. 停止或等待当前版本结束。
+2. 从已确认方案创建新版本。
+3. 选择新的图片模型。
+4. 重新执行完整启用任务集合。
+
+旧版本继续可查看、导出和删除。不得混合两个模型的结果冒充同一个完整版本。
+
+## 8. 状态机
+
+### 8.1 项目阶段
+
+```ts
+type EcommerceProjectStage =
+  | "draft"
+  | "analyzing"
+  | "analysis_failed"
+  | "awaiting_confirmation"
+  | "ready"
+  | "generating"
+  | "paused"
+  | "partially_failed"
+  | "completed";
+```
+
+核心转换：
+
+```text
+draft → analyzing → awaiting_confirmation → ready → generating → completed
+            └→ analysis_failed              ├→ paused
+                                             └→ partially_failed
+```
+
+### 8.2 图片任务状态
+
+```ts
+type EcommerceTaskStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "interrupted"
+  | "canceled";
+```
+
+`failed` 和 `interrupted` 必须区分。`failed` 表示收到明确失败；`interrupted` 表示刷新、关闭、网络状态未知或执行器丢失，不能自动重发。
+
+## 9. 数据模型
+
+以下类型是实施基线，允许按现有代码风格微调命名，但不得把大图片 base64 直接写入项目 JSON。
+
+```ts
+type EcommerceOutputScope = "main" | "detail" | "full";
+type EcommerceAssetRole =
+  | "product_identity"
+  | "packaging"
+  | "style_reference"
+  | "detail_reference";
+
+type EcommerceAsset = {
+  id: string;
+  role: EcommerceAssetRole;
+  title: string;
+  storageKey: string;
+  width: number;
+  height: number;
+  bytes: number;
+  mimeType: string;
+};
+
+type EcommerceFact = {
+  id: string;
+  topic: string;
+  value: string;
+  confidence: "confirmed" | "reasonable_inference" | "needs_confirmation";
+  sourceAssetIds: string[];
+  allowedAsImageCopy: boolean;
+};
+
+type EcommerceTaskKind = "main" | "detail";
+
+type EcommerceMainImageRole = "full_product" | "angle" | "detail" | "lifestyle" | "scale" | "packaging";
+type EcommerceDifferenceFactor = "background" | "angle" | "title_position" | "image_text_ratio" | "information_density" | "layout_structure" | "subject_scale" | "visual_device" | "hero_subject_mode";
+
+type EcommercePlanTask = {
+  id: string;
+  kind: EcommerceTaskKind;
+  order: number;
+  enabled: boolean;
+  pageRole: string;
+  structureType: "hero" | "scene" | "detail" | "flat_lay" | "process" | "information" | "comparison" | "summary" | "operation" | "category_motif";
+  layoutStructure: string;
+  mainImageRoles: EcommerceMainImageRole[];
+  buyerDemandId: string;
+  buyerDemand: string;
+  buyerQuestion: string;
+  matchedSellingPoint: string;
+  confidence: EcommerceFact["confidence"];
+  title: string;
+  moduleTitleDirection: string;
+  sellingPointLabel: string;
+  copySuggestion: string;
+  coreInformation: string;
+  visualSuggestion: string;
+  requiredProof: string;
+  visualProof: string;
+  visualDevice: string;
+  subjectScale: string;
+  backgroundSystem: string;
+  cameraAngle: string;
+  titlePlacement: string;
+  imageTextRatio: string;
+  informationDensity: string;
+  heroSubjectMode: "full_product" | "partial_product" | "not_hero";
+  sceneStructure: string;
+  requiredElements: string[];
+  forbiddenElements: string[];
+  riskReminder: string;
+  differenceFromPrevious: string;
+  differenceFactors: EcommerceDifferenceFactor[];
+};
+
+type EcommercePlan = {
+  schemaVersion: number;
+  informationConfidence: EcommerceFact[];
+  buyerDemandMap: Array<{ id: string; rank: number; demand: string; buyerQuestion: string; priorityReason: string }>;
+  demandSellingPointMatches: Array<{ buyerDemandId: string; buyerDemand: string; sellingPoint: string; confidence: EcommerceFact["confidence"]; copyDirection: string; visualProof: string; forbiddenClaims: string[] }>;
+  productTypeStrategy: string;
+  purchaseDecisionType: string;
+  detailComplexity: "standard" | "complex";
+  detailComplexityBasis: string;
+  pageStrategy: string;
+  bestHeroDirection: string;
+  visualRhythmPlan: string;
+  sceneLayoutPlan: string;
+  campaignStyleLock: string;
+  styleSystemLock: { typographyFeel: string; titleHierarchy: string; mainColor: string; accentColor: string; darkAnchor: string; highlightColor: string; labelSystem: string; informationCardStyle: string; lightingSystem: string; sceneTexture: string };
+  designStrengthLock: { categoryVisualMotif: string; buyerDemandRhythmMap: string; compositionScales: string[]; signatureDevices: string[]; colorContrast: string; sceneDensity: string; templateBan: string };
+  productIdentityPhysicsLock: { silhouette: string; colorMaterial: string; patternLogoPlacement: string; structuralRelationships: string; scaleRelationships: string; physicalLogic: string; doNotChange: string; compositionFreedom: string };
+  tasks: EcommercePlanTask[];
+};
+
+type EcommerceModelSnapshot = {
+  encodedModel: string;
+  channelId: string;
+  baseUrl: string;
+  modelName: string;
+  apiFormat: "openai" | "gemini";
+  capability: "text" | "image" | "video";
+  supportsImageInput: boolean;
+  script?: string;
+};
+
+type EcommerceRequestSnapshot = {
+  quality: string;
+  background: string;
+  systemPrompt: string;
+  reasoningEffort: "auto" | "low" | "medium" | "high" | "xhigh";
+  proxyEnabled: boolean;
+  proxyUrl: string;
+};
+
+type EcommerceImageSize = {
+  targetWidth: number;
+  targetHeight?: number;
+  targetRatio: string;
+  requestSize: string;
+  requestWidth: number;
+  requestHeight: number;
+};
+
+type EcommerceTaskAttempt = {
+  id: string;
+  createdAt: string;
+  status: EcommerceTaskStatus;
+  prompt: string;
+  errorDetails?: string;
+  storageKey?: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  mimeType?: string;
+};
+
+type EcommerceGenerationTask = {
+  id: string;
+  planTaskId: string;
+  kind: EcommerceTaskKind;
+  outputOrder: number;
+  status: EcommerceTaskStatus;
+  expectedTitle: string;
+  expectedSellingPointLabel: string;
+  selectedAttemptId?: string;
+  reviewFlags: Array<"copy" | "product_consistency" | "untrusted_claim" | "physical_logic" | "structure_or_style">;
+  nextPrompt?: string;
+  attempts: EcommerceTaskAttempt[];
+};
+
+type EcommerceGenerationVersion = {
+  id: string;
+  versionNumber: number;
+  createdAt: string;
+  workflowVersion: string;
+  language: string;
+  outputScope: EcommerceOutputScope;
+  referenceAssets: EcommerceAsset[];
+  requestConfig: EcommerceRequestSnapshot;
+  planSnapshot: EcommercePlan;
+  imageModel: EcommerceModelSnapshot;
+  mainImageSize?: EcommerceImageSize;
+  detailImageSize?: EcommerceImageSize;
+  tasks: EcommerceGenerationTask[];
+  status: "ready" | "generating" | "paused" | "partially_failed" | "completed";
+};
+
+type EcommerceProject = {
+  id: string;
+  title: string;
+  platform: "taobao";
+  language: string;
+  outputScope: EcommerceOutputScope;
+  createdAt: string;
+  updatedAt: string;
+  stage: EcommerceProjectStage;
+  productInfo: string;
+  assets: EcommerceAsset[];
+  analysisModel?: EcommerceModelSnapshot;
+  analysisRunId?: string;
+  workflowVersion: string;
+  plan?: EcommercePlan;
+  confirmedPlanRevision?: number;
+  versions: EcommerceGenerationVersion[];
+  activeVersionId?: string;
+};
+```
+
+`EcommercePlanTask.order` 只表示方案编辑顺序；创建版本时，启用的主图和详情页必须分别按该顺序生成从 `1` 开始连续的 `EcommerceGenerationTask.outputOrder`。执行、提示词编号、结果展示、ZIP 命名和画布排序只使用版本快照中的 `outputOrder`，禁用任务不占用输出编号。
+
+避免为未来平台提前堆积大量可选字段。新字段只在当前工作流确实需要时增加。
+
+## 10. 提示词上下文分层组装
+
+“精简”不代表删除业务信息，而是去除重复规则并把模型注意力集中到当前页面。完整规划始终保存在项目中。
+
+每张图片的最终提示词由以下部分按固定顺序构建：
+
+### A. 输出合同
+
+- 主图或详情页类型。
+- 目标与请求尺寸。
+- 语言。
+- 最终整图一次生成。
+- 标题和卖点必须直接出现在图片中。
+
+### B. 全案固定锁
+
+- Campaign Style Lock。
+- Style System Lock。
+- Design Strength Lock。
+- Product Identity & Physics Lock。
+- 商品参考图的身份用途。
+- 白底商品图非复制约束。
+
+### C. 全套简表
+
+只提供任务编号、页面角色和一句任务摘要，帮助模型理解整套节奏。不要逐字重复其他页面的完整 20 个字段。
+
+### D. 当前任务完整信息
+
+- 当前页面角色。
+- 买家需求和问题。
+- 匹配卖点及可信度。
+- 精确主标题和卖点短句。
+- 视觉证明、主体尺度和场景结构。
+- 必须元素、禁止元素和风险提醒。
+- 与上一页的差异。
+
+### E. 合并后的统一负面约束
+
+统一声明不得虚构销量、评价、认证、测试、功效、参数、材质、包装数量、兼容性和品牌授权；不得增加不存在的商品结构和配件；不得本地后期合成。
+
+提示词组装器应是纯函数，并把最终 prompt 保存到每次 attempt，便于审计和重做。不要在 React 组件中拼接大段提示词。
+
+## 11. 模型选择与锁定
+
+### 11.1 分析模型
+
+- 从现有文本模型渠道中选择。
+- 必须支持图片输入，才能分析商品图与参考页。
+- 点击“分析并规划”时保存模型快照。
+- 同一项目只允许一个分析令牌存活；输入变化时中止或作废旧令牌，只有当前令牌可以提交结果。
+- 重新分析可重新选择模型，但旧方案不应被静默覆盖；至少更新方案 revision。
+
+### 11.2 图片模型
+
+- 从现有图片能力模型中选择。
+- 有商品参考图时必须通过当前项目的能力判断确认支持参考图。
+- 点击“生成整套”并通过预检后保存模型快照。
+- 快照包含规范化渠道 `baseUrl`；继续、重试和重做时若同一渠道地址已变化，必须停止并提示恢复原地址。
+- 当前版本所有任务只使用该快照。
+- 生成中模型控件只读。
+- 不允许任务级模型字段。
+
+### 11.3 不可用模型
+
+渠道、端点、模型或密钥失效时暂停或标记失败，不能自动选择其他端点或模型。API Key 只从当前渠道读取，不进入版本快照或交付内容。用户只能修复原渠道后继续，或基于同一方案创建新版本并重新选择模型。
+
+## 12. 尺寸解析
+
+### 12.1 主图
+
+- 目标：`1200 × 1200`、`1:1`。
+- 从模型支持尺寸中筛选 `width >= 1200` 且为 `1:1` 的候选。
+- 选择宽度最小的候选，即最接近但不低于目标。
+- 没有候选则预检失败。
+
+### 12.2 详情页
+
+- 目标：宽 `1500px`、竖版、单屏高 `<= 3000px`。
+- 从模型支持尺寸中筛选 `width >= 1500`、`height > width` 且 `height <= 3000` 的候选。
+- 优先选择宽度最接近 `1500px` 的候选；宽度相同时选择最接近当前任务建议比例的尺寸。
+- 没有候选则预检失败。
+
+### 12.3 现有实现适配
+
+复用 `web/src/lib/media-size.ts` 已有的模型比例与尺寸能力，不要在电商组件中维护第二份型号名单。新增纯函数时放入 `web/src/lib/ecommerce/`，输入模型、API 格式、任务类型和候选尺寸，输出 `EcommerceImageSize` 或明确错误。
+
+最终记录模型返回图片的实际尺寸。实际宽度低于目标时标记尺寸异常并列入复核项，但不进行本地放大，也不自动重生成。
+
+## 13. 任务执行器
+
+执行器必须独立于 `pages/ecommerce/project.tsx` 的挂载生命周期。推荐由电商任务 store 持有可持久化状态，由模块级 runtime 管理 `AbortController` 和当前执行 Promise。
+
+执行器职责：
+
+- 从当前版本读取不可变任务快照。
+- 为任务构建 prompt。
+- 加载商品参考图并转换为请求所需格式。
+- 无参考图时调用 `requestGeneration`；有商品参考图时调用 `requestEdit`。
+- 把返回结果逐张交给 `uploadImage` 持久化。
+- 原子更新 attempt、task、version 和 project 状态。
+- 处理暂停、明确失败与中断。
+- 防止同一 task attempt 被重复启动。
+
+不要从电商模块导入 `pages/canvas/project.tsx` 中的页面内部函数。若画布和电商确实需要相同生成逻辑，只提取无业务含义的公共纯函数或 service，并保持双方依赖公共层。
+
+## 14. 本地存储与图片生命周期
+
+建议新增独立持久化 key：
+
+```text
+infinite-canvas:ecommerce_store
+```
+
+项目 JSON 使用现有 `localForage` app state；图片继续使用现有 `image_files` Blob store。项目中只保存 `storageKey` 和元信息，不长期保存 base64 或临时 `blob:` URL。
+
+必须调整统一图片引用清理的调用方，使其同时收集：
+
+- 所有画布项目。
+- 我的素材。
+- 所有电商项目素材。
+- 所有电商生成版本和 attempts。
+
+否则现有 `cleanupUnusedImages` 可能把仍被电商项目引用的图片误删。
+
+删除电商项目、版本或 attempt 后，再基于全局引用集合清理 Blob。不要假设一张商品图只属于一个项目。
+
+## 15. 导出
+
+复用 `web/src/lib/zip.ts` 的 `createZip`，在浏览器内创建 ZIP。浏览器不能承诺在用户文件系统中长期保留解压目录，因此“未压缩目录”在应用内表现为电商项目的本地持久化资源；用户下载的是分类 ZIP。
+
+ZIP 结构：
+
+```text
+<产品名>_电商全案_<日期>.zip
+├── 01_主图/
+│   ├── main-01.png
+│   └── ...
+├── 02_详情页/
+│   ├── detail-01.png
+│   └── ...
+└── 03_规划文档/
+    └── 策略规划.md
+```
+
+导出当前选定版本，不混入其他版本结果。每个任务导出其 `selectedAttemptId` 指向的图片。策略规划文档由当前版本的 `planSnapshot` 生成，并包含模型、工作流版本、目标尺寸和实际尺寸摘要。
+
+## 16. 发送到画布
+
+通过单独适配器完成，不让画布组件理解电商业务：
+
+```text
+EcommerceGenerationVersion
+→ ecommerce-to-canvas.ts
+→ CanvasNodeData[] / CanvasConnection[]
+→ useCanvasStore
+```
+
+用户可以选择：
+
+- 创建新画布。
+- 当前可识别的来源画布。
+- 任意已有画布。
+
+转换规则：
+
+- 《策略规划》转换为文本节点。
+- 每张主图和详情页转换为普通图片节点，并复用原 `storageKey`，不得复制大 Blob。
+- 创建“主图”和“详情页”分组节点，图片节点写入对应 `groupId`。
+- 创建最外层全案分组与现有分组能力是否支持嵌套，应先按当前画布实现核对；不支持嵌套时使用两个并列分组和一个策略文本节点，不扩展嵌套系统。
+- 节点位置由适配器按规则排列，避免覆盖目标画布现有节点。
+- 发送前显示目标画布、主图数量、详情页数量和策略文档数量。
+
+依赖方向必须保持：
+
+```text
+canvas ─────┐
+            ├─→ shared services / image storage / model config
+ecommerce ──┘
+
+ecommerce → ecommerce-to-canvas → canvas store
+canvas 不得 import ecommerce
+```
+
+## 17. 建议源码结构
+
+遵循项目“页面私有组件放在页面目录、避免无意义转发组件”的规范：
+
+```text
+web/src/pages/ecommerce/
+├── index.tsx
+├── project.tsx
+├── components/
+│   ├── ecommerce-project-card.tsx
+│   ├── ecommerce-assets-panel.tsx
+│   ├── ecommerce-plan-panel.tsx
+│   ├── ecommerce-task-card.tsx
+│   ├── ecommerce-run-panel.tsx
+│   └── ecommerce-version-picker.tsx
+└── hooks/
+    ├── use-ecommerce-project.ts
+    └── use-ecommerce-run.ts
+
+web/src/stores/ecommerce/
+├── use-ecommerce-store.ts
+└── use-ecommerce-task-store.ts
+
+web/src/lib/ecommerce/
+├── workflow-definition.ts
+├── plan-schema.ts
+├── prompt-builder.ts
+├── size-resolver.ts
+├── task-runtime.ts
+├── export.ts
+└── ecommerce-to-canvas.ts
+
+web/src/types/ecommerce.ts
+```
+
+文件可以根据实际规模合并，优先保持短小直接。不要创建只做重命名或简单 props 转发的组件。
+
+## 18. 预计修改的现有文件
+
+- `web/src/router.tsx`：新增列表和项目路由。
+- `web/src/constant/navigation-tools.ts`：新增导航工具。
+- `web/src/i18n/locales/zh-CN.ts`、`en-US.ts`：新增文案。
+- `web/src/stores/use-canvas-store.ts`：只在确有必要时增加安全的批量插入入口。
+- 图片清理调用处：纳入电商项目引用。
+- 可能复用 `web/src/components/model-picker.tsx`；不要复制一份模型选择器。
+- 可能复用 `web/src/services/api/image.ts` 的 `requestImageQuestion`、`requestGeneration`、`requestEdit`。
+- 可能复用 `web/src/services/image-storage.ts` 的 `uploadImage`、`imageToDataUrl`、`getImageBlob`。
+- 复用 `web/src/lib/zip.ts`。
+
+除非公共能力确实需要提取，不修改画布拖拽、缩放、框选、连线和节点渲染核心。
+
+## 19. 错误处理
+
+必须提供用户可理解的错误：
+
+- 分析模型不支持图片输入。
+- 规划 JSON 不符合 schema。
+- 商品素材缺失。
+- 图片模型不支持参考图或参考图数量。
+- 没有满足目标宽度的模型尺寸。
+- API Key/渠道未配置。
+- 请求被限流、超时、鉴权失败或返回未知格式。
+- 图片生成成功但本地保存失败。
+- 浏览器刷新后任务状态未知。
+- ZIP 导出读取不到某个 `storageKey`。
+- 发送目标画布已被删除。
+
+不自动切换模型，不自动降低尺寸，不自动重复请求，不把失败描述成完成。
+
+## 20. 安全与真实性
+
+- API Key 继续保存在浏览器本地，由前端直连用户配置的接口。
+- 不新增项目后端假设。
+- 不把本地项目描述为云同步。
+- 不虚构销售、评价、排名、认证、测试、专利、授权、医疗功效、材质、尺寸、参数、包装数量或兼容性。
+- 商品图中不可读的小字只能作为位置和视觉特征锁定，不得猜测文字内容。
+- 风格参考只能借鉴视觉语言，不能复制品牌、文案或精确版式。
+
+## 21. 实施阶段
+
+### 阶段一：项目骨架与本地数据
+
+- 路由、导航和项目列表。
+- 电商项目 store、类型、持久化和删除。
+- 项目工作台三栏框架。
+- 素材上传、角色标注和图片恢复。
+
+### 阶段二：结构化分析与方案编辑
+
+- 工作流版本定义。
+- 规划 JSON schema。
+- 分析模型调用。
+- 方案展示、编辑、排序、启停和确认。
+- 防模板与可信度预检。
+
+### 阶段三：版本快照与整套生成
+
+- 模型和尺寸预检。
+- GenerationVersion 和任务快照。
+- 路由外任务执行器。
+- 暂停、继续、失败、刷新中断与人工重试。
+- 图片保存和 attempt 历史。
+
+### 阶段四：导出与画布互通
+
+- 生成《策略规划.md》。
+- 分类 ZIP。
+- 目标画布选择。
+- 电商结果到普通画布节点的适配。
+- 全局图片引用清理。
+
+每阶段只修改必要文件。功能未完整落地前不要在正式功能文档中宣称已支持。
+
+## 22. 验收标准
+
+### 22.1 基础流程
+
+- 可以创建电商项目、上传商品图和资料并保存刷新后恢复。
+- 可以选择分析模型并得到可编辑结构化方案。
+- 可以选择一个图片模型并通过预检。
+- 点击“生成整套”后模型锁定，任务自动执行到完成或明确失败。
+- 页面切换不停止任务；刷新后不会自动重复未知请求。
+
+### 22.2 模型与版本
+
+- 同一版本所有任务记录相同图片模型快照。
+- 任务卡不存在模型覆盖入口。
+- 更换模型会创建新整套版本，不污染旧版本。
+- 失败重试和单张重做使用原版本模型。
+
+### 22.3 图片与尺寸
+
+- 主图使用不低于 `1200px` 的最接近兼容方图尺寸。
+- 详情页使用不低于 `1500px` 的最接近兼容竖图尺寸，且请求高度不超过 `3000px`。
+- 没有兼容尺寸时阻止开始。
+- 图片一次性直出，不经过本地叠字、拼接、缩放或合成。
+- 每项记录目标尺寸、请求尺寸和实际尺寸。
+
+### 22.4 任务可靠性
+
+- 每个任务、attempt 和最终图片可追溯到提示词、模型和版本。
+- 暂停后已完成结果保留。
+- 明确失败与中断状态区分。
+- 不自动重试、不自动换模型、不自动重生成质量问题图片。
+- 图片未持久化时不能显示完成。
+
+### 22.5 导出与画布
+
+- ZIP 目录和命名符合主图、详情页、规划文档分类。
+- 只导出当前版本选中的 attempts。
+- 用户可自由选择新画布或已有画布。
+- 发送后生成普通文本、图片和分组节点。
+- 画布核心代码中不存在电商流程判断。
+- 发送到画布后删除电商项目不会误删画布仍引用的图片。
+
+### 22.6 文档与项目流程
+
+- 实现完成后按根目录 `AGENTS.md` 更新 `CHANGELOG.md` 的 `Unreleased`。
+- 将对应 TODO 移入 `pending-test.mdx`，等待用户验证后再更新正式功能说明。
+- 除非用户明确要求，实现任务结束时不执行构建、测试或语法检查。
+
+## 23. 已确认的执行边界
+
+- 图片生成最大并发数：`2`。
+- 适用范围：只限制整套主图和详情页的图片生成请求；分析与方案请求不计入图片并发。
+- 排队方式：版本内部按计划顺序等待，不同项目和版本之间轮询领取槽位，单个大版本不能持续占满两个槽位。
+- 单项失败：记录失败、释放槽位并继续后续任务，不阻塞整套。
+- 自动重试次数：`0`。
+- 人工重试：继续使用原版本模型、任务快照和参考素材。
+- 暂停：中止活动请求，保留已经持久化的结果。
+- 继续：恢复尚未完成的任务；`interrupted` 任务必须由用户明确继续，不能因页面恢复而自动重发。
+
+本文已不存在阻塞实施的待确认边界值。若开发中需要新增其他超时、重试次数、大小限制或并发上限，仍须按根目录 `AGENTS.md` 先取得用户确认。

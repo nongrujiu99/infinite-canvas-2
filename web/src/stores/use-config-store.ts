@@ -12,6 +12,7 @@ export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 export type ChannelModel = {
     name: string;
     capability: ModelCapability;
+    supportsImageInput?: boolean;
     script?: string;
 };
 
@@ -97,7 +98,7 @@ export const defaultConfig: AiConfig = {
             models: [
                 { name: "gpt-image-2", capability: "image" },
                 { name: "grok-imagine-video", capability: "video" },
-                { name: "gpt-5.5", capability: "text" },
+                { name: "gpt-5.5", capability: "text", supportsImageInput: true },
                 { name: "gpt-4o-mini-tts", capability: "audio" },
             ],
         },
@@ -178,6 +179,14 @@ function findChannelModel(config: AiConfig, value: string): { channel: ModelChan
 
 export function modelCapabilityOf(config: AiConfig, value: string): ModelCapability | undefined {
     return findChannelModel(config, value)?.model.capability;
+}
+
+export function modelSupportsImageInput(config: AiConfig, value: string) {
+    return Boolean(findChannelModel(config, value)?.model.supportsImageInput);
+}
+
+export function modelDefinitionOf(config: AiConfig, value: string) {
+    return findChannelModel(config, value);
 }
 
 export function modelMatchesCapability(config: AiConfig, value: string, capability?: ModelCapability) {
@@ -300,7 +309,8 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         seen.add(name);
         const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
         const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
-        result.push({ name, capability, script });
+        const supportsImageInput = typeof item === "string" ? false : Boolean(item.supportsImageInput);
+        result.push({ name, capability, supportsImageInput, script });
     }
     return result;
 }

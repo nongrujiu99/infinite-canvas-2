@@ -1,4 +1,4 @@
-import { FileText, Maximize2 } from "lucide-react";
+import { FileText, Maximize2, ShoppingBag } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -8,6 +8,10 @@ export const navigationTools = [
     {
         slug: "prompts",
         icon: FileText,
+    },
+    {
+        slug: "ecommerce",
+        icon: ShoppingBag,
     },
 ] as const;
 

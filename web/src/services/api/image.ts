@@ -30,6 +30,12 @@ type ResponseInputMessage =
     | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string }
     | { role: "tool"; tool_call_id: string; content: string };
 
+export type StrictFunctionOutput = {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+};
+
 type ResponseFunctionTool = {
     type: "function";
     function: {
@@ -43,6 +49,7 @@ type ResponseFunctionTool = {
 type ToolResponseResult = {
     content: string;
     toolCalls: ResponseToolCall[];
+    incompleteReason?: string;
 };
 
 type ToolChoice = "auto" | "required" | { type: "function"; name: string };
@@ -64,6 +71,8 @@ type ResponseApiOutputItem =
     | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
 type ResponseApiPayload = {
     id?: string;
+    status?: string;
+    incomplete_details?: { reason?: string };
     output?: ResponseApiOutputItem[];
     output_text?: string;
     error?: { message?: string };
@@ -96,7 +105,14 @@ type GeminiPayload = {
     promptFeedback?: { blockReason?: string };
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
-type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string };
+type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string; strictFunction?: StrictFunctionOutput; maxOutputTokens?: number };
+
+export class StructuredOutputError extends Error {
+    constructor(message: string, public readonly rawResponse?: string) {
+        super(message);
+        this.name = "StructuredOutputError";
+    }
+}
 
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
@@ -433,10 +449,10 @@ function parseToolResponse(payload: ResponseApiPayload): ToolResponseResult {
         .map((item) => ({
             id: item.call_id || item.id || "",
             type: "function" as const,
-            function: { name: item.name || "", arguments: item.arguments || "{}" },
+            function: { name: item.name || "", arguments: item.arguments || "" },
         }))
         .filter((item) => item.id && item.function.name);
-    return { content, toolCalls };
+    return { content, toolCalls, ...(payload.status === "incomplete" ? { incompleteReason: payload.incomplete_details?.reason || "unknown" } : {}) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -495,7 +511,7 @@ function consumeResponseStreamBlock(block: string, state: ResponseStreamState, o
         state.text = event.text;
         onDelta?.(state.text);
     }
-    if (type === "response.completed" && isRecord(event.response)) {
+    if (["response.completed", "response.incomplete"].includes(type) && isRecord(event.response)) {
         state.payload = event.response as ResponseApiPayload;
     } else if (Array.isArray(event.output)) {
         state.payload = event as ResponseApiPayload;
@@ -612,7 +628,7 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
     const functionDeclarations = tools.map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
-        parameters: tool.function.parameters,
+        parametersJsonSchema: tool.function.parameters,
     }));
     const functionCallingConfig =
         typeof toolChoice === "object"
@@ -695,7 +711,7 @@ function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
             return {
                 id: call.id || nanoid(),
                 type: "function" as const,
-                function: { name: call.name || "", arguments: JSON.stringify(call.args || {}) },
+                function: { name: call.name || "", arguments: call.args === undefined ? "" : JSON.stringify(call.args) },
                 ...(thoughtSignature ? { thoughtSignature } : {}),
             };
         });
@@ -872,7 +888,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     const script = resolveModelScript(config, config.model || config.textModel);
+    const strictFunction = options?.strictFunction;
+    const tools: ResponseFunctionTool[] = strictFunction ? [{ type: "function", function: { ...strictFunction, strict: true } }] : [];
+    const toolChoice: ToolChoice = strictFunction ? { type: "function", name: strictFunction.name } : "auto";
     if (script) {
+        if (strictFunction) throw new StructuredOutputError("当前自定义模型脚本不支持严格函数调用，已在请求前停止");
         try {
             const answer = await runModelScript<string>({
                 capability: "text",
@@ -891,20 +911,47 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     }
     try {
         if (requestConfig.apiFormat === "gemini") {
-            const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options)).content || apiText("noContent");
+            const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(tools, toolChoice)), onDelta, options);
+            if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
+            const answer = result.content || apiText("noContent");
             if (answer === apiText("noContent")) onDelta(answer);
             return answer;
         }
-        const answer = (await requestStreamingResponse(requestConfig, {
+        const result = await requestStreamingResponse(requestConfig, {
             model: requestConfig.model,
             input: toResponseInput(withSystemMessage(requestConfig, messages)),
             ...(requestConfig.reasoningEffort === "auto" ? {} : { reasoning: { effort: requestConfig.reasoningEffort } }),
-        }, onDelta, options)).content || apiText("noContent");
+            ...(options?.maxOutputTokens ? { max_output_tokens: options.maxOutputTokens } : {}),
+            ...(strictFunction ? { tools: tools.map(toResponseTool), tool_choice: toolChoice } : {}),
+        }, onDelta, options);
+        if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
+        const answer = result.content || apiText("noContent");
         if (answer === apiText("noContent")) onDelta(answer);
         return answer;
     } catch (error) {
+        if (error instanceof StructuredOutputError || error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name)) throw error;
+        if (strictFunction) throw new StructuredOutputError(`严格结构化输出请求失败：${readAxiosError(error, apiText("requestFailed"))}`);
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
+}
+
+function requireStrictFunctionArguments(result: ToolResponseResult, expectedName: string) {
+    if (result.incompleteReason) {
+        const rawResponse = result.toolCalls.length === 1 ? result.toolCalls[0].function.arguments || undefined : undefined;
+        throw new StructuredOutputError(`严格结构化输出因达到输出边界而未完成：${result.incompleteReason}`, rawResponse);
+    }
+    if (result.toolCalls.length !== 1) throw new StructuredOutputError(`严格结构化输出要求恰好一个函数调用，实际收到 ${result.toolCalls.length} 个`);
+    const call = result.toolCalls[0];
+    if (call.function.name !== expectedName) throw new StructuredOutputError(`严格结构化输出函数名称错误：期望 ${expectedName}，实际 ${call.function.name || "缺失"}`, call.function.arguments || undefined);
+    const argumentsText = call.function.arguments.trim();
+    if (!argumentsText) throw new StructuredOutputError("严格结构化输出缺少函数 arguments");
+    try {
+        const value = JSON.parse(argumentsText);
+        if (!isRecord(value)) throw new Error("arguments 不是 JSON 对象");
+    } catch (error) {
+        throw new StructuredOutputError(`严格结构化输出无法取得有效函数 arguments：${error instanceof Error ? error.message : String(error)}`, argumentsText);
+    }
+    return argumentsText;
 }
 
 

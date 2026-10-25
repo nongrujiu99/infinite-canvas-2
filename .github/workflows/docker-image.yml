@@ -10,7 +10,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/basketikun/infinite-canvas
+  # 跟随当前仓库所有者，仓库迁移后不用再改这里（ghcr 命名空间必须与推送凭据一致）
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/infinite-canvas
 
 jobs:
   meta:

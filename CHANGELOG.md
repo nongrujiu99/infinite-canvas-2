@@ -3,6 +3,7 @@
 ## Unreleased
 
 + [修复] Docker 镜像改推到当前仓库命名空间：两个镜像工作流的镜像名改为跟随 `github.repository_owner`，`docker-compose.yml` 与 Docker 部署文档里的镜像地址同步更新，解决因仓库迁移导致 `ghcr.io/basketikun/...` 无推送权限、镜像自 v0.20.0 起一直构建失败的问题。
++ [修复] 应用镜像补上 `latest` 标签：此前只有版本号与 commit sha 标签，而 `docker-compose.yml` 引用的是 `:latest`，`docker compose pull` 必然 404。
 
 ## v0.23.0 - 2026-10-26
 

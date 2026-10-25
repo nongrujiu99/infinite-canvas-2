@@ -30,6 +30,12 @@ type ResponseInputMessage =
     | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string }
     | { role: "tool"; tool_call_id: string; content: string };
 
+export type StrictFunctionOutput = {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+};
+
 type ResponseFunctionTool = {
     type: "function";
     function: {
@@ -43,6 +49,7 @@ type ResponseFunctionTool = {
 type ToolResponseResult = {
     content: string;
     toolCalls: ResponseToolCall[];
+    incompleteReason?: string;
 };
 
 type ToolChoice = "auto" | "required" | { type: "function"; name: string };
@@ -64,6 +71,8 @@ type ResponseApiOutputItem =
     | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
 type ResponseApiPayload = {
     id?: string;
+    status?: string;
+    incomplete_details?: { reason?: string };
     output?: ResponseApiOutputItem[];
     output_text?: string;
     error?: { message?: string };
@@ -96,7 +105,14 @@ type GeminiPayload = {
     promptFeedback?: { blockReason?: string };
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
-type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string };
+type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string; strictFunction?: StrictFunctionOutput; maxOutputTokens?: number };
+
+export class StructuredOutputError extends Error {
+    constructor(message: string, public readonly rawResponse?: string) {
+        super(message);
+        this.name = "StructuredOutputError";
+    }
+}
 
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
@@ -239,18 +255,17 @@ function closestGeminiAspectRatio(value: string) {
 }
 
 function resolveGeminiImageSize(quality: string, dimensions: { width: number; height: number } | null) {
-    if (dimensions) {
-        const size = `${dimensions.width}x${dimensions.height}`;
-        const scale = inferMediaScale(size);
-        if (Object.values(imageSizePresets[scale]).includes(size)) return scale.toUpperCase();
-        const edge = Math.max(dimensions.width, dimensions.height);
-        if (edge <= 768) return "512";
-        if (edge <= 1536) return "1K";
-        if (edge <= 3072) return "2K";
-        return "4K";
-    }
     const normalizedQuality = normalizeQuality(quality);
-    return normalizedQuality ? GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality] : undefined;
+    if (normalizedQuality) return GEMINI_IMAGE_SIZE_BY_QUALITY[normalizedQuality];
+    if (!dimensions) return undefined;
+    const size = `${dimensions.width}x${dimensions.height}`;
+    const scale = inferMediaScale(size);
+    if (Object.values(imageSizePresets[scale]).includes(size)) return scale.toUpperCase();
+    const edge = Math.max(dimensions.width, dimensions.height);
+    if (edge <= 768) return "512";
+    if (edge <= 1536) return "1K";
+    if (edge <= 3072) return "2K";
+    return "4K";
 }
 
 function resolveImageSource(item: Record<string, unknown>, baseUrl?: string) {
@@ -433,10 +448,10 @@ function parseToolResponse(payload: ResponseApiPayload): ToolResponseResult {
         .map((item) => ({
             id: item.call_id || item.id || "",
             type: "function" as const,
-            function: { name: item.name || "", arguments: item.arguments || "{}" },
+            function: { name: item.name || "", arguments: item.arguments || "" },
         }))
         .filter((item) => item.id && item.function.name);
-    return { content, toolCalls };
+    return { content, toolCalls, ...(payload.status === "incomplete" ? { incompleteReason: payload.incomplete_details?.reason || "unknown" } : {}) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -495,7 +510,7 @@ function consumeResponseStreamBlock(block: string, state: ResponseStreamState, o
         state.text = event.text;
         onDelta?.(state.text);
     }
-    if (type === "response.completed" && isRecord(event.response)) {
+    if (["response.completed", "response.incomplete"].includes(type) && isRecord(event.response)) {
         state.payload = event.response as ResponseApiPayload;
     } else if (Array.isArray(event.output)) {
         state.payload = event as ResponseApiPayload;
@@ -515,6 +530,102 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
         consumeResponseStreamBlock(state.buffer, state, onDelta);
         state.buffer = "";
     }
+}
+
+async function requestChatCompletionsStreaming(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+    const response = await fetch(aiApiUrl(config, "/chat/completions"), {
+        method: "POST",
+        headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
+        body: JSON.stringify({ ...body, stream: true }),
+        signal: options?.signal,
+    });
+    if (!response.ok) {
+        const errorMsg = await readFetchError(response, apiText("requestFailed"));
+        throw new Error(errorMsg);
+    }
+    if (!response.body) {
+        const payload = (await response.json()) as Record<string, unknown>;
+        return parseChatCompletionsPayload(payload);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    const toolCallMap = new Map<number, { id: string; function: { name: string; arguments: string } }>();
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data:")) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === "[DONE]") continue;
+            try {
+                const event = JSON.parse(data) as Record<string, unknown>;
+                const choices = (event.choices as Array<Record<string, unknown>>) || [];
+                const delta = choices[0]?.delta as Record<string, unknown> | undefined;
+                if (delta?.content && typeof delta.content === "string") {
+                    text += delta.content;
+                    onDelta?.(text);
+                }
+                const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+                if (Array.isArray(deltaToolCalls)) {
+                    for (const tc of deltaToolCalls) {
+                        const index = (tc.index as number) ?? 0;
+                        const func = tc.function as Record<string, unknown> | undefined;
+                        let entry = toolCallMap.get(index);
+                        if (!entry) {
+                            entry = { id: (tc.id as string) || nanoid(), function: { name: "", arguments: "" } };
+                            toolCallMap.set(index, entry);
+                        }
+                        if (func?.name && typeof func.name === "string") entry.function.name = func.name;
+                        if (func?.arguments && typeof func.arguments === "string") entry.function.arguments += func.arguments;
+                    }
+                }
+                const finishReason = choices[0]?.finish_reason as string | undefined;
+                if (finishReason === "tool_calls" && toolCallMap.size === 0) {
+                    const message = choices[0]?.message as Record<string, unknown> | undefined;
+                    const calls = (message?.tool_calls as Array<Record<string, unknown>>) || [];
+                    for (const call of calls) {
+                        const func = call.function as Record<string, unknown> | undefined;
+                        if (func?.name && typeof func.arguments === "string") {
+                            toolCallMap.set(toolCallMap.size, {
+                                id: (call.id as string) || nanoid(),
+                                function: { name: func.name as string, arguments: func.arguments as string },
+                            });
+                        }
+                    }
+                }
+            } catch {
+                // Ignore malformed SSE chunks
+            }
+        }
+    }
+    const toolCalls = Array.from(toolCallMap.values()).map((entry) => ({ ...entry, type: "function" as const }));
+    return { content: text, toolCalls };
+}
+
+function parseChatCompletionsPayload(payload: Record<string, unknown>): ToolResponseResult {
+    const choices = (payload.choices as Array<Record<string, unknown>>) || [];
+    const message = choices[0]?.message as Record<string, unknown> | undefined;
+    const content = (message?.content as string) || "";
+    const toolCalls: ResponseToolCall[] = [];
+    const calls = (message?.tool_calls as Array<Record<string, unknown>>) || [];
+    for (const call of calls) {
+        const func = call.function as Record<string, unknown> | undefined;
+        if (func?.name && typeof func.arguments === "string") {
+            toolCalls.push({
+                id: (call.id as string) || nanoid(),
+                type: "function",
+                function: { name: func.name as string, arguments: func.arguments as string },
+            });
+        }
+    }
+    return { content, toolCalls };
 }
 
 async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
@@ -612,7 +723,7 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
     const functionDeclarations = tools.map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
-        parameters: tool.function.parameters,
+        parametersJsonSchema: tool.function.parameters,
     }));
     const functionCallingConfig =
         typeof toolChoice === "object"
@@ -695,7 +806,7 @@ function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
             return {
                 id: call.id || nanoid(),
                 type: "function" as const,
-                function: { name: call.name || "", arguments: JSON.stringify(call.args || {}) },
+                function: { name: call.name || "", arguments: call.args === undefined ? "" : JSON.stringify(call.args) },
                 ...(thoughtSignature ? { thoughtSignature } : {}),
             };
         });
@@ -852,8 +963,13 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     } else if (isGptImage) {
         if (requestSize) formData.set("size", requestSize);
         if (quality) formData.set("quality", quality);
+    } else {
+        formData.set("response_format", "b64_json");
+        formData.set("output_format", IMAGE_OUTPUT_FORMAT);
+        if (quality) formData.set("quality", quality);
+        Object.entries(sizeParams).forEach(([key, value]) => formData.set(key, value));
     }
-    if (isGptImage && background) {
+    if (background) {
         formData.set("background", background);
     }
     const files = await Promise.all((nativeMask ? references.slice(0, 1) : references).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
@@ -872,7 +988,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     const script = resolveModelScript(config, config.model || config.textModel);
+    const strictFunction = options?.strictFunction;
+    const tools: ResponseFunctionTool[] = strictFunction ? [{ type: "function", function: { ...strictFunction, strict: true } }] : [];
+    const toolChoice: ToolChoice = strictFunction ? { type: "function", name: strictFunction.name } : "auto";
     if (script) {
+        if (strictFunction) throw new StructuredOutputError("当前自定义模型脚本不支持严格函数调用，已在请求前停止");
         try {
             const answer = await runModelScript<string>({
                 capability: "text",
@@ -891,20 +1011,51 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     }
     try {
         if (requestConfig.apiFormat === "gemini") {
-            const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options)).content || apiText("noContent");
+            const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(tools, toolChoice)), onDelta, options);
+            if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
+            const answer = result.content || apiText("noContent");
             if (answer === apiText("noContent")) onDelta(answer);
             return answer;
         }
-        const answer = (await requestStreamingResponse(requestConfig, {
+        const chatMessages = withSystemMessage(requestConfig, messages).map((msg) => {
+            if ("type" in msg) return msg;
+            if (msg.role === "tool") return msg;
+            return { role: msg.role, content: msg.content };
+        });
+        const result = await requestChatCompletionsStreaming(requestConfig, {
             model: requestConfig.model,
-            input: toResponseInput(withSystemMessage(requestConfig, messages)),
-            ...(requestConfig.reasoningEffort === "auto" ? {} : { reasoning: { effort: requestConfig.reasoningEffort } }),
-        }, onDelta, options)).content || apiText("noContent");
+            messages: chatMessages,
+            ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
+            ...(strictFunction ? { tools: tools.map((tool) => ({ type: "function", function: tool.function })), tool_choice: toolChoice } : {}),
+        }, onDelta, options);
+        if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
+        const answer = result.content || apiText("noContent");
         if (answer === apiText("noContent")) onDelta(answer);
         return answer;
     } catch (error) {
+        if (error instanceof StructuredOutputError || error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name)) throw error;
+        if (strictFunction) throw new StructuredOutputError(`严格结构化输出请求失败：${readAxiosError(error, apiText("requestFailed"))}`);
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
+}
+
+function requireStrictFunctionArguments(result: ToolResponseResult, expectedName: string) {
+    if (result.incompleteReason) {
+        const rawResponse = result.toolCalls.length === 1 ? result.toolCalls[0].function.arguments || undefined : undefined;
+        throw new StructuredOutputError(`严格结构化输出因达到输出边界而未完成：${result.incompleteReason}`, rawResponse);
+    }
+    if (result.toolCalls.length !== 1) throw new StructuredOutputError(`严格结构化输出要求恰好一个函数调用，实际收到 ${result.toolCalls.length} 个`, result.content || undefined);
+    const call = result.toolCalls[0];
+    if (call.function.name !== expectedName) throw new StructuredOutputError(`严格结构化输出函数名称错误：期望 ${expectedName}，实际 ${call.function.name || "缺失"}`, call.function.arguments || undefined);
+    const argumentsText = call.function.arguments.trim();
+    if (!argumentsText) throw new StructuredOutputError("严格结构化输出缺少函数 arguments");
+    try {
+        const value = JSON.parse(argumentsText);
+        if (!isRecord(value)) throw new Error("arguments 不是 JSON 对象");
+    } catch (error) {
+        throw new StructuredOutputError(`严格结构化输出无法取得有效函数 arguments：${error instanceof Error ? error.message : String(error)}`, argumentsText);
+    }
+    return argumentsText;
 }
 
 

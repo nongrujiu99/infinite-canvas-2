@@ -3061,6 +3061,10 @@ function InfiniteCanvasPage() {
 
  const handleRetryNode = useCallback(
  async (node: CanvasNodeData, imageId?: string) => {
+ if (hasResumableVideoTask(node)) {
+ await pollVideoNodeTask(node);
+ return;
+ }
  const incomingOperationId = connectionsRef.current.find((connection) => connection.valid !== false && connection.toNodeId === node.id)?.fromNodeId;
  const incomingOperation = nodesRef.current.find((item) => item.id === incomingOperationId);
  if (incomingOperation?.type === CanvasNodeType.Operation && ["mask", "superResolve", "angle"].includes(incomingOperation.metadata?.operationKind || "")) {
@@ -3072,10 +3076,6 @@ function InfiniteCanvasPage() {
  }
  }
  if (generationRequestsRef.current.has(node.id)) return;
- if (hasResumableVideoTask(node)) {
- await pollVideoNodeTask(node);
- return;
- }
  const pendingImage = node.metadata?.images?.find((item) => item.pendingRemoteResult && (!imageId || item.id === imageId));
  const pendingResult = pendingImage?.content || (node.metadata?.pendingRemoteResult ? node.metadata.content : undefined);
  if (node.type === CanvasNodeType.Audio && pendingResult) {

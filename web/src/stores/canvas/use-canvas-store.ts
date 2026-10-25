@@ -104,7 +104,12 @@ export const useCanvasStore = create<CanvasStore>()(
                 return project.id;
             },
             openProject: (id) => {
-                return get().projects.find((item) => item.id === id) || null;
+                const project = get().projects.find((item) => item.id === id) || null;
+                if (!project) return null;
+                // 已删除的「一键详情」节点残留在旧画布里会导致画布渲染崩溃，打开时剔除节点及其连线
+                const stale = new Set(project.nodes.filter((node) => String(node.metadata?.operationKind) === "detailPage").map((node) => node.id));
+                if (!stale.size) return project;
+                return { ...project, nodes: project.nodes.filter((node) => !stale.has(node.id)), connections: project.connections.filter((connection) => !stale.has(connection.fromNodeId) && !stale.has(connection.toNodeId)) };
             },
             renameProject: (id, title) =>
                 set((state) => ({

@@ -1,9 +1,13 @@
-import { FileText, Maximize2 } from "lucide-react";
+import { FileText, Maximize2, ShoppingBag } from "lucide-react";
 
 export const navigationTools = [
     {
         slug: "canvas",
         icon: Maximize2,
+    },
+    {
+        slug: "image",
+        icon: ShoppingBag,
     },
     {
         slug: "prompts",

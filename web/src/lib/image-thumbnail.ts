@@ -47,3 +47,13 @@ export async function createImageThumbnail(blob: Blob, maxEdge = CANVAS_IMAGE_PR
     bitmap.close();
     return new Promise<Blob | undefined>((resolve) => canvas.toBlob((result) => resolve(result || undefined), "image/webp", 0.86));
 }
+
+/** 缩略图要存进风格对象里，只能是 data URL（blob URL 刷新即失效）。 */
+export function blobToDataUrl(blob: Blob) {
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("image read failed"));
+        reader.readAsDataURL(blob);
+    });
+}

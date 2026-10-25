@@ -429,6 +429,21 @@ export function resolveModelChannel(config: AiConfig, value: string) {
     return matched || config.channels[0] || createModelChannel({ id: "default", name: i18n.t("config.channels.defaultName"), baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })) });
 }
 
+/**
+ * 渠道凭据存在 config.channels[] 上，顶层的 baseUrl / apiKey 只是早期版本的遗留字段，
+ * 多渠道路径下通常为空。所以判断「能不能发请求」必须落到具体模型所属的渠道，
+ * 直接看顶层字段会把已配置好的渠道误判成未配置。
+ */
+export function isModelChannelConfigured(config: AiConfig, value?: string) {
+    const channel = resolveModelChannel(config, value || config.model || config.imageModel);
+    return Boolean(channel.baseUrl.trim() && channel.apiKey.trim());
+}
+
+/** 按能力判断该能力当前选中的模型是否已经有可用凭据。 */
+export function isCapabilityConfigured(config: AiConfig, capability: ModelCapability) {
+    return isModelChannelConfigured(config, resolveModelForCapability(config, undefined, capability));
+}
+
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
     const channel = resolveModelChannel(config, value);
     return {

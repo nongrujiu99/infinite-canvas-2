@@ -97,8 +97,11 @@ export const useAssetStore = create<AssetStore>()(
             cleanupImages: (extra) => {
                 window.setTimeout(async () => {
                     const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
-                    await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
-                    await cleanupUnusedMedia({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
+                    // 生图工作台的结果图不在 assets/projects 里，必须一起纳入保留集，否则会被当孤儿回收
+                    const { useEcomStudioStore } = await import("@/stores/studio/use-ecom-studio-store");
+                    const keep = [extra, useEcomStudioStore.getState().results];
+                    await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra: keep });
+                    await cleanupUnusedMedia({ assets: get().assets, projects: useCanvasStore.getState().projects, extra: keep });
                 }, 0);
             },
         }),

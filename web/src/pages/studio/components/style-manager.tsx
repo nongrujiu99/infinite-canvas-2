@@ -33,14 +33,18 @@ function PaletteStrip({ style }: { style: EcomStyle }) {
     );
 }
 
-export type StyleManagerProps = {
-    open: boolean;
-    onClose: () => void;
+export type StyleManagerPanelProps = {
     /** 从风格图识别需要当前生效的模型渠道。 */
     config: AiConfig;
 };
 
-export function StyleManager({ open, onClose, config }: StyleManagerProps) {
+/**
+ * 视觉配方管理（内容区）。
+ *
+ * 外壳（遮罩、标题、页签）由 VisualManager 提供：配方和场景是同一件事的两个维度，
+ * 放在同一个弹窗里切页签，比开两个入口更符合「管理我的素材库」的心智。
+ */
+export function StyleManagerPanel({ config }: StyleManagerPanelProps) {
     const { message } = App.useApp();
     const styles = useAllEcomStyles();
     const overrides = useEcomStyleStore((state) => state.overrides);
@@ -118,137 +122,112 @@ export function StyleManager({ open, onClose, config }: StyleManagerProps) {
         }
     };
 
-    const handleClose = () => {
-        setPending(null);
-        onClose();
-    };
-
-    if (!open) return null;
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6" onClick={handleClose}>
-            <div className="flex h-full max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl" onClick={(event) => event.stopPropagation()}>
-                <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-                    <div>
-                        <h2 className="text-base font-medium text-foreground">风格管理</h2>
-                        <p className="text-xs text-muted-foreground">内置风格只读，改动会存成覆盖层，随时可以恢复默认。</p>
-                    </div>
+        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[320px_1fr]">
+            <aside className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
+                <div className="space-y-2 border-b border-border p-3">
                     <div className="flex items-center gap-2">
-                        <button type="button" className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:border-primary hover:text-primary" onClick={handleCreate}>
+                        <span className="flex-1 text-[11px] text-muted-foreground">共 {styles.length} 套配方</span>
+                        <button type="button" className="rounded-lg border border-border px-2 py-1 text-xs text-foreground hover:border-primary hover:text-primary" onClick={handleCreate}>
                             新建风格
                         </button>
-                        <button type="button" className="rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground" onClick={handleClose}>
-                            关闭
-                        </button>
                     </div>
-                </header>
-
-                <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[320px_1fr]">
-                    <aside className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
-                        <div className="space-y-2 border-b border-border p-3">
-                            <input
-                                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
-                                placeholder="搜索风格名称或场景"
-                                value={keyword}
-                                onChange={(event) => setKeyword(event.target.value)}
-                            />
-                            <div className="flex flex-wrap gap-1">
-                                <button type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === "all" ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag("all")}>
-                                    全部标签
-                                </button>
-                                {ECOM_STYLE_TAGS.map((item) => (
-                                    <button key={item} type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === item ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag(item)}>
-                                        {item}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                                {STATUS_FILTERS.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        className={cn("rounded-md px-2 py-0.5 text-[11px]", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
-                                        onClick={() => setStatus(item.id)}
-                                    >
-                                        {item.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                            {pending ? <div className="mb-1 rounded-lg border border-primary/40 bg-primary/5 px-2.5 py-2 text-xs text-primary">新建风格（未保存）</div> : null}
-                            {visible.length === 0 ? <p className="px-2 py-6 text-center text-xs text-muted-foreground">没有匹配的风格</p> : null}
-                            {visible.map((style) => {
-                                const active = !pending && style.id === editingId;
-                                const changed = style.builtIn ? dirtyStyleFields(style.id, state).length : 0;
-                                return (
-                                    <button
-                                        key={style.id}
-                                        type="button"
-                                        className={cn("mb-1 w-full rounded-lg border px-2.5 py-2 text-left transition", active ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")}
-                                        onClick={() => {
-                                            setPending(null);
-                                            setEditingId(style.id);
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-1.5">
-                                            <span className={cn("truncate text-sm", style.enabled ? "text-foreground" : "text-muted-foreground line-through")}>{style.name}</span>
-                                            {!style.builtIn ? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">自建</span> : null}
-                                            {changed ? <span className="rounded bg-primary/10 px-1 text-[10px] text-primary">{changed} 项改动</span> : null}
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-2">
-                                            <PaletteStrip style={style} />
-                                            <span className="truncate text-[11px] text-muted-foreground">{style.tags.join(" · ")}</span>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </aside>
-
-                    <section className="flex min-h-0 flex-col">
-                        {current ? (
-                            <>
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span>{current.builtIn ? "内置风格" : "自建风格"}</span>
-                                        <span>·</span>
-                                        <button type="button" className={cn("rounded-full border px-2 py-0.5", current.enabled ? "border-primary/40 text-primary" : "border-border")} onClick={() => toggleStyle(current.id, !current.enabled)}>
-                                            {current.enabled ? "工作台可选" : "已停用"}
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                                        onClick={() => {
-                                            const copy = duplicateStyle(current);
-                                            setPending(copy);
-                                        }}
-                                    >
-                                        复制为新风格
-                                    </button>
-                                </div>
-                                <StyleEditor
-                                    key={`${current.id}-${editorKey}`}
-                                    style={current}
-                                    dirtyFields={dirty}
-                                    config={config}
-                                    onImportStyle={current.builtIn ? undefined : handleImport}
-                                    onSave={handleSave}
-                                    onCancel={() => {
-                                        setPending(null);
-                                        setEditorKey((prev) => prev + 1);
-                                    }}
-                                    onReset={handleReset}
-                                />
-                            </>
-                        ) : (
-                            <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">左侧选一个风格开始编辑</div>
-                        )}
-                    </section>
+                    <input
+                        className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                        placeholder="搜索风格名称或场景"
+                        value={keyword}
+                        onChange={(event) => setKeyword(event.target.value)}
+                    />
+                    <div className="flex flex-wrap gap-1">
+                        <button type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === "all" ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag("all")}>
+                            全部标签
+                        </button>
+                        {ECOM_STYLE_TAGS.map((item) => (
+                            <button key={item} type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === item ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag(item)}>
+                                {item}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                        {STATUS_FILTERS.map((item) => (
+                            <button key={item.id} type="button" className={cn("rounded-md px-2 py-0.5 text-[11px]", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.id)}>
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                    {pending ? <div className="mb-1 rounded-lg border border-primary/40 bg-primary/5 px-2.5 py-2 text-xs text-primary">新建风格（未保存）</div> : null}
+                    {visible.length === 0 ? <p className="px-2 py-6 text-center text-xs text-muted-foreground">没有匹配的风格</p> : null}
+                    {visible.map((style) => {
+                        const active = !pending && style.id === editingId;
+                        const changed = style.builtIn ? dirtyStyleFields(style.id, state).length : 0;
+                        return (
+                            <button
+                                key={style.id}
+                                type="button"
+                                className={cn("mb-1 w-full rounded-lg border px-2.5 py-2 text-left transition", active ? "border-primary bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")}
+                                onClick={() => {
+                                    setPending(null);
+                                    setEditingId(style.id);
+                                }}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <span className={cn("truncate text-sm", style.enabled ? "text-foreground" : "text-muted-foreground line-through")}>{style.name}</span>
+                                    {!style.builtIn ? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">自建</span> : null}
+                                    {changed ? <span className="rounded bg-primary/10 px-1 text-[10px] text-primary">{changed} 项改动</span> : null}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
+                                    <PaletteStrip style={style} />
+                                    <span className="truncate text-[11px] text-muted-foreground">{style.tags.join(" · ")}</span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </aside>
+
+            <section className="flex min-h-0 flex-col">
+                {current ? (
+                    <>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{current.builtIn ? "内置风格" : "自建风格"}</span>
+                                <span>·</span>
+                                <button type="button" className={cn("rounded-full border px-2 py-0.5", current.enabled ? "border-primary/40 text-primary" : "border-border")} onClick={() => toggleStyle(current.id, !current.enabled)}>
+                                    {current.enabled ? "工作台可选" : "已停用"}
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
+                                onClick={() => {
+                                    const copy = duplicateStyle(current);
+                                    setPending(copy);
+                                }}
+                            >
+                                复制为新风格
+                            </button>
+                        </div>
+                        <StyleEditor
+                            key={`${current.id}-${editorKey}`}
+                            style={current}
+                            dirtyFields={dirty}
+                            config={config}
+                            onImportStyle={current.builtIn ? undefined : handleImport}
+                            onSave={handleSave}
+                            onCancel={() => {
+                                setPending(null);
+                                setEditorKey((prev) => prev + 1);
+                            }}
+                            onReset={handleReset}
+                        />
+                    </>
+                ) : (
+                    <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">左侧选一个风格开始编辑</div>
+                )}
+            </section>
         </div>
     );
 }

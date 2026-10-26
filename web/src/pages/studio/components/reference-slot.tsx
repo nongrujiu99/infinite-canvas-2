@@ -237,11 +237,12 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                     disabled={!productImage}
                     onClick={() => inputRef.current?.click()}
                     className={cn(
-                        "flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 transition",
+                        // 和产品图上传区同高：两列并排时标题、上传框、下一块的水平线都能对齐
+                        "flex min-h-[6.5rem] w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-3 transition",
                         productImage ? "border-border hover:border-primary/40 hover:bg-muted/40" : "cursor-not-allowed border-border/60 opacity-55",
                     )}
                 >
-                    {uploading ? <Spin size="small" /> : <ImagePlus className="size-4 shrink-0 text-muted-foreground" />}
+                    {uploading ? <Spin size="small" /> : <ImagePlus className="size-5 shrink-0 text-muted-foreground" />}
                     <span className="truncate text-[11px] text-muted-foreground">{t("studio.reference.empty")}</span>
                 </button>
             )}

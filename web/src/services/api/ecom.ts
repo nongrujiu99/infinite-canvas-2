@@ -1,8 +1,9 @@
 import { ECOM_ANGLES, ECOM_CATEGORIES, findEcomAngle, findEcomCategory, type EcomAngleId, type EcomCategoryId } from "@/constant/ecom/categories";
+import { ECOM_SCENES } from "@/constant/ecom/scenes";
 import { ECOM_STYLE_TAGS, type EcomPalette, type EcomStyleTag } from "@/constant/ecom/styles";
 import { imageToDataUrl } from "@/services/image-storage";
 import { resolveModelForCapability, type AiConfig } from "@/stores/use-config-store";
-import type { EcomProductAnalysis, EcomReferenceDigest, EcomReferenceMode, EcomStyleDigest } from "@/types/ecom";
+import type { EcomProductAnalysis, EcomReferenceDigest, EcomReferenceMode, EcomSceneDigest, EcomStyleDigest } from "@/types/ecom";
 import type { ReferenceImage } from "@/types/image";
 import { requestImageQuestion, type AiTextMessage } from "./image";
 
@@ -59,6 +60,28 @@ function normalizeAngle(value: unknown): EcomAngleId | undefined {
 
 function normalizeString(value: unknown): string | undefined {
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * 产品件数：模型偶尔会返回 "3件" / 0 / 小数，统一收敛成 1-20 的整数。
+ * 兜底成 1 而不是原值——提示词里出现 "0 products" 会让整段产品锁失效。
+ */
+function normalizeItemCount(value: unknown): number {
+    const count = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+    if (!Number.isFinite(count)) return 1;
+    return Math.min(20, Math.max(1, Math.round(count)));
+}
+
+/**
+ * 逐件清单不能去重：同款多件（一只黑鼠标 × 3）是最常见的多件摆法，
+ * 走 normalizeStringList 会缩成 1 条，件数也就跟着被判成 1。
+ */
+function normalizeItemList(value: unknown, limit = 20): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        .map((item) => item.trim())
+        .slice(0, limit);
 }
 
 function normalizeStringList(value: unknown, limit = 5): string[] {
@@ -128,13 +151,16 @@ function buildAnalysisPrompt() {
     return [
         "You are inspecting one product photo for an e-commerce retouching workflow.",
         "Describe only what is actually visible in this photo. Never guess hidden ports, textures, logos or accessories.",
+        "The photo may show a single product or several products arranged together. Count them first, because everything downstream depends on that number.",
         "Return exactly one JSON object. No markdown, no code fences, no commentary before or after.",
         "",
         "JSON shape:",
         `{
   "category": one of ${CATEGORY_IDS.map((id) => `"${id}"`).join(" | ")},
   "subCategory": a sub-type id from the list below, or "" when none matches,
-  "subject": short English noun phrase naming this exact product, e.g. "three-key macro pad",
+  "itemCount": how many separate product units are visible, as a whole number; use 1 for a normal single-product shot,
+  "items": when itemCount > 1, one short English noun phrase per unit in reading order, e.g. ["black desk mat", "three-key macro pad", "braided USB-C cable"]; use [] when itemCount is 1,
+  "subject": short English noun phrase naming this exact product — or the whole set when itemCount > 1, e.g. "three-key macro pad" / "three-piece desk accessory set",
   "material": the dominant visible material, e.g. "matte ABS plastic" / "anodised aluminium",
   "finish": the surface treatment, one of "matte" | "soft-touch" | "glossy" | "brushed metal" | "anodised" | "fabric" | "silicone" | "glass" | "mixed",
   "mainColor": body colour as #RRGGBB sampled from the largest body area, ignoring the background and any screen glow,
@@ -158,6 +184,9 @@ function buildAnalysisPrompt() {
         "- Colour must be the product housing, never the backdrop, shadow or reflection.",
         '- If a sub-type is only roughly similar, return the closest one rather than "".',
         '- "avoid" must be specific to this item\'s own quirks, not generic quality words.',
+        "- Count every distinct unit you can see, including identical units repeated as a set. Never merge two units into one count, and never count the backdrop, a reflection or a loose prop of the setting as a product unit.",
+        "- Packaging counts only when it is the product being sold. Accessories that come in the box but are not the subject do not count.",
+        '- When itemCount > 1, describe the shared material, finish, colour and structure, and name the differences between units only inside "items".',
     ].join("\n");
 }
 
@@ -171,9 +200,14 @@ export async function analyzeProduct(config: AiConfig, image: ReferenceImage, op
     const subId = normalizeString(parsed.subCategory);
     const sub = subId ? categorySpec?.subs.find((item) => item.id === subId) : undefined;
     const confidence = typeof parsed.angleConfidence === "number" && Number.isFinite(parsed.angleConfidence) ? Math.min(1, Math.max(0, parsed.angleConfidence)) : undefined;
+    // items 比 itemCount 更硬：模型漏给件数但列了 3 件时，以实际列出的件数为准
+    const items = normalizeItemList(parsed.items);
+    const itemCount = Math.max(normalizeItemCount(parsed.itemCount), items.length > 1 ? items.length : 1);
     const analysis: EcomProductAnalysis = {
         category,
         subject: normalizeString(parsed.subject) ?? categorySpec?.prompt ?? "the product",
+        itemCount,
+        items: items.length > 1 ? items : undefined,
         subCategory: sub ? { id: sub.id, name: sub.name } : undefined,
         angle: normalizeAngle(parsed.angle),
         angleConfidence: confidence,
@@ -397,4 +431,76 @@ export async function analyzeStyle(config: AiConfig, image: ReferenceImage, opti
     };
     // 没有场景也没有光线，等于没读出可用风格，宁可让用户重传也不要存一个空壳
     return digest.scene || digest.lighting ? digest : null;
+}
+
+/** 可以作为行为归类的内置场景 id：参考图场景的环境来自参考图，不能当模板。 */
+const SCENE_FAMILY_IDS = ECOM_SCENES.filter((scene) => scene.id !== "reference").map((scene) => scene.id);
+
+/**
+ * 场景参考图识别。
+ *
+ * 与风格识别的差别在「问什么」：风格要的是审美语法（光比、构图、配色），
+ * 场景要的是地点本身（承托面、背景、光源、交代地点的道具）。
+ * 同一个地点可以套任何平台审美，所以这里绝不问平台相关的东西。
+ */
+function buildScenePrompt() {
+    return [
+        "You are turning ONE reference photo into a reusable physical SETTING for an e-commerce product retouching pipeline.",
+        "The product in the photo is a placeholder. Ignore it completely: not its category, not its colour, not its branding, not its shape.",
+        "Describe only the place around it: what a product would rest on, what is behind it, where the light comes from, and which ordinary objects establish that place.",
+        "Return exactly one JSON object. No markdown, no code fences, no commentary before or after.",
+        "",
+        "JSON shape:",
+        `{
+  "name": 2-6 Chinese characters naming the place, e.g. "出租屋书桌" / "露营天幕旁",
+  "note": one Chinese sentence under 30 characters on when to use this place,
+  "family": one id from the place list below — the built-in place whose physical behaviour is closest,
+  "surfaceMaterial": English adjective phrase for the material of the resting surface, e.g. "chipped white laminate",
+  "surfaceNoun": English bare noun for what the product rests on, e.g. "desk" / "coffee table" / "windowsill",
+  "surfaceNote": short English modifier without a leading preposition, or "",
+  "backdrop": one English sentence on what is behind the product and how far away it sits,
+  "lightSource": one English sentence on where the light comes from, its quality and its colour temperature,
+  "depth": one English sentence on depth of field and how the space reads,
+  "props": 1-3 short English noun phrases for the ordinary objects that establish this place,
+  "fitCategories": 1-4 category ids from the list below,
+  "avoid": 1-3 short English phrases naming what would break this place
+}`,
+        "",
+        "Place ids:",
+        ...ECOM_SCENES.filter((scene) => scene.id !== "reference").map((scene) => `- ${scene.id}: ${scene.name} — a product would rest on "${scene.surfaceNoun}"`),
+        "",
+        "Category ids:",
+        ...ECOM_CATEGORIES.map((item) => `- ${item.id}: ${item.prompt}`),
+        "",
+        "Rules:",
+        '- "surfaceMaterial" is an adjective phrase only, never a noun; "surfaceNoun" is a bare noun with no article and no material — the two are joined later as "material + noun".',
+        "- Never name the product in any field, and never list a second copy of the product as a prop.",
+        '- "props" are the objects that tell you where you are (a mug, a folded towel, a coiled cable, a book). No brands, no readable text, no people, no food mess.',
+        '- "family" must be an existing place id, never a new name. A seamless paper or fabric backdrop means "studio".',
+        "- Keep every English field under 25 words, concrete and photographic. No poetic language.",
+    ].join("\n");
+}
+
+/** 识别场景参考图。失败返回 null，界面降级为手动新建，不落半套场景。 */
+export async function analyzeScene(config: AiConfig, image: ReferenceImage, options?: EcomVisionOptions): Promise<EcomSceneDigest | null> {
+    const raw = await askVision(config, buildScenePrompt(), [image], options);
+    const parsed = parseJsonObject<Record<string, unknown>>(raw);
+    if (!parsed) return null;
+    const family = normalizeString(parsed.family)?.toLowerCase();
+    const digest: EcomSceneDigest = {
+        name: normalizeString(parsed.name),
+        note: normalizeString(parsed.note),
+        family: family && SCENE_FAMILY_IDS.includes(family) ? family : undefined,
+        surfaceMaterial: normalizeString(parsed.surfaceMaterial),
+        surfaceNoun: normalizeString(parsed.surfaceNoun),
+        surfaceNote: normalizeString(parsed.surfaceNote),
+        backdrop: normalizeString(parsed.backdrop),
+        lightSource: normalizeString(parsed.lightSource),
+        depth: normalizeString(parsed.depth),
+        props: normalizeStringList(parsed.props, 3),
+        fitCategories: normalizeIdList<EcomCategoryId>(parsed.fitCategories, CATEGORY_IDS, 4),
+        avoid: normalizeStringList(parsed.avoid, 3),
+    };
+    // 既没有承托物也没有背景，等于没读出「这是哪」，宁可让用户重传
+    return digest.surfaceNoun || digest.backdrop ? digest : null;
 }

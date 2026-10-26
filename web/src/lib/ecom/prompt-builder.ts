@@ -1,7 +1,8 @@
 import { findEcomAngle, findEcomCategory, type EcomAngleId, type EcomCategoryId } from "@/constant/ecom/categories";
 import type { EcomPalette, EcomStyle } from "@/constant/ecom/styles";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
-import type { EcomAnglePolicy, EcomProductAnalysis, EcomReferenceDigest, EcomReferenceMode } from "@/types/ecom";
+import { buildFramingBlock } from "@/lib/ecom/framing";
+import type { EcomAnglePolicy, EcomProductAnalysis, EcomReferenceDigest, EcomReferenceMode, EcomSubjectAnchor, EcomSubjectBox, EcomSubjectScale } from "@/types/ecom";
 
 type DigestTextField = "scene" | "lighting" | "composition" | "texture";
 
@@ -60,6 +61,28 @@ export type BuildEcomPromptInput = {
      * 空字符串必须等于不传，保证不填时提示词与旧版逐字一致。
      */
     extraPrompt?: string;
+    /** 成片比例，例如 "3:4"；只用于构图块，缺省时按方图算。 */
+    frameRatio?: string;
+    /** 产品占比档位，auto 表示跟随风格（不写构图块）。 */
+    subjectScale?: EcomSubjectScale;
+    /** 产品落点，center 为默认（不干预）。 */
+    subjectAnchor?: EcomSubjectAnchor;
+    /** 画布上拖出来的自由构图框；给了就按精确百分比写，压过 subjectScale / subjectAnchor。 */
+    subjectBox?: EcomSubjectBox | null;
+    /** 输入图已经按框合成过（产品已在正确位置），此时构图块改为「保持这个布局」而不是「摆成这个布局」。 */
+    framingLocked?: boolean;
+    /**
+     * [Platform look] 区块正文：这套画面属于哪个平台的审美语言（光比、饱和、留白、修图程度）。
+     * 空串等于不下发，提示词与加平台层之前逐字一致。
+     */
+    platformNote?: string;
+    /**
+     * [Scene props] 区块正文：从产品材质与品类推导出的场景道具。
+     * 空串等于不下发——影棚场景和亚马逊这类零道具组合本来就没有这段。
+     */
+    propsNote?: string;
+    /** 追加到 [Color] 末尾的明暗平衡提示。空串等于不下发。 */
+    colorNotes?: string;
 };
 
 /** 补充描述的字数上限。再长也不该出现：多出来的通常是自相矛盾的要求。 */
@@ -100,7 +123,7 @@ export function looksLikeProductEdit(text?: string) {
     return PRODUCT_EDIT_HINTS.some((pattern) => pattern.test(value));
 }
 
-export function buildEcomPrompt({ analysis, style, angle, palette, digests = [], anglePolicy = "keep", withReferenceImage = false, showRiser = false, extraPrompt = "" }: BuildEcomPromptInput) {
+export function buildEcomPrompt({ analysis, style, angle, palette, digests = [], anglePolicy = "keep", withReferenceImage = false, showRiser = false, extraPrompt = "", frameRatio = "1:1", subjectScale = "auto", subjectAnchor = "center", subjectBox = null, framingLocked = false, platformNote = "", propsNote = "", colorNotes = "" }: BuildEcomPromptInput) {
     const productLabel = imageReferenceLabel(0);
     const referenceLabel = imageReferenceLabel(1);
     const angleSpec = findEcomAngle(angle);
@@ -114,9 +137,24 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
     const supportBlock = riserText
         ? `[Support]\nThe product sits on ${riserText}. That riser is a scene prop outside the product: never merge it into the product body, never enlarge it beyond the product footprint, and never let it hide or replace the product's own base.`
         : `[Support]\nThe product rests directly on the scene surface on its own base. Do not add any riser, pedestal, plinth, display stand, acrylic block, tray, slab or platform under or behind the product. Flat coverings that the scene itself calls for — a mat, cloth, rug or paper — are fine, but they must stay flat on the surface and never be raised into a block.`;
+    /*
+     * 一张图里摆多件（套装 / 多 SKU / 组合图）时，原来的提示词只锁「一件」：识别只挑一件当 subject，
+     * [Product lock] 写死 one unique product instance，[Avoid] 还禁 duplicated product，
+     * 模型于是把其余几件当多余元素删掉——这就是「多产品图只出一个产品」的来源。
+     * 件数 > 1 时下面几段整段换成「整组都要保留」；单件路径的提示词逐字不变。
+     */
+    const itemCount = Math.max(1, Math.round(analysis.itemCount ?? 1));
+    const multiItem = itemCount > 1;
+    const itemRoster = multiItem && analysis.items?.length ? `\nThe units in ${productLabel} are: ${analysis.items.slice(0, itemCount).join(", ")}. Keep each one recognisable as itself.` : "";
+    /*
+     * 多件图里 "duplicated product" 会被读成「不许出现相同的第二件」，与「整组都要保留」正面冲突，
+     * 所以整条替换而不是叠加；风格/品类自带的同一条也一并摘掉。
+     */
+    const baseAvoid = multiItem ? ["missing product unit", "extra product unit", "merged product units", "regrouped product units", "only one product shown"] : ["duplicated product"];
+    const inheritedAvoid = [...style.avoid, ...(analysis.avoid ?? []), ...mergeAvoid(digests)].filter((item) => !(multiItem && /^duplicated product$/i.test(item.trim())));
     const avoid = Array.from(
         new Set([
-            "duplicated product",
+            ...baseAvoid,
             "distorted geometry",
             "stretched or squashed proportions",
             "invented texture or invented details",
@@ -128,9 +166,7 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
             "CGI or 3D render look",
             "blown-out highlights",
             ...(riserText ? [] : ["riser", "pedestal", "display stand", "acrylic block under the product"]),
-            ...style.avoid,
-            ...(analysis.avoid ?? []),
-            ...mergeAvoid(digests),
+            ...inheritedAvoid,
         ]),
     );
 
@@ -153,33 +189,60 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
     const propsConflict = Boolean(extraText) && avoid.some((item) => BLANKET_PROPS_BAN.test(item.trim()));
     const avoidBlock = `[Avoid]\n${avoid.join(", ")}${propsConflict ? " (the props named in [Operator notes] are allowed and expected — these bans do not apply to them)" : ""}`;
     const extraBlock = extraText
-        ? `[Operator notes]\nOn top of the scene described above, the operator asked for: ${extraText}\nApply it as scene staging only — props, surface, background and atmosphere around the product. For those staged elements this note is the most specific instruction and outranks both the style and any scene reference: where they disagree about a prop, a surface or the atmosphere, follow the note for the part it names and keep everything else as described above.${propsConflict ? `\nWhere [Avoid] bans props or decorative elements, that ban does not apply to the props named here — it still applies to any other prop.` : ""}\nProps stay secondary: visually lighter than the product, never in front of it, never covering, cropping or casting a shadow across its front face, and never larger than it in the frame.\nIt can never override [Product lock], [Product finish], [Branding], [Color], [Composition] or [Camera], never puts text, logos, prices or badges into the frame, and never duplicates the product. If part of it contradicts those blocks, keep the product exactly as in ${productLabel} and apply only the compatible part.`
+        ? `[Operator notes]\nOn top of the scene described above, the operator asked for: ${extraText}\nApply it as scene staging only — props, surface, background and atmosphere around the product. For those staged elements this note is the most specific instruction and outranks both the style and any scene reference: where they disagree about a prop, a surface or the atmosphere, follow the note for the part it names and keep everything else as described above.${propsConflict ? `\nWhere [Avoid] bans props or decorative elements, that ban does not apply to the props named here — it still applies to any other prop.` : ""}\nProps stay secondary: visually lighter than the product, never in front of it, never covering, cropping or casting a shadow across its front face, and never larger than it in the frame.\nIt can never override [Product lock], [Product finish], [Branding], [Color], [Composition] or [Camera], never puts text, logos, prices or badges into the frame, and never duplicates ${multiItem ? "the units of the set" : "the product"}. If part of it contradicts those blocks, keep ${multiItem ? "the whole set" : "the product"} exactly as in ${productLabel} and apply only the compatible part.`
         : "";
     const scaleHint = findEcomCategory(analysis.category)?.scale.trim() ?? "";
     const sourceAngle = findEcomAngle(analysis.angle);
     const camera =
         anglePolicy === "change" && angleSpec
-            ? `${angleSpec.prompt}. Rebuild the same product at this angle, keeping its geometry, proportions, key layout and label positions consistent with ${productLabel}.`
-            : `Keep the exact camera angle, perspective and lens of ${productLabel}${sourceAngle ? `; the original shot is a ${sourceAngle.labelEn}` : ""}. Do not rotate, re-frame or re-project the product. Only replace the environment, lighting and color.`;
+            ? `${angleSpec.prompt}. Rebuild ${multiItem ? `the same ${itemCount} units as a group` : "the same product"} at this angle, keeping ${multiItem ? "each unit's" : "its"} geometry, proportions, key layout and label positions consistent with ${productLabel}.`
+            : `Keep the exact camera angle, perspective and lens of ${productLabel}${sourceAngle ? `; the original shot is a ${sourceAngle.labelEn}` : ""}. Do not rotate, re-frame or re-project ${multiItem ? "the group" : "the product"}. Only replace the environment, lighting and color.${multiItem ? `\nKeep all ${itemCount} units inside the frame at their original spacing — do not spread them apart, stack them or let the edge of the frame crop one away.` : ""}`;
 
     const finishText = [analysis.material, analysis.finish].filter(Boolean).join(", ");
+    /*
+     * 构图默认为「自动 + 居中」，此时 buildFramingBlock 返回空串，整段不出现——
+     * 没动过这两个控件的用户拿到的提示词与旧版逐字一致。
+     */
+    const framingBlock = buildFramingBlock({
+        ratio: frameRatio,
+        scale: subjectScale,
+        anchor: subjectAnchor,
+        box: subjectBox,
+        noun: multiItem ? "the whole group" : "the product",
+        locked: framingLocked,
+        imageLabel: productLabel,
+    });
+    /*
+     * 单件与多件的产品锁分开写，而不是在单件那句后面追加一句：
+     * "one unique product instance" 和「保留整组」是互相矛盾的，追加只会让模型挑一条听。
+     */
+    const productLock = multiItem
+        ? `[Product lock]\n${productLabel} holds ${itemCount} separate product units and every one of them must be rendered: same count (${itemCount}), same models, same relative sizes, same grouping and same placement in the frame.\nDo not add, drop, merge, duplicate, replace or redesign any unit. Showing only part of the set is a failure, and so is inventing a unit that is not in ${productLabel}.\nEach unit keeps its own silhouette, component count and proportions, and never degrades into a background prop, a reflection or a piece of scenery.\nKeep the width-to-height ratio, thickness, corner radius, seams and parting lines of every unit exactly as photographed. Never stretch, squash, thin or fatten any body.\nEvery visible piece belongs to its own unit — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.${productShape ? `\n${productShape}` : ""}${itemRoster}`
+        : `[Product lock]\nKeep the exact same product as ${productLabel}: same silhouette, same component count, same proportions, one unique product instance.\nDo not add, duplicate, replace or redesign it.\nKeep its width-to-height ratio, thickness, corner radius, seams and parting lines exactly as photographed. Never stretch, squash, thin or fatten the body.\nEvery visible piece belongs to the product — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.${productShape ? `\n${productShape}` : ""}`;
+
     const blocks = [
-        `[Priority]\nPreserving the product in ${productLabel} outranks every instruction below. Where the scene, lighting or style request conflicts with keeping the product intact, keep the product and soften the conflict.`,
-        `[Image roles]\n${productLabel} = the product to preserve.${withReferenceImage ? ` ${referenceLabel} = environment reference only, never use it as the subject.` : ""}`,
-        `[Product lock]\nKeep the exact same product as ${productLabel}: same silhouette, same component count, same proportions, one unique product instance.\nDo not add, duplicate, replace or redesign it.\nKeep its width-to-height ratio, thickness, corner radius, seams and parting lines exactly as photographed. Never stretch, squash, thin or fatten the body.\nEvery visible piece belongs to the product — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.${productShape ? `\n${productShape}` : ""}`,
+        `[Priority]\nPreserving ${multiItem ? `the product set in ${productLabel} — all ${itemCount} units —` : `the product in ${productLabel}`} outranks every instruction below. Where the scene, lighting or style request conflicts with keeping ${multiItem ? "the set" : "the product"} intact, keep ${multiItem ? "the set" : "the product"} and soften the conflict.`,
+        `[Image roles]\n${productLabel} = ${multiItem ? `the set of ${itemCount} products to preserve, all of them` : "the product to preserve"}.${withReferenceImage ? ` ${referenceLabel} = environment reference only, never use it as the subject.` : ""}`,
+        productLock,
         `[Product finish]\nKeep the original material and surface finish${finishText ? `: ${finishText}` : ""}. Preserve the original highlight position, intensity and surface grain.\nA matte surface stays matte, a brushed surface keeps its grain direction, a glossy surface keeps its reflection shape. Never change the finish, over-polish the surface, or swap one material for another.`,
         `[Branding]\nKeep every logo, label, print and its position unchanged. Do not add new text, price tags, badges or promotional marks, and never invent characters that are not in ${productLabel}.${analysis.labelText ? `\nThe visible text on the product reads "${analysis.labelText}" — reproduce it without alteration.` : ""}`,
         ...(CONTROL_CATEGORIES.includes(analysis.category)
             ? [`[Controls]\nKeep the exact key count, keycap legends, port count and indicator light positions of ${productLabel}. Do not add, remove, merge, relabel or relocate any button, port, switch or light.`]
             : []),
         `[Camera]\n${camera}`,
+        // 紧跟机位：取景（多大、放哪）与机位是同一层的画面指令，也方便它压过后面的 [Composition]
+        ...(framingBlock ? [framingBlock] : []),
         ...(scaleHint ? [`[Scale]\nReal-world size: ${scaleHint}. Sell that scale through the support surface, nearby props and depth of field. Never render it at appliance scale, and never shrink it to a miniature.`] : []),
-        `[Scene]\n${style.scene}${sceneText ? ` ${sceneText}` : ""}\nScene elements stay behind and around the product, never covering its front face.`,
+        // 平台层在场景层之前：先说清「这是哪一类图」，场景细节才不会盖过平台感
+        ...(platformNote.trim() ? [platformNote.trim()] : []),
+        `[Scene]\n${style.scene}${sceneText ? ` ${sceneText}` : ""}\nScene elements stay behind and around ${multiItem ? "the group" : "the product"}, never covering ${multiItem ? "any unit's" : "its"} front face.`,
         supportBlock,
+        // 紧接场景块：道具是场景的一部分，离开场景描述就没有确定的位置关系
+        ...(propsNote.trim() ? [propsNote.trim()] : []),
         // 放在场景块之后、光线块之前：位置就在它要修饰的内容旁边，模型不会把它当成全局改图指令
         ...(extraBlock ? [extraBlock] : []),
         `[Lighting]\n${style.lighting}${lightingText ? ` ${lightingText}` : ""}`,
-        `[Color]\nKeep the product body color exactly as in ${productLabel}${analysis.mainColor ? ` (${analysis.mainColor})` : ""}; do not shift its hue, saturate it or add gradients onto it.\nMulti-part colouring must survive: if the product has a differently coloured base, panel, trim or keycap set, keep every part in its own original colour and never pull those parts toward the environment palette.\nEnvironment: ${envPalette.main} dominant, ${envPalette.sub} secondary, ${envPalette.accent} accent.`,
+        `[Color]\nKeep ${multiItem ? "every unit's body color" : "the product body color"} exactly as in ${productLabel}${analysis.mainColor ? ` (${analysis.mainColor})` : ""}; do not shift ${multiItem ? "their hue" : "its hue"}, saturate ${multiItem ? "them" : "it"} or add gradients onto ${multiItem ? "them" : "it"}.\nMulti-part colouring must survive: if the product has a differently coloured base, panel, trim or keycap set, keep every part in its own original colour and never pull those parts toward the environment palette.\nEnvironment: ${envPalette.main} dominant, ${envPalette.sub} secondary, ${envPalette.accent} accent.${colorNotes.trim() ? `\n${colorNotes.trim()}` : ""}`,
         `[Composition]\n${compositionText || style.composition}`,
     ];
     if (textureText) blocks.push(`[Env surface]\n${textureText} — applies to the background and support surface only, never to the product.`);

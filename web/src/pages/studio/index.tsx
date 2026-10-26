@@ -5,36 +5,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { findEcomAngle } from "@/constant/ecom/categories";
+import { composeFramedProduct } from "@/lib/ecom/frame-compose";
+import { describeSubjectBox, displaySubjectBox } from "@/lib/ecom/framing";
 import { buildEcomPrompt, normalizeExtraPrompt } from "@/lib/ecom/prompt-builder";
-import { paletteOf, pickPaletteForProduct, sortStylesByCategory } from "@/lib/ecom/style-match";
-import { adaptMediaSizeToModel, imageSizePresets } from "@/lib/media-size";
+import { paletteOf, pickPaletteForProduct } from "@/lib/ecom/style-match";
+import { useEcomLook } from "@/lib/ecom/use-look";
+import { adaptMediaSizeToModel, imageSizePresets, parsePixelSize } from "@/lib/media-size";
 import { cn } from "@/lib/utils";
 import { digestAngleOf } from "@/services/api/ecom";
 import { ECOM_ENDPOINT_LABEL, requestEcomImage } from "@/services/api/ecom-image";
 import { uploadImage } from "@/services/image-storage";
-import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { isModelChannelConfigured, modelOptionName, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
+import { LookPicker } from "./components/look-picker";
 import { ProductUploader } from "./components/product-uploader";
 import { ReferenceSlot } from "./components/reference-slot";
 import { ResultGrid } from "./components/result-grid";
 import { StudioSettings } from "./components/studio-settings";
 import { StyleGrid, styleCoveredFields } from "./components/style-grid";
-import { StyleManager } from "./components/style-manager";
+import { VisualManager, type VisualManagerTab } from "./components/visual-manager";
 
 export default function EcomStudioPage() {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const config = useEffectiveConfig();
     const [managerOpen, setManagerOpen] = useState(false);
+    /** 弹窗默认页签：从「管理风格」进来是配方，从「管理场景」进来是场景。 */
+    const [managerTab, setManagerTab] = useState<VisualManagerTab>("style");
     const abortRef = useRef<AbortController | null>(null);
-
-    const styles = useActiveEcomStyles();
 
     const productImage = useEcomStudioStore((state) => state.productImage);
     const analysis = useEcomStudioStore((state) => state.analysis);
-    const styleId = useEcomStudioStore((state) => state.styleId);
     const paletteIndex = useEcomStudioStore((state) => state.paletteIndex);
     const anglePolicy = useEcomStudioStore((state) => state.anglePolicy);
     const targetAngle = useEcomStudioStore((state) => state.targetAngle);
@@ -42,13 +44,15 @@ export default function EcomStudioPage() {
     const ratio = useEcomStudioStore((state) => state.ratio);
     const scale = useEcomStudioStore((state) => state.scale);
     const count = useEcomStudioStore((state) => state.count);
+    const subjectScale = useEcomStudioStore((state) => state.subjectScale);
+    const subjectAnchor = useEcomStudioStore((state) => state.subjectAnchor);
+    const subjectBox = useEcomStudioStore((state) => state.subjectBox);
     const withReferenceImage = useEcomStudioStore((state) => state.withReferenceImage);
     const showRiser = useEcomStudioStore((state) => state.showRiser);
     const extraPrompt = useEcomStudioStore((state) => state.extraPrompt);
     const model = useEcomStudioStore((state) => state.model);
     const generating = useEcomStudioStore((state) => state.generating);
     const generateError = useEcomStudioStore((state) => state.generateError);
-    const selectStyle = useEcomStudioStore((state) => state.selectStyle);
     const setTargetAngle = useEcomStudioStore((state) => state.setTargetAngle);
     const setModel = useEcomStudioStore((state) => state.setModel);
     const addResults = useEcomStudioStore((state) => state.addResults);
@@ -57,13 +61,12 @@ export default function EcomStudioPage() {
     const setLastEndpoint = useEcomStudioStore((state) => state.setLastEndpoint);
 
     const digests = useMemo(() => references.filter((item) => item.status === "done" && item.digest).map((item) => item.digest!), [references]);
-    const sortedStyles = useMemo(() => sortStylesByCategory(styles, analysis?.category), [analysis?.category, styles]);
-    const style = sortedStyles.find((item) => item.id === styleId);
-
-    // 未选风格时默认落在当前品类最相关的一个，省掉一次无意义的点击
-    useEffect(() => {
-        if (!styleId && sortedStyles.length) selectStyle(sortedStyles[0].id);
-    }, [selectStyle, sortedStyles, styleId]);
+    /*
+     * 两层合成：平台决定审美语言，场景决定地点，属性联动决定场景里还有什么。
+     * 用户显式挑了一套自定义配方时，它整体覆盖前两者——这是有意为之，
+     * 否则「配方自带纯白背景」和「场景选了窗边」会同时写进提示词，模型只能挑一条听。
+     */
+    const { look, effectiveStyle: style, customStyle, notes } = useEcomLook();
 
     // 参考图给出机位时预填目标机位，但不强行改策略
     const referenceAngleId = useMemo(() => digestAngleOf(digests)?.id, [digests]);
@@ -84,6 +87,15 @@ export default function EcomStudioPage() {
         return { ...config, model: activeModel, size: requestSize, count: String(count), background: "" };
     }, [activeModel, config, count, ratio, scale]);
 
+    /**
+     * 用户动过构图才有值。默认「自动 + 居中」时为 null：
+     * 既不往提示词里加 [Framing]，也不合成画布，出图与加这功能之前逐字一致。
+     */
+    const activeFraming = useMemo(
+        () => (subjectBox || subjectScale !== "auto" ? displaySubjectBox({ box: subjectBox, scale: subjectScale, anchor: subjectAnchor, ratio }) : null),
+        [ratio, subjectAnchor, subjectBox, subjectScale],
+    );
+
     const handleGenerate = useCallback(async () => {
         if (!productImage || !style) {
             message.warning(t("studio.generate.missingInput"));
@@ -95,28 +107,48 @@ export default function EcomStudioPage() {
         }
         const angleId = (anglePolicy === "change" ? targetAngle : undefined) ?? analysis?.angle ?? "three-quarter";
         const palette = paletteIndex < 0 ? pickPaletteForProduct(style, analysis?.mainColor) : paletteOf(style, paletteIndex);
-        const prompt = buildEcomPrompt({
-            analysis: analysis ?? { category: "other", subject: "the product" },
-            style,
-            angle: angleId,
-            palette,
-            digests,
-            anglePolicy,
-            withReferenceImage,
-            showRiser,
-            // 留空时与旧版提示词逐字一致，等于这个功能不存在
-            extraPrompt,
-        });
-
-        // 只有模型支持多图时才把参考图一起提交，否则只发产品图，任何 edit 模型都能用
-        const referenceImages: ReferenceImage[] = withReferenceImage ? references.filter((item) => item.status === "done").map((item) => item.image) : [];
-        const submit: ReferenceImage[] = [productImage, ...referenceImages];
 
         const controller = new AbortController();
         abortRef.current = controller;
         setGenerating(true);
         setGenerateError(undefined);
         try {
+            /*
+             * 构图动过就先把产品按框合成进成片画布，再照这张图生成。
+             * 提示词里的百分比对模型只是弱约束，它常按自己的审美重新构图；布局一旦画进输入图，
+             * 模型要做的只剩「把白底换成场景」，位置与大小才真的咬得住。
+             * 没动过构图、或合成失败（跨域 / 解码 / 画布不可用）时照旧提交原图，行为与以前一致。
+             */
+            const composed = activeFraming ? await composeFramedProduct({ source: productImage.dataUrl, box: activeFraming, ratio, size: parsePixelSize(buildRequestConfig().size) }) : null;
+            const framingLocked = Boolean(composed);
+
+            const prompt = buildEcomPrompt({
+                analysis: analysis ?? { category: "other", subject: "the product" },
+                style,
+                angle: angleId,
+                palette,
+                digests,
+                anglePolicy,
+                withReferenceImage,
+                showRiser,
+                // 留空时与旧版提示词逐字一致，等于这个功能不存在
+                extraPrompt,
+                // 构图默认「自动 + 居中」，此时不产生 [Framing]，同样逐字一致
+                frameRatio: ratio,
+                subjectScale,
+                subjectAnchor,
+                subjectBox: composed ? activeFraming : subjectBox,
+                framingLocked,
+                // 平台 × 场景路径才有这三段；用自定义配方时全部为空串，提示词与旧版一致
+                platformNote: notes.platformNote,
+                propsNote: notes.propsNote,
+                colorNotes: notes.colorNotes,
+            });
+
+            // 只有模型支持多图时才把参考图一起提交，否则只发产品图，任何 edit 模型都能用
+            const referenceImages: ReferenceImage[] = withReferenceImage ? references.filter((item) => item.status === "done").map((item) => item.image) : [];
+            const submit: ReferenceImage[] = [composed ? { ...productImage, dataUrl: composed.dataUrl } : productImage, ...referenceImages];
+
             // 中转站按模型声明兼容端点，这里按模型自动挑能用的那条，不假设一定是 images/edits
             const { images, endpoint } = await requestEcomImage(buildRequestConfig(), prompt, submit, { signal: controller.signal });
             setLastEndpoint(ECOM_ENDPOINT_LABEL[endpoint]);
@@ -155,6 +187,7 @@ export default function EcomStudioPage() {
             setGenerating(false);
         }
     }, [
+        activeFraming,
         addResults,
         analysis,
         anglePolicy,
@@ -173,6 +206,7 @@ export default function EcomStudioPage() {
         setLastEndpoint,
         showRiser,
         style,
+        notes,
         t,
         targetAngle,
         withReferenceImage,
@@ -184,7 +218,11 @@ export default function EcomStudioPage() {
     }, []);
 
     const angleLabel = anglePolicy === "change" && targetAngle ? findEcomAngle(targetAngle)?.name : undefined;
-    const recap = style ? [style.name, angleLabel ?? t("studio.settings.keepAngle"), ratio, scale.toUpperCase(), `×${count}`].join("  ·  ") : "";
+    // 构图动过才写进摘要，默认「自动」时摘要与以前一样
+    const framingLabel = activeFraming ? t("studio.settings.occupancyRecap", { value: describeSubjectBox(activeFraming) }) : "";
+    // 摘要用「配方名」而不是风格名：两条路径的名字要能一眼区分自己走的是哪条
+    const lookLabel = customStyle ? customStyle.name : `${look.platform.name} · ${look.scene.name}`;
+    const recap = [lookLabel, angleLabel ?? t("studio.settings.keepAngle"), ratio, scale.toUpperCase(), `×${count}`, framingLabel].filter(Boolean).join("  ·  ");
     // 补充描述生效时单独给一行：它改变了提示词内容，用户需要一眼确认这句确实被带上了
     const hasExtra = Boolean(normalizeExtraPrompt(extraPrompt));
 
@@ -219,16 +257,25 @@ export default function EcomStudioPage() {
                     </header>
 
                     {/*
-                     * 左侧是窄控制栏（自己滚动，生成条常驻底部），右侧只放结果。
-                     * 生成按钮原本压在右栏顶部，既占地方又把结果顶下去；挪进控制栏后右栏是一条干净图墙。
+                     * 左侧是控制栏（自己滚动，生成条常驻底部），右侧只放结果。
+                     * 控制栏内部再分两列：产品图 + 场景风格 ｜ 参考图 + 生成设置，
+                     * 两列等高、竖线贯穿到底，短的那列留白而不是把整块面板撑高。
                      */}
-                    <div className="grid min-h-0 gap-3 lg:flex-1 lg:grid-cols-[minmax(0,19.5rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+                    <div className="grid min-h-0 gap-3 lg:flex-1 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <div className="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
-                                <ProductUploader config={config} />
-                                <StyleGrid categoryId={analysis?.category} coveredFields={coveredFields} onOpenManager={() => setManagerOpen(true)} />
-                                <ReferenceSlot config={config} />
-                                <StudioSettings config={config} onModelChange={setModel} />
+                            <div className="min-h-0 flex-1 overflow-y-auto">
+                                <div className="grid sm:min-h-full sm:grid-cols-2 sm:divide-x sm:divide-border/60">
+                                    <div className="flex min-w-0 flex-col divide-y divide-border/60">
+                                        <ProductUploader config={config} />
+                                        {/* 平台 × 场景是主路径；自定义配方排在它下面，选了才生效 */}
+                                        <LookPicker onManageScenes={() => { setManagerTab("scene"); setManagerOpen(true); }} />
+                                        <StyleGrid categoryId={analysis?.category} coveredFields={coveredFields} onOpenManager={() => { setManagerTab("style"); setManagerOpen(true); }} />
+                                    </div>
+                                    <div className="flex min-w-0 flex-col divide-y divide-border/60">
+                                        <ReferenceSlot config={config} />
+                                        <StudioSettings config={config} onModelChange={setModel} />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="shrink-0 border-t border-border bg-card p-2.5">
@@ -257,7 +304,7 @@ export default function EcomStudioPage() {
                                 </div>
 
                                 <p className="mt-1.5 truncate text-[10px] tabular-nums text-muted-foreground" title={recap}>
-                                    {style ? recap : t("studio.generate.pickStyleFirst")}
+                                    {recap}
                                     {!productImage ? ` · ${t("studio.generate.pickProduct")}` : ""}
                                 </p>
 
@@ -290,7 +337,7 @@ export default function EcomStudioPage() {
                         </div>
                     </div>
 
-                    <StyleManager open={managerOpen} onClose={() => setManagerOpen(false)} config={config} />
+                    <VisualManager open={managerOpen} onClose={() => setManagerOpen(false)} config={config} tab={managerTab} onTabChange={setManagerTab} />
                 </div>
             </div>
         </div>

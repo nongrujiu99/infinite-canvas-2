@@ -10,6 +10,14 @@ export type EcomProductAnalysis = {
     angleConfidence?: number;
     /** 具体子类，例如「三键小键盘」。 */
     subject: string;
+    /**
+     * 上传图里独立产品的件数，1 表示单件主图。
+     * 一张图摆多件（套装 / 多 SKU / 组合图）时必须大于 1，提示词据此在
+     * 「只锁一件」和「整组都要保留」之间切换；缺省按 1 处理，与旧行为一致。
+     */
+    itemCount?: number;
+    /** 多件时每一件的简短英文名，按画面顺序；单件时为空。 */
+    items?: string[];
     /** 命中品类表里的细分项时回填，用于加细主体锚点。 */
     subCategory?: { id: string; name: string };
     /** 材质描述，用于锁定产品表面表现。 */
@@ -46,11 +54,48 @@ export type EcomReferenceDigest = {
 /** keep：保持原图机位；change：按推荐机位重投影。 */
 export type EcomAnglePolicy = "keep" | "change";
 
+/** 产品在画面里的占比档位；auto 表示跟随风格，不写构图块。 */
+export type EcomSubjectScale = "auto" | "small" | "medium" | "large";
+
+/** 产品在画面里的落点（九宫格）；center 为默认，不干预。 */
+export type EcomSubjectAnchor = "center" | "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+/**
+ * 产品在成片里的自由构图框，可直接拖拽 / 缩放。
+ * 三个值都是占画面的百分比（0-100），与像素无关：
+ * `cx` 中心点横向位置、`cy` 中心点纵向位置、`w` 框宽占画面宽度的比例。
+ * 不存高度与宽高比——高度由产品图自身比例推出，所以永远等比，换图换比例都不会拉伸。
+ */
+export type EcomSubjectBox = { cx: number; cy: number; w: number };
+
 /**
  * 从一张风格参考图识别出的风格草稿。
  * 字段与 EcomStyle 同名，缺省表示模型没给出可用值，由 createStyleDraft 兜底，
  * 这样「识别不全」只会退回默认值，不会产出半套风格。
  */
+/**
+ * 场景参考图的拆解结果。
+ *
+ * 与风格拆解的区别：风格描述的是「审美」（光比、构图、配色），
+ * 场景描述的是「地点」（承托面、背景、光源、交代地点的道具）。
+ * 所以这里没有配色和构图，只有物理环境。
+ */
+export type EcomSceneDigest = {
+    name?: string;
+    note?: string;
+    /** 行为归类：内置场景 id，决定规则怎么套用。 */
+    family?: string;
+    surfaceMaterial?: string;
+    surfaceNoun?: string;
+    surfaceNote?: string;
+    backdrop?: string;
+    lightSource?: string;
+    depth?: string;
+    props?: string[];
+    fitCategories?: EcomCategoryId[];
+    avoid?: string[];
+};
+
 export type EcomStyleDigest = {
     name?: string;
     note?: string;

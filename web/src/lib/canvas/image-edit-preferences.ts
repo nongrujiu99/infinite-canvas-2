@@ -28,17 +28,45 @@ export function supportsSuperResolveScale(config: AiConfig, model: string, scale
  return (name.includes("nano-banana-2") || name.includes("nano-banana-pro")) && scale !== "4k";
 }
 
+/**
+ * 按模型名认「能不能吃参考图」的白名单。只用于界面上的候选过滤与提示，
+ * 不再作为出图时的硬拦截——名单永远追不上新模型，误判一次就是「这个模型永远出不了图」。
+ */
+const REFERENCE_EDIT_KEYWORDS = [
+    "gpt-image",
+    "nano-banana",
+    "seededit",
+    "seedream",
+    "doubao-seedream",
+    "qwen-image-edit",
+    "flux-kontext",
+    "grok-imagine-image",
+    "grok-4.1-image",
+    "grok-4.2-image",
+    // 国产与开源系列：图生图能力常挂在 /images/generations 上，名字里看不出来
+    "kolors",
+    "hunyuan-image",
+    "hunyuan-vision",
+    "wanx",
+    "wan2.",
+    "step-1x",
+    "cogview",
+    "janus",
+    "imagen",
+    "firefly",
+];
+
 export function supportsImageEditModel(config: AiConfig, model: string, operation: ImageEditOperation = "reference", referenceCount = 1) {
- const name = modelOptionName(model).toLowerCase();
- const channel = resolveModelChannel(config, model);
- const configured = channel.models.find((item) => item.name === modelOptionName(model));
- if (configured?.script?.trim()) return true;
- const geminiImage = name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
- if (operation === "superResolve") {
- return name.includes("gpt-image-2") || name.includes("nano-banana-2") || name.includes("nano-banana-pro");
- }
- if (operation === "mask" || referenceCount > 1) {
- return geminiImage || name.includes("gpt-image") || /qwen-image-edit-(?:2509|2511|plus|multi)/.test(name);
- }
- return geminiImage || ["gpt-image", "nano-banana", "seededit", "qwen-image-edit", "flux-kontext", "grok-imagine-image", "grok-4.1-image", "grok-4.2-image"].some((keyword) => name.includes(keyword));
+    const name = modelOptionName(model).toLowerCase();
+    const channel = resolveModelChannel(config, model);
+    const configured = channel.models.find((item) => item.name === modelOptionName(model));
+    if (configured?.script?.trim()) return true;
+    const geminiImage = name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
+    if (operation === "superResolve") {
+        return name.includes("gpt-image-2") || name.includes("nano-banana-2") || name.includes("nano-banana-pro");
+    }
+    if (operation === "mask" || referenceCount > 1) {
+        return geminiImage || name.includes("gpt-image") || /qwen-image-edit-(?:2509|2511|plus|multi)/.test(name) || REFERENCE_EDIT_KEYWORDS.some((keyword) => name.includes(keyword));
+    }
+    return geminiImage || REFERENCE_EDIT_KEYWORDS.some((keyword) => name.includes(keyword));
 }

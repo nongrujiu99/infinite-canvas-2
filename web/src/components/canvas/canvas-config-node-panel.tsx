@@ -1,11 +1,12 @@
-import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video } from "lucide-react";
-import { Button, Input, InputNumber, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
+import { Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video, Wand2 } from "lucide-react";
+import { Button, Input, InputNumber, message, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
 import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, resolveModelChannel, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { optimizeCanvasPrompt } from "@/services/api/canvas-prompt";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasGenerationMode, CanvasGenerationSettings, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
@@ -36,9 +37,12 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  const { t } = useTranslation();
  const globalConfig = useEffectiveConfig();
  const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+ const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
  const [promptExpanded, setPromptExpanded] = useState(false);
+ const [optimizing, setOptimizing] = useState(false);
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const mode = node.metadata?.generationMode || "image";
+ const canOptimize = mode === "image";
  const settings = getNodeGenerationSettings(node, mode);
  const config = buildNodeConfig(globalConfig, node, mode);
  const requiresImageEditModel = mode === "image" && inputSummary.imageCount > 0;
@@ -62,6 +66,41 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  useEffect(() => {
  if (requiresImageEditModel && compatibleImageModels.length && !modelCompatible) changeModel(compatibleImageModels[0]);
  }, [changeModel, compatibleImageModels, modelCompatible, requiresImageEditModel]);
+ const imageReferences = useMemo(
+ () => inputs.flatMap((input) => (input.type === "group" ? input.children : [input])).flatMap((input) => (input.type === "image" && input.image ? [{ nodeId: input.nodeId, image: input.image }] : [])),
+ [inputs],
+ );
+ const optimizePrompt = useCallback(async () => {
+ const source = node.metadata?.composerContent ?? node.metadata?.prompt ?? "";
+ if (!source.trim()) {
+ message.warning(t("canvas.composer.optimizeEmpty"));
+ return;
+ }
+ if (!isAiConfigReady(globalConfig, resolveModelForCapability(globalConfig, undefined, "text"))) {
+ openConfigDialog(true);
+ return;
+ }
+ setOptimizing(true);
+ try {
+ const result = await optimizeCanvasPrompt(globalConfig, { prompt: source, references: imageReferences });
+ onConfigChange(node.id, { composerContent: result.prompt });
+ const options = {
+ duration: 8,
+ content: (
+ <span className="inline-flex items-center gap-3">
+ {t(result.textOverLimit ? "canvas.composer.optimizeTextTooLong" : "canvas.composer.optimizeDone")}
+ <Button type="link" size="small" className="!h-auto !p-0 !text-xs" onClick={() => onConfigChange(node.id, { composerContent: source })}>{t("canvas.composer.optimizeUndo")}</Button>
+ </span>
+ ),
+ };
+ if (result.textOverLimit) message.warning(options);
+ else message.success(options);
+ } catch {
+ message.error(t("canvas.composer.optimizeFailed"));
+ } finally {
+ setOptimizing(false);
+ }
+ }, [globalConfig, imageReferences, isAiConfigReady, node.id, node.metadata?.composerContent, node.metadata?.prompt, onConfigChange, openConfigDialog, t]);
  const summary = inputSummaryText(mode, inputSummary, t);
  return (
  <div className="flex h-full w-full cursor-move flex-col overflow-hidden px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
@@ -142,8 +181,22 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  <CompactGenerationSettings mode={mode} config={config} settings={settings} onChange={updateSettings} />
  </div>
 
- <div className="mt-3 grid min-w-0 shrink-0 cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
+ <div className={`mt-3 grid min-w-0 shrink-0 cursor-default items-center gap-2 ${canOptimize ? "grid-cols-[minmax(0,1fr)_auto_auto]" : "grid-cols-[minmax(0,1fr)_auto]"}`} onMouseDown={(event) => event.stopPropagation()}>
  <ModelPicker className="canvas-compact-control h-9 min-w-0 overflow-hidden" config={config} value={config.model} onChange={changeModel} capability={mode} optionFilter={requiresImageEditModel ? (item) => supportsImageEditModel(config, item, "reference", inputSummary.imageCount) : undefined} onMissingConfig={() => openConfigDialog(true)} fullWidth contained />
+ {canOptimize ? (
+ <Button
+ size="small"
+ className="!h-9 !w-auto !shrink-0 !cursor-pointer !rounded-lg !px-2.5"
+ icon={<Wand2 className="size-4" />}
+ loading={optimizing}
+ disabled={isRunning || optimizing || !hasComposerContent}
+ onMouseDown={(event) => event.stopPropagation()}
+ onClick={optimizePrompt}
+ title={t("canvas.composer.optimize")}
+ >
+ <span className="whitespace-nowrap">{t("canvas.composer.optimizeButton")}</span>
+ </Button>
+ ) : null}
  <Button
  type="primary"
  size="small"
@@ -182,6 +235,8 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  onStartReferenceSelection={(nodeId) => { setPromptExpanded(false); onStartReferenceSelection(nodeId); }}
  onReorderReferences={(inputOrder) => onConfigChange(node.id, { inputOrder })}
  invalidSourceIds={invalidSourceIds}
+ onOptimize={canOptimize ? optimizePrompt : undefined}
+ optimizing={optimizing}
  />
  </Modal>
  </div>

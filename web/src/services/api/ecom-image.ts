@@ -18,7 +18,8 @@ import { requestEdit, requestGeneration } from "./image";
  */
 
 const IMAGE_TIMEOUT_MS = 10 * 60_000;
-const ENDPOINT_CACHE_KEY = "ecom:image-endpoint:v1";
+/** v2：缓存键改成「接口格式 + 域名 + 模型」，同名模型在不同渠道上端点可能不同。 */
+const ENDPOINT_CACHE_KEY = "ecom:image-endpoint:v2";
 
 export type EcomImageEndpoint = "edits" | "generations" | "chat" | "gemini";
 
@@ -33,12 +34,31 @@ export const ECOM_ENDPOINT_LABEL: Record<EcomImageEndpoint, string> = {
     gemini: "v1beta generateContent",
 };
 
-/** 只匹配「端点声明不兼容」这类错误，参数/额度/鉴权错误要原样抛给用户，不能当成端点问题重试。 */
+/**
+ * 只匹配「端点声明不兼容」这类错误，参数/额度/鉴权错误要原样抛给用户，不能当成端点问题重试。
+ *
+ * 各家中转站的措辞差别很大，除了「兼容端点」这种标准说法，还有「当前模型不支持 OpenAI 聊天调用，
+ * 请按模型页面说明使用 Gemini 原生出图接口」这类换一种说法的拒绝。这句话如果不认出来，
+ * 该模型就再也不会去试 Gemini 原生端点，表现为「这个模型永远出不了图」。
+ */
 const ENDPOINT_MISMATCH =
-    /不支持本次\s*api\s*端点|兼容端点|模型广场[^\n]{0,20}声明|compatible endpoint|does\s*not\s*support[^\n]{0,30}endpoint|endpoint[^\n]{0,20}not[^\n]{0,10}support/i;
+    /不支持本次\s*api\s*端点|兼容端点|模型广场[^\n]{0,20}声明|compatible endpoint|does\s*not\s*support[^\n]{0,30}endpoint|endpoint[^\n]{0,20}not[^\n]{0,10}support|不支持[^\n]{0,14}(?:聊天|对话|chat|调用方式|此调用|图片编辑)|(?:聊天|对话|chat)[^\n]{0,14}不支持|原生[^\n]{0,12}(?:接口|端点|出图|接口调用)|请[^\n]{0,10}使用[^\n]{0,20}(?:原生|gemini)[^\n]{0,12}(?:接口|端点|出图)|not\s*supported\s*for\s*(?:this\s*)?model|没有支持此参考图操作|no model compatible with this reference|does\s*not\s*support[^\n]{0,26}(?:image\s*edit|editing|this\s*operation|chat|conversations?)|doesn'?t\s*support[^\n]{0,26}(?:image|chat)/i;
+
+/**
+ * 模型级失败：模型名不存在、没开通、没权限、没余额。
+ * 这类错误换端点不会有任何区别，必须立刻把上游原文抛给用户，不能白烧几笔付费请求。
+ */
+const MODEL_LEVEL_FAILURE =
+    /model[\s\S]{0,60}?(?:does\s*not\s*exist|not\s*found|not\s*available|不存在|未找到|未开通|无权限|没有权限|no\s*access)|(?:模型|模型名)[\s\S]{0,20}?(?:不存在|未找到|未开通|无权限|没有权限|不可用)|model_not_found|insufficient[_\s]quota|invalid[_\s]api[_\s]key/i;
 
 export function isEndpointMismatch(message: string) {
     return ENDPOINT_MISMATCH.test(message);
+}
+
+/** Gemini 系的出图模型大多只开放原生 generateContent，先撞 OpenAI 端点纯属浪费一次请求。 */
+function prefersGemini(model: string) {
+    const name = model.toLowerCase();
+    return name.includes("nano-banana") || (name.includes("gemini") && name.includes("image")) || /imagen-?\d/.test(name);
 }
 
 type EndpointCache = Partial<Record<string, EcomImageEndpoint>>;
@@ -53,24 +73,58 @@ function readEndpointCache(): EndpointCache {
     }
 }
 
-function rememberEndpoint(model: string, endpoint: EcomImageEndpoint) {
+/** 同名模型挂在不同渠道上端点可能不一样，所以缓存键要带上接口格式和域名。 */
+function endpointCacheKey(config: AiConfig, model: string) {
+    const host = config.baseUrl.trim().replace(/\/+$/, "");
+    return `${config.apiFormat}|${host}|${model}`;
+}
+
+function rememberEndpoint(config: AiConfig, model: string, endpoint: EcomImageEndpoint) {
     try {
         const cache = readEndpointCache();
-        cache[model] = endpoint;
+        cache[endpointCacheKey(config, model)] = endpoint;
         globalThis.localStorage?.setItem(ENDPOINT_CACHE_KEY, JSON.stringify(cache));
     } catch {
         // 存不了就下次重新探测，不影响出图
     }
 }
 
-export function cachedImageEndpoint(model: string): EcomImageEndpoint | undefined {
-    return readEndpointCache()[model];
+export function cachedImageEndpoint(config: AiConfig, model: string): EcomImageEndpoint | undefined {
+    return readEndpointCache()[endpointCacheKey(config, model)];
 }
 
-/** 有参考图必须走编辑类端点；没参考图优先生成类端点。缓存的命中端点排到最前。 */
-function candidateEndpoints(model: string, hasReferences: boolean): EcomImageEndpoint[] {
-    const base: EcomImageEndpoint[] = hasReferences ? ["edits", "chat", "gemini"] : ["generations", "chat", "gemini"];
-    const cached = readEndpointCache()[model];
+/** 缓存的端点失效了就删掉：下次仍从「按模型挑的默认顺序」开始，而不是从一个已知会失败的端点开始。 */
+function forgetEndpoint(config: AiConfig, model: string) {
+    try {
+        const cache = readEndpointCache();
+        const key = endpointCacheKey(config, model);
+        if (!(key in cache)) return;
+        delete cache[key];
+        globalThis.localStorage?.setItem(ENDPOINT_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+        // 清不掉也不影响出图
+    }
+}
+
+/**
+ * 有参考图时优走编辑类端点；没参考图优先生成类端点。缓存的命中端点排到最前。
+ *
+ * 有参考图也保留 `/images/generations` 作为最后兜底：doubao-seedream / kolors 这类模型的
+ * 图生图就挂在这条路由上（靠 image 字段收参考图），排除了它们就永远出不了图。
+ * Gemini 系把原生端点提到第二顺位，不再浪费一次 /chat/completions。
+ */
+function candidateEndpoints(config: AiConfig, model: string, hasReferences: boolean): EcomImageEndpoint[] {
+    const geminiFirst = config.apiFormat === "gemini";
+    const base: EcomImageEndpoint[] = geminiFirst
+        ? ["gemini", ...(hasReferences ? (["edits", "chat", "generations"] as EcomImageEndpoint[]) : (["generations", "chat"] as EcomImageEndpoint[]))]
+        : prefersGemini(model)
+          ? hasReferences
+              ? ["edits", "gemini", "chat", "generations"]
+              : ["generations", "gemini", "chat"]
+          : hasReferences
+            ? ["edits", "chat", "gemini", "generations"]
+            : ["generations", "chat", "gemini"];
+    const cached = cachedImageEndpoint(config, model);
     if (!cached || !base.includes(cached)) return base;
     return [cached, ...base.filter((item) => item !== cached)];
 }
@@ -109,16 +163,36 @@ function readUpstreamMessage(value: unknown, depth = 0): string {
     );
 }
 
+/** 把 HTTP 状态挂在 Error 上：文案认不出来时还能靠 400 / 404 / 405 判断「这条路走不通」。 */
+type HttpError = Error & { httpStatus?: number };
+
 /** 统一把 axios 错误换成带上游原文的 Error，否则端点判定拿不到关键信息。 */
-function toReadableError(error: unknown) {
+function toReadableError(error: unknown): unknown {
     if (axios.isCancel(error)) return error;
     if (axios.isAxiosError(error)) {
         const upstream = readUpstreamMessage(error.response?.data);
-        if (upstream) return new Error(upstream);
-        return new Error(error.message || i18n.t("studio.generate.failed"));
+        const normalized: HttpError = new Error(upstream || error.message || i18n.t("studio.generate.failed"));
+        normalized.httpStatus = error.response?.status;
+        return normalized;
     }
     if (error instanceof Error) return error;
     return new Error(String(error));
+}
+
+/**
+ * 状态码只能证明「这条路在这家站上没开」，不能证明「该换下一条」。
+ *
+ * - 404 / 405 / 415 / 501：路由不存在或方法不允许，任何模型撞上都一样 → 换下一条。
+ *   典型场景：站上只实现了 /images/generations，没实现 /images/edits，返回 `Invalid URL (POST /v1/images/edits)`。
+ * - 400 / 422：绝大多数是参数错（尺寸不支持、prompt 超长、参考图格式不对）→ 不能换，
+ *   否则一次生成会白烧 2~3 笔付费请求，最后还抛一句「该模型不支持任何出图端点」把真原因埋掉。
+ *   真正属于端点不兼容的 400，交给 ENDPOINT_MISMATCH 按文案认。
+ * - 模型名不存在 / 未开通 / 无权限：换端点毫无意义，立刻抛原文。
+ */
+function looksLikeUnsupportedEndpoint(error: unknown, message: string) {
+    if (MODEL_LEVEL_FAILURE.test(message)) return false;
+    const status = (error as HttpError | null)?.httpStatus;
+    return status === 404 || status === 405 || status === 415 || status === 501;
 }
 
 function normalizeImageUrl(value: unknown, baseUrl: string): string {
@@ -258,7 +332,7 @@ async function requestPerCount(config: AiConfig, prompt: string, references: Ref
 
 async function runEndpoint(endpoint: EcomImageEndpoint, config: AiConfig, prompt: string, references: ReferenceImage[], signal?: AbortSignal) {
     if (endpoint === "edits") return requestEdit(config, prompt, references, { signal });
-    if (endpoint === "generations") return requestGeneration(config, prompt, { signal });
+    if (endpoint === "generations") return requestGeneration(config, prompt, { signal, references });
     if (endpoint === "chat") return requestPerCount(config, prompt, references, signal, requestChatOnce);
     return requestPerCount(config, prompt, references, signal, requestGeminiOnce);
 }
@@ -270,7 +344,7 @@ async function runEndpoint(endpoint: EcomImageEndpoint, config: AiConfig, prompt
 export async function requestEcomImage(config: AiConfig, prompt: string, references: ReferenceImage[], options?: { signal?: AbortSignal }): Promise<EcomImageResponse> {
     const model = config.model || config.imageModel;
     const requestConfig = resolveModelRequestConfig(config, model);
-    const candidates = candidateEndpoints(model, references.length > 0);
+    const candidates = candidateEndpoints(requestConfig, model, references.length > 0);
     const failures: string[] = [];
 
     for (const endpoint of candidates) {
@@ -280,13 +354,22 @@ export async function requestEcomImage(config: AiConfig, prompt: string, referen
                 failures.push(`${ECOM_ENDPOINT_LABEL[endpoint]}: ${i18n.t("studio.generate.emptyResult")}`);
                 continue;
             }
-            rememberEndpoint(model, endpoint);
+            rememberEndpoint(requestConfig, model, endpoint);
             return { images, endpoint };
         } catch (error) {
             if (options?.signal?.aborted) throw error;
             const normalized = toReadableError(error);
             const message = normalized instanceof Error ? normalized.message : String(normalized);
-            if (!isEndpointMismatch(message)) throw normalized;
+            /*
+             * 两条判定：
+             * 1. 文案明确说端点不兼容 → 换下一个候选；
+             * 2. 文案没认出来，但状态码说明这条路走不通 → 也换。中转站措辞千奇百怪，
+             *    不能只靠正则决定一个模型还能不能再试一次。
+             */
+            const retryable = isEndpointMismatch(message) || looksLikeUnsupportedEndpoint(normalized, message);
+            if (!retryable) throw normalized;
+            // 缓存的端点已经失效，清掉，下次别再从一个必然失败的端点开始
+            if (endpoint === candidates[0]) forgetEndpoint(requestConfig, model);
             failures.push(`${ECOM_ENDPOINT_LABEL[endpoint]} → ${message}`);
         }
     }

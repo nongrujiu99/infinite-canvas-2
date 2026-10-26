@@ -6,17 +6,27 @@ import { useTranslation } from "react-i18next";
 import { ModelPicker } from "@/components/model-picker";
 import { findEcomAngle } from "@/constant/ecom/categories";
 import { supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
+import { displaySubjectBox, SUBJECT_SCALE_VALUES, subjectWidthPercent } from "@/lib/ecom/framing";
 import { ANGLE_RISK_LABEL, suggestAngleChanges } from "@/lib/ecom/style-match";
+import { adaptMediaSizeToModel, imageSizePresets, mediaRatioOptionsForModel, mediaScaleOptionsForModel, parsePixelSize } from "@/lib/media-size";
 import { cn } from "@/lib/utils";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { resolveModelForCapability, type AiConfig } from "@/stores/use-config-store";
+import type { EcomSubjectScale } from "@/types/ecom";
+import { FramingCanvas } from "./framing-canvas";
 import { StudioSection } from "./section";
 
-const SCALES = ["1k", "2k", "4k"];
-const RATIOS = ["1:1", "3:4", "4:3", "16:9", "9:16"];
 const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground";
 const PICKER = "h-7 w-full rounded-md bg-transparent px-1.5 text-[11px]";
+
+/** 占比档位的文案键；生成栏摘要也要用，所以导出。 */
+export const SCALE_LABEL_KEY: Record<EcomSubjectScale, string> = {
+    auto: "studio.settings.occupancyAuto",
+    small: "studio.settings.occupancySmall",
+    medium: "studio.settings.occupancyMedium",
+    large: "studio.settings.occupancyLarge",
+};
 
 export function StudioSettings({ config, onModelChange }: { config: AiConfig; onModelChange: (model: string) => void }) {
     const { t } = useTranslation();
@@ -29,6 +39,10 @@ export function StudioSettings({ config, onModelChange }: { config: AiConfig; on
     const ratio = useEcomStudioStore((state) => state.ratio);
     const scale = useEcomStudioStore((state) => state.scale);
     const count = useEcomStudioStore((state) => state.count);
+    const subjectScale = useEcomStudioStore((state) => state.subjectScale);
+    const subjectAnchor = useEcomStudioStore((state) => state.subjectAnchor);
+    const subjectBox = useEcomStudioStore((state) => state.subjectBox);
+    const productImage = useEcomStudioStore((state) => state.productImage);
     const withReferenceImage = useEcomStudioStore((state) => state.withReferenceImage);
     const model = useEcomStudioStore((state) => state.model);
     const visionModel = useEcomStudioStore((state) => state.visionModel);
@@ -37,6 +51,8 @@ export function StudioSettings({ config, onModelChange }: { config: AiConfig; on
     const setRatio = useEcomStudioStore((state) => state.setRatio);
     const setScale = useEcomStudioStore((state) => state.setScale);
     const setCount = useEcomStudioStore((state) => state.setCount);
+    const setSubjectScale = useEcomStudioStore((state) => state.setSubjectScale);
+    const setSubjectBox = useEcomStudioStore((state) => state.setSubjectBox);
     const setWithReferenceImage = useEcomStudioStore((state) => state.setWithReferenceImage);
     const setVisionModel = useEcomStudioStore((state) => state.setVisionModel);
 
@@ -49,6 +65,32 @@ export function StudioSettings({ config, onModelChange }: { config: AiConfig; on
 
     const activeModel = model || config.model || config.imageModel;
     const multiImageOk = supportsImageEditModel(config, activeModel, "reference", 2);
+
+    // 比例取模型能接受的档位；分辨率下拉直接给出最终会请求的像素，换比例时数字跟着变
+    const ratioOptions = useMemo(
+        () =>
+            mediaRatioOptionsForModel(activeModel, config.apiFormat)
+                .filter((item) => item.value !== "auto")
+                .map((item) => ({ value: item.value, label: item.value })),
+        [activeModel, config.apiFormat],
+    );
+    const scaleOptions = useMemo(() => {
+        const values = mediaScaleOptionsForModel(activeModel, config.apiFormat).filter((item) => item !== "auto") as string[];
+        // 历史存下来的档位在当前模型上不可用时仍然显示出来，避免下拉空着
+        const list = values.includes(scale) ? values : [scale, ...values];
+        return list.map((value) => ({ value, label: `${value.toUpperCase()} · ${pixelLabel(value, ratio, activeModel, config.apiFormat)}` }));
+    }, [activeModel, config.apiFormat, ratio, scale]);
+
+    // 手拖过的框优先；没拖过就用档位换算，旧存档也能在画布上看到自己的位置
+    const framingBox = useMemo(() => displaySubjectBox({ box: subjectBox, scale: subjectScale, anchor: subjectAnchor, ratio }), [subjectBox, subjectScale, subjectAnchor, ratio]);
+    const framingAuto = !subjectBox && subjectScale === "auto";
+    // 拖过之后档位不再精确匹配，按宽度就近高亮，避免一排按钮全是未选状态
+    const activeScale = useMemo(() => {
+        if (!subjectBox) return subjectScale;
+        return SUBJECT_SCALE_VALUES.filter((value) => value !== "auto").find((value) => Math.abs(subjectWidthPercent(value, ratio) - subjectBox.w) <= 3) ?? null;
+    }, [subjectBox, subjectScale, ratio]);
+    // 把「按当前比例算出来多大」直接写出来，用户才知道这个档位在当前比例下到底意味着什么
+    const framingHint = framingAuto ? "" : t("studio.settings.framingHintValue", { ratio, percent: Math.round(framingBox.w) });
 
     return (
         <StudioSection index="04" title={t("studio.settings.title")}>
@@ -90,30 +132,58 @@ export function StudioSettings({ config, onModelChange }: { config: AiConfig; on
                 </div>
             )}
 
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <label className="min-w-0">
                     <span className={FIELD_LABEL}>{t("studio.settings.ratio")}</span>
-                    <Select size="small" className="w-full" value={ratio} onChange={setRatio} options={RATIOS.map((value) => ({ value, label: value }))} />
-                </label>
-                <label className="min-w-0">
-                    <span className={FIELD_LABEL}>{t("studio.settings.resolution")}</span>
-                    <Select size="small" className="w-full" value={scale} onChange={setScale} options={SCALES.map((value) => ({ value, label: value.toUpperCase() }))} />
+                    <Select size="small" className="w-full" value={ratio} onChange={setRatio} options={ratioOptions} />
                 </label>
                 <label className="min-w-0">
                     <span className={FIELD_LABEL}>{t("studio.settings.count")}</span>
                     <InputNumber size="small" className="w-full" min={1} max={4} value={count} onChange={(value) => setCount(Number(value) || 1)} />
                 </label>
+                <label className="col-span-2 min-w-0">
+                    <span className={FIELD_LABEL}>{t("studio.settings.resolution")}</span>
+                    <Select size="small" className="w-full" value={scale} onChange={setScale} options={scaleOptions} />
+                </label>
             </div>
 
-            <div className="mt-2.5 flex items-end gap-2">
-                <label className="min-w-0 flex-1">
-                    <span className={FIELD_LABEL}>{t("studio.settings.model")}</span>
-                    <ModelPicker config={config} value={activeModel} onChange={onModelChange} capability="image" fullWidth className={PICKER} />
-                </label>
-                <button type="button" onClick={() => setAdvanced((value) => !value)} className="mb-0.5 flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                    {t("studio.settings.advanced")}
-                    <ChevronDown className={cn("size-3 transition-transform", advanced && "rotate-180")} />
-                </button>
+            {/*
+             * 构图：只控「多大、放哪」，不改产品本身。默认「自动」，
+             * 此时不产生 [Framing] 段，提示词与加这块之前逐字一致。
+             * 画布上的框可自由拖动 / 缩放，四档只是它的快捷方式。
+             */}
+            <div className="mt-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className={cn(FIELD_LABEL, "mb-0")}>{t("studio.settings.framing")}</span>
+                    {framingAuto ? null : (
+                        <button type="button" onClick={() => setSubjectScale("auto")} className="shrink-0 rounded px-1 py-0.5 text-[10px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                            {t("studio.settings.framingReset")}
+                        </button>
+                    )}
+                </div>
+                <FramingCanvas ratio={ratio} image={productImage} box={framingBox} auto={framingAuto} onChange={setSubjectBox} />
+                <div className="mt-1.5 flex rounded-lg border border-border/80 bg-muted/40 p-0.5">
+                    {SUBJECT_SCALE_VALUES.map((value) => (
+                        <Segment key={value} active={activeScale === value} onClick={() => setSubjectScale(value)}>
+                            {t(SCALE_LABEL_KEY[value])}
+                        </Segment>
+                    ))}
+                </div>
+            </div>
+
+            {/* 把「按比例算出来多大」直接写出来：用户才知道这个档位在当前比例下到底意味着什么 */}
+            {framingHint ? <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{framingHint}</p> : null}
+
+            {/* 窄列里模型名和「高级」抢同一行会把模型名截成 gpt-ima…，所以「高级」上移到标签行，模型独占整行 */}
+            <div className="mt-2.5">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className={cn(FIELD_LABEL, "mb-0")}>{t("studio.settings.model")}</span>
+                    <button type="button" onClick={() => setAdvanced((value) => !value)} className="flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                        {t("studio.settings.advanced")}
+                        <ChevronDown className={cn("size-3 transition-transform", advanced && "rotate-180")} />
+                    </button>
+                </div>
+                <ModelPicker config={config} value={activeModel} onChange={onModelChange} capability="image" fullWidth className={PICKER} />
             </div>
 
             {advanced ? (
@@ -140,6 +210,13 @@ export function StudioSettings({ config, onModelChange }: { config: AiConfig; on
             ) : null}
         </StudioSection>
     );
+}
+
+/** 分辨率下拉里显示最终像素：模型只认比例参数时会收敛到最接近的档位，所以这里给的是实际会请求的尺寸。 */
+function pixelLabel(scale: string, ratio: string, model: string, apiFormat: AiConfig["apiFormat"]) {
+    const preset = imageSizePresets[scale]?.[ratio] ?? ratio;
+    const pixels = parsePixelSize(adaptMediaSizeToModel(preset, model, apiFormat));
+    return pixels ? `${pixels.width} × ${pixels.height}` : preset;
 }
 
 function Segment({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {

@@ -8,7 +8,6 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { adaptMediaSizeToModel, imageSizePresets, inferMediaRatio, inferMediaScale, supportsGeminiImageSize, usesAspectRatioImageParams } from "@/lib/media-size";
-import { supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -366,6 +365,31 @@ function readStatusError(status: number | undefined, fallback: string) {
     if (status === 502) return apiText("badGateway");
     if (status === 503) return apiText("serviceBusy");
     return status ? apiText("httpFailed", { status }) : fallback;
+}
+
+/** 文案之外还要把 HTTP 状态带上去：上层靠 404/405 判断「这条端点在这家站上根本没开」。 */
+export type ApiStatusError = Error & { httpStatus?: number };
+
+function createApiError(message: string, status?: number): ApiStatusError {
+    const error: ApiStatusError = new Error(message);
+    if (typeof status === "number") error.httpStatus = status;
+    return error;
+}
+
+/** axios 错误可能已经被包过一层，尽量从原点或 cause 链上取状态码。 */
+function statusOf(error: unknown): number | undefined {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4 && current; depth += 1) {
+        const status = (current as { httpStatus?: number; response?: { status?: number } }).httpStatus ?? (current as { response?: { status?: number } }).response?.status;
+        if (typeof status === "number") return status;
+        current = (current as { cause?: unknown }).cause;
+    }
+    return undefined;
+}
+
+/** 统一出口：message 与原来逐字一致，只是多挂一个 httpStatus，避免破坏既有文案。 */
+function toApiError(error: unknown, fallback: string): ApiStatusError {
+    return createApiError(readAxiosError(error, fallback), statusOf(error));
 }
 
 function withSystemPrompt(config: AiConfig, prompt: string) {
@@ -850,7 +874,12 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
+/**
+ * 纯文生图接口。带上 `references` 时会额外塞一个 `image` 字段：
+ * doubao-seedream / kolors / hunyuan-image 这类模型的「图生图」就挂在这条路由上，
+ * 标准 OpenAI 会忽略（或拒绝）这个字段，所以只在明确要带参考图时才加。
+ */
+export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions & { references?: ReferenceImage[] }) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const script = resolveModelScript(config, config.model || config.imageModel);
@@ -859,31 +888,33 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         const requestSize = resolveRequestSize(quality, config.size);
         const background = normalizeBackground(config.background);
         try {
+            const refs = await Promise.all((options?.references || []).map((image) => imageToDataUrl(image)));
             const result = await runModelScript({
                 capability: "image",
                 script,
                 config: requestConfig,
                 prompt: withSystemPrompt(requestConfig, prompt),
-                images: [],
+                images: refs.filter(Boolean) as string[],
                 params: { size: requestSize, quality, count: n, ...(background ? { background } : {}) },
                 signal: options?.signal,
             });
             return normalizeScriptImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw toApiError(error, apiText("requestFailed"));
         }
     }
     if (requestConfig.apiFormat === "gemini") {
         try {
-            return await requestGeminiImages(requestConfig, prompt, [], n, options);
+            return await requestGeminiImages(requestConfig, prompt, options?.references || [], n, options);
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw toApiError(error, apiText("requestFailed"));
         }
     }
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const sizeParams = resolveOpenAiImageSizeParams(requestConfig, requestSize);
     const background = normalizeBackground(config.background);
+    const referenceUrls = (await Promise.all((options?.references || []).map((image) => imageToDataUrl(image)))).filter(Boolean) as string[];
     try {
         const response = await axios.post<ImageApiResponse>(
             aiApiUrl(requestConfig, "/images/generations"),
@@ -894,6 +925,8 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 ...(quality ? { quality } : {}),
                 ...sizeParams,
                 ...(background ? { background } : {}),
+                // doubao-seedream / kolors 这类把图生图挂在 generations 上的站，参考图走 image 字段
+                ...(referenceUrls.length ? { image: referenceUrls } : {}),
                 // gpt-image models reject response_format; they always return b64.
                 ...(/gpt-image/.test(requestConfig.model) ? {} : { response_format: "b64_json" }),
                 output_format: IMAGE_OUTPUT_FORMAT,
@@ -907,12 +940,18 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         const images = await parseImagePayload(response.data, requestConfig.baseUrl);
         return images;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw toApiError(error, apiText("requestFailed"));
     }
 }
 
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
-    if (!supportsImageEditModel(config, config.model || config.imageModel, "reference", references.length)) throw new Error(i18n.t("canvas.editors.noCompatibleEditModel"));
+    /*
+     * 这里原本有一句 supportsImageEditModel 的硬拦截，请求根本不会发出去。
+     * 但那张能力表是按模型名猜的：`doubao-seedream-5-0`、`kolors`、`hunyuan-image` 这类
+     * 图生图挂在 /images/generations 上的系列一律不在名单里，于是「换模型 → 报当前渠道没有
+     * 支持此参考图操作的模型 → 连试都没试」。真实能力交给服务端判定：能接受就出图，
+     * 不接受就把上游原文抛给用户，上层再换下一个候选端点。
+     */
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
@@ -934,14 +973,14 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             });
             return normalizeScriptImages(result).map((dataUrl) => ({ id: nanoid(), dataUrl }));
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw toApiError(error, apiText("requestFailed"));
         }
     }
     if (requestConfig.apiFormat === "gemini") {
         try {
             return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw toApiError(error, apiText("requestFailed"));
         }
     }
 
@@ -981,7 +1020,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         const images = await parseImagePayload(response.data, requestConfig.baseUrl);
         return images;
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw toApiError(error, apiText("requestFailed"));
     }
 }
 
@@ -1006,7 +1045,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
             if (text === apiText("noContent")) onDelta(text);
             return text;
         } catch (error) {
-            throw new Error(readAxiosError(error, apiText("requestFailed")));
+            throw toApiError(error, apiText("requestFailed"));
         }
     }
     try {
@@ -1035,7 +1074,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     } catch (error) {
         if (error instanceof StructuredOutputError || error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name)) throw error;
         if (strictFunction) throw new StructuredOutputError(`严格结构化输出请求失败：${readAxiosError(error, apiText("requestFailed"))}`);
-        throw new Error(readAxiosError(error, apiText("requestFailed")));
+        throw toApiError(error, apiText("requestFailed"));
     }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { Button, Image } from "antd";
-import { FileText, Group, Image as ImageIcon, Maximize2, Music2, Video, X } from "lucide-react";
+import { FileText, Group, Image as ImageIcon, Maximize2, Music2, Video, Wand2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
@@ -26,6 +26,8 @@ type CanvasConfigComposerProps = {
  invalidSourceIds?: string[];
  expanded?: boolean;
  onExpand?: () => void;
+ onOptimize?: () => void;
+ optimizing?: boolean;
 };
 
 type Token =
@@ -38,7 +40,7 @@ type MentionState = {
 
 export const CONFIG_REFERENCE_PATTERN = /@\[node:([^\]]+)\]/g;
 
-export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNodes = [], onChange, onClose, embedded = false, onDisconnectReference, onStartReferenceSelection, onReorderReferences, invalidSourceIds = [], expanded = false, onExpand }: CanvasConfigComposerProps) {
+export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNodes = [], onChange, onClose, embedded = false, onDisconnectReference, onStartReferenceSelection, onReorderReferences, invalidSourceIds = [], expanded = false, onExpand, onOptimize, optimizing = false }: CanvasConfigComposerProps) {
  const { t } = useTranslation();
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const editorRef = useRef<HTMLDivElement>(null);
@@ -137,7 +139,10 @@ export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNo
  </div>
  : <div className="mb-1 flex h-7 shrink-0 items-center justify-between gap-2">
  <span className="text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.composer.title")}</span>
+ <div className="flex shrink-0 items-center gap-0.5">
+ {onOptimize && expanded ? <Button size="small" type="text" loading={optimizing} className="!h-7 !w-7 !min-w-7 !rounded-lg !p-0 opacity-60 hover:opacity-100" icon={<Wand2 className="size-3.5" />} onClick={onOptimize} aria-label={t("canvas.composer.optimize")} title={t("canvas.composer.optimize")} /> : null}
  {onExpand ? <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !rounded-lg !p-0 opacity-60 hover:opacity-100" icon={<Maximize2 className="size-3.5" />} onClick={onExpand} aria-label={t("canvas.promptPanel.expandEditor")} title={t("canvas.promptPanel.expandEditor")} /> : null}
+ </div>
  </div>}
  <div className="shrink-0"><CanvasNodeReferenceBar nodeId={nodeId} nodes={nodes} connectedNodes={connectedNodes} compact={embedded && !expanded} invalidSourceIds={invalidSourceIds} onDisconnect={onDisconnectReference} onStartSelection={onStartReferenceSelection} onReorder={onReorderReferences} /></div>
  <div className={`relative rounded-xl ${embedded || expanded ? "min-h-0 flex-1" : ""}`} onDoubleClick={(event) => { event.stopPropagation(); editorRef.current?.focus(); }}>

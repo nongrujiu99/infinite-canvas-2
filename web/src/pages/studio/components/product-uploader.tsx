@@ -159,6 +159,8 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                         <Select size="small" className="w-full" value={analysis?.category ?? "other"} onChange={(value) => setCategory(value)} options={ECOM_CATEGORIES.map((item) => ({ value: item.id, label: item.name }))} />
                         <div className="flex flex-wrap items-center gap-1">
                             {analysis?.finish ? <Chip>{analysis.finish}</Chip> : null}
+                            {/* 只在多件时出现：让用户能一眼确认模型数对了几件，数错就直接重新识别 */}
+                            {(analysis?.itemCount ?? 1) > 1 ? <Chip>{t("studio.product.itemCount", { count: analysis?.itemCount })}</Chip> : null}
                             {sourceAngle ? (
                                 <span
                                     className={cn(
@@ -174,10 +176,11 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                         </div>
 
                         {analysisStatus === "analyzing" ? (
-                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            // Spin 渲染成 div，放在 p 里会触发 HTML 嵌套告警，所以这里用 div
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                 <Spin size="small" />
                                 {t("studio.analysis.running")}
-                            </p>
+                            </div>
                         ) : analysisStatus === "failed" ? (
                             <p className="flex flex-wrap items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                                 {t("studio.analysis.failedHint")}
@@ -208,9 +211,9 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                         setDragging(false);
                         void acceptFile(event.dataTransfer.files?.[0]);
                     }}
-                    className={cn("flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-5 transition", dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/40")}
+                    className={cn("flex min-h-[6.5rem] w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-5 transition", dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/40")}
                 >
-                    {uploading ? <Spin size="small" /> : <ImagePlus className="size-4 text-muted-foreground" />}
+                    {uploading ? <Spin size="small" /> : <ImagePlus className="size-5 text-muted-foreground" />}
                     <span className="truncate text-[12px] text-foreground">{t("studio.product.dropHint")}</span>
                 </button>
             )}

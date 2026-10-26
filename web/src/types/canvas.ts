@@ -68,6 +68,12 @@ export type CanvasNodeText = {
 export type CanvasNodeMetadata = {
     content?: string;
     composerContent?: string;
+    /** 「优化提示词」的产出，单独存放，不覆盖 composerContent；为空时生图用 composerContent。 */
+    optimizedPrompt?: string;
+    /** 生成优化结果时的输入原文，用于判断输入改过之后结果是否过期。 */
+    optimizedSource?: string;
+    /** 优化强度：light 只补画面细节，full 允许重排版式；缺省按 light。 */
+    promptOptimizeLevel?: "light" | "full";
     prompt?: string;
     status?: CanvasNodeStatus;
     errorDetails?: string;

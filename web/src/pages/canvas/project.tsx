@@ -65,6 +65,7 @@ import {
  isGenerationCanceled,
  resetInterruptedGeneration,
  resolveMetadataReferences,
+ resolveNodePrompt,
  sourceNodeReferenceImages,
 } from "@/lib/canvas/canvas-generation-helpers";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
@@ -3132,7 +3133,7 @@ function InfiniteCanvasPage() {
  return;
  }
 
- const context = hasSavedImageMetadata ? null : await hydrateNodeGenerationContext(buildNodeGenerationContext(sourceNode.id, nodesRef.current, connectionsRef.current.filter((connection) => connection.valid !== false), sourceNode.metadata?.prompt || node.metadata?.prompt || ""));
+ const context = hasSavedImageMetadata ? null : await hydrateNodeGenerationContext(buildNodeGenerationContext(sourceNode.id, nodesRef.current, connectionsRef.current.filter((connection) => connection.valid !== false), resolveNodePrompt(sourceNode) || resolveNodePrompt(node)));
  const prompt = (savedImageMetadata?.prompt || context?.prompt || "").trim();
  if (!prompt) {
  message.warning(t("canvas.projectPage.retryPromptMissing"));
@@ -3419,7 +3420,7 @@ function InfiniteCanvasPage() {
  onStop={confirmStopGeneration}
  onGenerate={(nodeId) => {
  const target = nodesRef.current.find((item) => item.id === nodeId);
- void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
+ void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", resolveNodePrompt(target));
  }}
  />
  ),

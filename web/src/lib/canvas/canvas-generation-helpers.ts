@@ -188,6 +188,12 @@ export function isAudioFile(file: File) {
     return file.type.startsWith("audio/") || /\.(mp3|wav)$/i.test(file.name);
 }
 
+/** 生图实际使用的提示词：优化结果优先，优化区为空时回退到输入框原文。 */
+export function resolveNodePrompt(node: CanvasNodeData | undefined) {
+    const optimized = node?.metadata?.optimizedPrompt?.trim();
+    return optimized || node?.metadata?.composerContent || node?.metadata?.prompt || "";
+}
+
 export function buildAngleLabel(params: CanvasImageAngleParams) {
     const horizontal = params.horizontalAngle === 0 ? i18n.t("canvas.generation.front") : params.horizontalAngle > 0 ? i18n.t("canvas.generation.rotateRight", { angle: params.horizontalAngle }) : i18n.t("canvas.generation.rotateLeft", { angle: Math.abs(params.horizontalAngle) });
     const pitch = params.pitchAngle === 0 ? i18n.t("canvas.generation.level") : params.pitchAngle > 0 ? i18n.t("canvas.generation.topDown", { angle: params.pitchAngle }) : i18n.t("canvas.generation.lowAngle", { angle: Math.abs(params.pitchAngle) });

@@ -10,7 +10,7 @@ import type { EcomProductAnalysis } from "@/types/ecom";
 import { StyleImport } from "./style-import";
 
 const INPUT = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary";
-const MONO = "font-mono text-[11px] leading-5";
+const MONO = "font-mono text-xs leading-5";
 
 /** 预览用的示意产品，只为让用户看到 prompt 结构，不参与实际生成。 */
 const PREVIEW_PRODUCTS: Record<EcomCategoryId, { subject: string; structure: string; material: string; mainColor: string }> = {
@@ -48,8 +48,8 @@ function FieldCard({ field, dirty, children }: { field: EcomStyleField; dirty: b
         <section className={cn("rounded-xl border p-4", dirty ? "border-primary/40 bg-primary/[0.03]" : "border-border bg-card")}>
             <header className="mb-1.5 flex flex-wrap items-center gap-2">
                 <h4 className="text-sm font-medium text-foreground">{meta?.label}</h4>
-                <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{meta?.block}</code>
-                {dirty ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">已修改</span> : null}
+                <code className="rounded-lg bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{meta?.block}</code>
+                {dirty ? <span className="rounded-lg bg-primary/10 px-1.5 py-0.5 text-xs text-primary">已修改</span> : null}
             </header>
             <p className="mb-2 text-xs text-muted-foreground">{meta?.hint}</p>
             {children}
@@ -128,9 +128,9 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
                     </div>
                     {draft.cover ? (
                         <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/20 p-2">
-                            <img src={draft.cover} alt="风格参考图" className="size-10 shrink-0 rounded-md border border-border object-cover" />
-                            <span className="min-w-0 flex-1 text-[11px] leading-4 text-muted-foreground">风格参考图，只作对比用，不进 prompt。</span>
-                            <button type="button" className="shrink-0 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-destructive" onClick={() => patch({ cover: undefined })}>
+                            <img src={draft.cover} alt="风格参考图" className="size-10 shrink-0 rounded-lg border border-border object-cover"  loading="lazy" decoding="async"/>
+                            <span className="min-w-0 flex-1 text-xs leading-4 text-muted-foreground">风格参考图，只作对比用，不进 prompt。</span>
+                            <button type="button" className="shrink-0 rounded-lg px-2 py-1 text-xs text-muted-foreground hover:text-destructive" onClick={() => patch({ cover: undefined })}>
                                 移除
                             </button>
                         </div>
@@ -153,12 +153,12 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
 
                 <FieldCard field="scene" dirty={isDirty("scene")}>
                     <textarea className={cn(INPUT, "h-20 resize-none")} value={draft.scene} placeholder="seamless off-white backdrop, no props" onChange={(event) => patch({ scene: event.target.value })} />
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">建议用英文写，模型对英文场景词的响应更稳定。这里只写背景环境，承托物写到下一栏。</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">建议用英文写，模型对英文场景词的响应更稳定。这里只写背景环境，承托物写到下一栏。</p>
                 </FieldCard>
 
                 <FieldCard field="riser" dirty={isDirty("riser")}>
                     <textarea className={cn(INPUT, "h-14 resize-none")} value={draft.riser ?? ""} placeholder="a low matte plinth（留空＝产品直接放在场景表面上）" onChange={(event) => patch({ riser: event.target.value })} />
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">展示台/垫块。工作台里「展示台」开关关掉时，这一栏不会下发。</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">展示台/垫块。工作台里「展示台」开关关掉时，这一栏不会下发。</p>
                 </FieldCard>
 
                 <FieldCard field="lighting" dirty={isDirty("lighting")}>
@@ -183,7 +183,7 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
                             })
                         }
                     />
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">逗号分隔，至少保留一个。</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">逗号分隔，至少保留一个。</p>
                 </FieldCard>
 
                 <FieldCard field="palettes" dirty={isDirty("palettes")}>
@@ -194,7 +194,7 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
                                     <input className={cn(INPUT, "h-8 flex-1")} value={palette.name} placeholder="配色名称" onChange={(event) => updatePalette(index, { name: event.target.value })} />
                                     <button
                                         type="button"
-                                        className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                                        className="rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
                                         disabled={draft.palettes.length <= 1}
                                         onClick={() => patch({ palettes: draft.palettes.filter((_, i) => i !== index) })}
                                     >
@@ -206,15 +206,15 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
                                         <label key={role} className="flex items-center gap-1.5">
                                             <input
                                                 type="color"
-                                                className="size-7 cursor-pointer rounded border border-border bg-transparent"
+                                                className="size-7 cursor-pointer rounded-lg border border-border bg-transparent"
                                                 value={isHexColor(palette[role]) ? palette[role] : "#FFFFFF"}
                                                 onChange={(event) => updatePalette(index, withColor(palette, role, event.target.value.toUpperCase()))}
                                             />
-                                            <input className={cn(INPUT, "h-7 px-1.5 font-mono text-[11px]")} value={palette[role]} onChange={(event) => updatePalette(index, withColor(palette, role, event.target.value))} />
+                                            <input className={cn(INPUT, "h-7 px-1.5 font-mono text-xs")} value={palette[role]} onChange={(event) => updatePalette(index, withColor(palette, role, event.target.value))} />
                                         </label>
                                     ))}
                                 </div>
-                                <p className="mt-1 text-[11px] text-muted-foreground">主色 / 辅色 / 点缀色，只作用于环境，不改产品本体。</p>
+                                <p className="mt-1 text-xs text-muted-foreground">主色 / 辅色 / 点缀色，只作用于环境，不改产品本体。</p>
                             </div>
                         ))}
                         <button
@@ -235,7 +235,7 @@ export function StyleEditor({ style, dirtyFields, onSave, onCancel, onReset, con
                             </Chip>
                         ))}
                     </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">排在前面的机位优先推荐。保角模式下不下发，只作展示。</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground">排在前面的机位优先推荐。保角模式下不下发，只作展示。</p>
                 </FieldCard>
 
                 <FieldCard field="avoid" dirty={isDirty("avoid")}>

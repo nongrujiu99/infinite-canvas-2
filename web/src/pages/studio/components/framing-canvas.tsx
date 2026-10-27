@@ -157,7 +157,7 @@ export function FramingCanvas({ ratio, image, box, auto, onChange }: { ratio: st
                     onPointerDown={begin("move")}
                     style={{ left: `${view.cx}%`, top: `${view.cy}%`, width: `${view.w}%`, aspectRatio: String(productAspect) }}
                     className={cn(
-                        "absolute -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-[3px] border-2 transition-colors",
+                        "absolute -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-lg border-2 transition-colors",
                         dragging === "move" ? "cursor-grabbing border-primary" : "border-primary/80 hover:border-primary",
                         auto ? "border-dashed border-primary/50" : "bg-primary/10",
                     )}
@@ -167,7 +167,7 @@ export function FramingCanvas({ ratio, image, box, auto, onChange }: { ratio: st
                          * 把白边裁掉再画：框的边框必须贴着产品本体，否则「拖到这儿」跟成片里产品的位置差一截。
                          * 宽高都用百分比反算，配合框的 aspectRatio（= 产品本体比例）刚好对齐。
                          */
-                        <span className="-inset-0.5 absolute block overflow-hidden rounded-[2px]">
+                        <span className="-inset-0.5 absolute block overflow-hidden rounded-lg">
                             <img
                                 src={image.dataUrl}
                                 alt=""
@@ -189,19 +189,19 @@ export function FramingCanvas({ ratio, image, box, auto, onChange }: { ratio: st
                     )}
 
                     {/* 标签放框内左上角：框贴顶时放外面会被画布裁掉 */}
-                    <span data-framing-label className="pointer-events-none absolute top-0.5 left-0.5 rounded bg-background/85 px-1 text-[9px] leading-[14px] font-medium text-muted-foreground tabular-nums">
+                    <span data-framing-label className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-background/85 px-1 text-xs leading-[14px] font-medium text-muted-foreground tabular-nums">
                         {Math.round(view.w)}%
                     </span>
 
                     {/* 缩放手柄：命中区 20px，视觉只有 10px；略微内收，避免落在画布裁切区外点不到 */}
                     <span role="presentation" data-framing-handle onPointerDown={begin("resize")} className="absolute -right-1 -bottom-1 flex size-5 cursor-nwse-resize touch-none items-center justify-center">
-                        <span className={cn("size-2.5 rounded-[2px] border border-background bg-primary transition-transform", dragging === "resize" && "scale-125")} />
+                        <span className={cn("size-2.5 rounded-full border border-background bg-primary transition-transform", dragging === "resize" && "scale-125")} />
                     </span>
                 </div>
             </div>
-            <p className="mt-1 flex items-center justify-between gap-2 text-[10px] leading-4 text-muted-foreground">
+            <p className="mt-1 flex items-center justify-between gap-2 text-xs leading-4 text-muted-foreground">
                 <span>{image ? (auto ? t("studio.settings.framingCanvasHint") : t("studio.settings.framingLockHint")) : t("studio.settings.framingCanvasNoImage")}</span>
-                {auto ? <span className="shrink-0 rounded bg-muted px-1 text-[9px]">{t("studio.settings.framingAutoTag")}</span> : null}
+                {auto ? <span className="shrink-0 rounded-lg bg-muted px-1 text-xs">{t("studio.settings.framingAutoTag")}</span> : null}
             </p>
         </div>
     );

@@ -105,14 +105,14 @@ export function ConfigPromptSources() {
  <div className="min-w-[220px] flex-1">
  <div className="flex min-w-0 items-center gap-2">
  <span className="truncate text-sm font-semibold">{source.name}</span>
- {source.builtIn ? <Tag className="m-0 shrink-0 text-[10px]">{t("config.promptSources.builtIn")}</Tag> : null}
+ {source.builtIn ? <Tag className="m-0 shrink-0 text-xs">{t("config.promptSources.builtIn")}</Tag> : null}
  </div>
  <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
  <a className="max-w-full truncate hover:text-foreground hover:underline " href={source.homepage || source.url} target="_blank" rel="noreferrer">
  {source.homepage || source.url}
  </a>
  <span className="tabular-nums">{t("config.promptSources.itemCount", { count: status?.count ?? 0 })}</span>
- {status?.lastError ? <Tag color="error" className="m-0 text-[10px]" title={status.lastError}>{t("config.promptSources.failed")}</Tag> : status?.lastSuccessAt ? <Tag color="success" className="m-0 text-[10px]">{t("config.promptSources.healthy")}</Tag> : <Tag className="m-0 text-[10px]">{t("config.promptSources.unsynced")}</Tag>}
+ {status?.lastError ? <Tag color="error" className="m-0 text-xs" title={status.lastError}>{t("config.promptSources.failed")}</Tag> : status?.lastSuccessAt ? <Tag color="success" className="m-0 text-xs">{t("config.promptSources.healthy")}</Tag> : <Tag className="m-0 text-xs">{t("config.promptSources.unsynced")}</Tag>}
  <span>{status?.lastSuccessAt ? t("config.promptSources.lastSuccess", { time: formatTime(status.lastSuccessAt, i18n.resolvedLanguage) }) : t("config.promptSources.neverFetched")}</span>
  </div>
  </div>

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { AiConfig } from "@/stores/use-config-store";
 
 const INPUT = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary";
-const MONO = "font-mono text-[11px] leading-5";
+const MONO = "font-mono text-xs leading-5";
 
 function familyName(id: EcomSceneId) {
     return ECOM_SCENES.find((item) => item.id === id)?.name ?? id;
@@ -22,7 +22,7 @@ function FieldCard({ title, hint, dirty, children }: { title: string; hint?: str
         <section className={cn("rounded-xl border p-4", dirty ? "border-primary/40 bg-primary/[0.03]" : "border-border bg-card")}>
             <header className="mb-1.5 flex items-center gap-2">
                 <h4 className="text-sm font-medium text-foreground">{title}</h4>
-                {dirty ? <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">已修改</span> : null}
+                {dirty ? <span className="rounded-lg bg-primary/10 px-1.5 py-0.5 text-xs text-primary">已修改</span> : null}
             </header>
             {hint ? <p className="mb-2 text-xs text-muted-foreground">{hint}</p> : null}
             {children}
@@ -114,7 +114,7 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                             </Chip>
                         ))}
                     </div>
-                    <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+                    <p className="mt-2 text-xs leading-4 text-muted-foreground">
                         当前按「{familyName(sceneFamilyOf(draft))}」套用规则：{familyName(sceneFamilyOf(draft)) === "影棚" ? "不会补任何道具，承托面材质也不会被改写" : "会按产品材质与品类补呼应道具，并替换承托面材质形容词"}。
                     </p>
                 </FieldCard>
@@ -122,16 +122,16 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                 <FieldCard title="承托面" dirty={isDirty("surfaceMaterial") || isDirty("surfaceNoun") || isDirty("surfaceNote")} hint="产品放在什么上面。材质是形容词，会被属性规则替换；承托物名词始终保留，不会被改。">
                     <div className="grid gap-2 sm:grid-cols-2">
                         <label className="space-y-1">
-                            <span className="text-[11px] text-muted-foreground">材质（可被规则替换）</span>
+                            <span className="text-xs text-muted-foreground">材质（可被规则替换）</span>
                             <input className={INPUT} value={draft.surfaceMaterial} placeholder="matte oak" onChange={(event) => patch({ surfaceMaterial: event.target.value })} />
                         </label>
                         <label className="space-y-1">
-                            <span className="text-[11px] text-muted-foreground">承托物（不可被改）</span>
+                            <span className="text-xs text-muted-foreground">承托物（不可被改）</span>
                             <input className={INPUT} value={draft.surfaceNoun} placeholder="desktop" onChange={(event) => patch({ surfaceNoun: event.target.value })} />
                         </label>
                     </div>
                     <label className="mt-2 block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">修饰（可留空，如 with faint open grain）</span>
+                        <span className="text-xs text-muted-foreground">修饰（可留空，如 with faint open grain）</span>
                         <input className={INPUT} value={draft.surfaceNote ?? ""} onChange={(event) => patch({ surfaceNote: event.target.value || undefined })} />
                     </label>
                 </FieldCard>
@@ -142,11 +142,11 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                     hint="背景只写产品后面那面墙/台的材质与色调；能认出来的器具（显示器、沥水架）单独放下一栏，由平台决定留不留——亚马逊和品牌 KV 一律拿掉。光源只写这个地点有什么光、在哪个方向。"
                 >
                     <label className="block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">背景（材质与色调，不写器具）</span>
+                        <span className="text-xs text-muted-foreground">背景（材质与色调，不写器具）</span>
                         <textarea className={cn(INPUT, "h-16 resize-none")} value={draft.backdrop} onChange={(event) => patch({ backdrop: event.target.value })} />
                     </label>
                     <label className="mt-2 block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">交代地点的器具（可留空，只写一件，不写线缆）</span>
+                        <span className="text-xs text-muted-foreground">交代地点的器具（可留空，只写一件，不写线缆）</span>
                         <input
                             className={INPUT}
                             value={draft.backdropDetail ?? ""}
@@ -155,18 +155,18 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                         />
                     </label>
                     <label className="mt-2 block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">可用光源（只写有什么光、在哪，不写软硬）</span>
+                        <span className="text-xs text-muted-foreground">可用光源（只写有什么光、在哪，不写软硬）</span>
                         <textarea className={cn(INPUT, "h-14 resize-none")} value={draft.lightSource} onChange={(event) => patch({ lightSource: event.target.value })} />
                     </label>
                     <label className="mt-2 block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">景深与空间关系（可留空）</span>
+                        <span className="text-xs text-muted-foreground">景深与空间关系（可留空）</span>
                         <textarea className={cn(INPUT, "h-12 resize-none")} value={draft.depth} onChange={(event) => patch({ depth: event.target.value })} />
                     </label>
                 </FieldCard>
 
                 <FieldCard title="场景道具" dirty={isDirty("props")} hint="一行一件，只写与产品属性无关的中性道具（交代地点的）。跟材质、品类呼应的道具由属性联动自动推导，不要写在这里——写了会重复。">
                     <label className="block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">道具清单（一行一件）</span>
+                        <span className="text-xs text-muted-foreground">道具清单（一行一件）</span>
                         <textarea
                             className={cn(INPUT, "h-20 resize-none", MONO)}
                             value={draft.props.join("\n")}
@@ -185,7 +185,7 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
 
                 <FieldCard title="避免" dirty={isDirty("avoid")} hint="这个场景里不该出现的东西，会合进 [Avoid]。">
                     <label className="block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">避免项（逗号分隔）</span>
+                        <span className="text-xs text-muted-foreground">避免项（逗号分隔）</span>
                         <textarea
                             className={cn(INPUT, "h-14 resize-none", MONO)}
                             value={draft.avoid.join(", ")}
@@ -222,7 +222,7 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                     </button>
                     {showPreview ? (
                         <div className="border-t border-border bg-muted/40 p-3">
-                            <p className="mb-1 text-[11px] text-muted-foreground">[Scene]</p>
+                            <p className="mb-1 text-xs text-muted-foreground">[Scene]</p>
                             <pre className={cn(MONO, "max-h-60 overflow-auto whitespace-pre-wrap text-muted-foreground")}>{preview || "（承托面与背景还没填，这里会是空的）"}</pre>
                         </div>
                     ) : null}

@@ -124,7 +124,7 @@ export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNo
  return (
  <div
  data-canvas-no-zoom
- className={expanded ? "flex h-[58dvh] min-h-[420px] flex-col rounded-xl border p-3" : embedded ? "flex h-full min-h-0 flex-col rounded-xl border px-2 py-1.5" : "rounded-2xl border p-3 shadow-2xl backdrop-blur"}
+ className={expanded ? "flex h-[58dvh] min-h-[420px] flex-col rounded-xl border p-3" : embedded ? "flex h-full min-h-0 flex-col rounded-xl border px-2 py-1.5" : "rounded-xl border p-3 shadow-2xl backdrop-blur"}
  style={{ background: embedded ? theme.node.fill : theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
  onMouseDown={stopCanvasInteraction}
  onPointerDown={stopCanvasInteraction}
@@ -133,12 +133,12 @@ export function CanvasConfigComposer({ nodeId, nodes, value, inputs, connectedNo
  {!embedded && !expanded ? <div className="mb-2 flex items-center justify-between gap-2">
  <div className="flex min-w-0 items-baseline gap-2">
  <div className="shrink-0 text-xs font-semibold">{t("canvas.composer.title")}</div>
- <div className="truncate text-[11px] opacity-55">{t("canvas.composer.description")}</div>
+ <div className="truncate text-xs opacity-55">{t("canvas.composer.description")}</div>
  </div>
  <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<X className="size-3.5" />} onClick={onClose} />
  </div>
  : <div className="mb-1 flex h-7 shrink-0 items-center justify-between gap-2">
- <span className="text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.composer.title")}</span>
+ <span className="text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.composer.title")}</span>
  <div className="flex shrink-0 items-center gap-0.5">
  {onOptimize && expanded ? <Button size="small" type="text" loading={optimizing} className="!h-7 !w-7 !min-w-7 !rounded-lg !p-0 opacity-60 hover:opacity-100" icon={<Wand2 className="size-3.5" />} onClick={onOptimize} aria-label={t("canvas.composer.optimize")} title={t("canvas.composer.optimize")} /> : null}
  {onExpand ? <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !rounded-lg !p-0 opacity-60 hover:opacity-100" icon={<Maximize2 className="size-3.5" />} onClick={onExpand} aria-label={t("canvas.promptPanel.expandEditor")} title={t("canvas.promptPanel.expandEditor")} /> : null}
@@ -246,11 +246,11 @@ function MentionMenu({ inputs, allInputs, activeIndex, theme, onSelect }: { inpu
 
 function ResourcePreview({ input }: { input: NodeGenerationInput }) {
  if (input.type === "group") return <span className="grid size-9 shrink-0 place-items-center"><Group className="size-4" /></span>;
- if (input.type === "image" && input.image) return <img src={input.image.dataUrl} alt="" className="size-9 rounded-md object-cover" />;
- if (input.type === "video" && input.video) return <video src={input.video.url} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+ if (input.type === "image" && input.image) return <img src={input.image.dataUrl} alt="" className="size-9 rounded-lg object-cover"  loading="lazy" decoding="async"/>;
+ if (input.type === "video" && input.video) return <video src={input.video.url} className="size-9 rounded-lg bg-black object-cover" muted preload="metadata" />;
  const Icon = input.type === "audio" ? Music2 : input.type === "video" ? Video : input.type === "image" ? ImageIcon : FileText;
  return (
- <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
+ <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-black/10">
  <Icon className="size-4" />
  </span>
  );
@@ -260,14 +260,14 @@ function createReferenceChip(input: NodeGenerationInput, inputs: NodeGenerationI
  const wrapper = document.createElement("span");
  wrapper.contentEditable = "false";
  wrapper.dataset.referenceNodeId = input.nodeId;
- wrapper.className = "mx-px inline-flex h-7 max-w-40 items-center justify-center overflow-hidden rounded-md border px-1 text-xs leading-none align-middle";
+ wrapper.className = "mx-px inline-flex h-7 max-w-40 items-center justify-center overflow-hidden rounded-lg border px-1 text-xs leading-none align-middle";
  Object.assign(wrapper.style, chipStyle(theme));
  if (input.type === "image" && input.image) {
  const image = document.createElement("img");
  image.src = input.image.dataUrl;
  image.alt = input.title;
- image.className = "size-6 rounded object-cover";
- wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded align-middle";
+ image.className = "size-6 rounded-lg object-cover";
+ wrapper.className = "mx-px inline-flex size-6 items-center justify-center overflow-hidden rounded-lg align-middle";
  wrapper.appendChild(image);
  wrapper.addEventListener("click", (event) => {
  event.preventDefault();

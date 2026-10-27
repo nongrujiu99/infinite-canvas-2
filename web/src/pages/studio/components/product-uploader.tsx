@@ -151,8 +151,8 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                         onClick={() => inputRef.current?.click()}
                         className="group relative size-[5.5rem] shrink-0 overflow-hidden rounded-xl border border-border bg-muted transition focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                     >
-                        <img src={productImage.dataUrl} alt={productImage.name} className="size-full object-contain" />
-                        <span className="absolute inset-0 flex items-center justify-center bg-background/70 text-[11px] font-medium text-foreground opacity-0 transition group-hover:opacity-100">
+                        <img src={productImage.dataUrl} alt={productImage.name} className="size-full object-contain"  loading="lazy" decoding="async"/>
+                        <span className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium text-foreground opacity-0 transition group-hover:opacity-100">
                             {uploading ? <Spin size="small" /> : t("studio.product.replace")}
                         </span>
                         {analysisStatus === "analyzing" ? (
@@ -170,7 +170,7 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                             {/* 主色直接显示出来：取错了能立刻发现，不用等出图再对色 */}
                             {analysis?.mainColor ? (
                                 <Tooltip title={t(analysisStatus === "failed" ? "studio.product.mainColorSampled" : "studio.product.mainColor", { hex: analysis.mainColor })}>
-                                    <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
                                         <span className="size-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: analysis.mainColor }} />
                                         {analysis.mainColor}
                                     </span>
@@ -181,7 +181,7 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                             {sourceAngle ? (
                                 <span
                                     className={cn(
-                                        "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]",
+                                        "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs",
                                         lowConfidence ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400" : "border-border text-muted-foreground",
                                     )}
                                     title={lowConfidence ? t("studio.product.lowConfidence") : undefined}
@@ -194,21 +194,21 @@ export function ProductUploader({ config }: { config: AiConfig }) {
 
                         {analysisStatus === "analyzing" ? (
                             // Spin 渲染成 div，放在 p 里会触发 HTML 嵌套告警，所以这里用 div
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Spin size="small" />
                                 {t("studio.analysis.running")}
                             </div>
                         ) : analysisStatus === "failed" ? (
-                            <p className="flex flex-wrap items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+                            <p className="flex flex-wrap items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
                                 {t("studio.analysis.failedHint")}
                                 <Tooltip title={[analysisError, t("studio.analysis.visionHint")].filter(Boolean).join("\n")}>
                                     <span className="cursor-help underline decoration-dotted underline-offset-2">{t("studio.analysis.why")}</span>
                                 </Tooltip>
                             </p>
                         ) : !channelReady ? (
-                            <p className="text-[11px] text-muted-foreground">{t("studio.analysis.noChannel")}</p>
+                            <p className="text-xs text-muted-foreground">{t("studio.analysis.noChannel")}</p>
                         ) : (
-                            <p className="truncate text-[11px] text-muted-foreground" title={detail}>
+                            <p className="truncate text-xs text-muted-foreground" title={detail}>
                                 {analysis?.labelText ? t("studio.product.branding", { text: analysis.labelText }) : analysis?.subCategory ? t("studio.product.subCategoryIs", { name: analysis.subCategory.name }) : ""}
                             </p>
                         )}
@@ -239,5 +239,5 @@ export function ProductUploader({ config }: { config: AiConfig }) {
 }
 
 function Chip({ children }: { children: ReactNode }) {
-    return <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{children}</span>;
+    return <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">{children}</span>;
 }

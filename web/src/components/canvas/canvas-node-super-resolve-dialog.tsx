@@ -42,7 +42,7 @@ export function CanvasNodeSuperResolveDialog({ dataUrl, config, open, onClose, o
  <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">
  <div className="rounded-xl border p-4">
  <div className="grid min-h-[280px] place-items-center rounded-lg bg-black/5 dark:bg-white/5">
- <img src={dataUrl} alt="" className="max-h-[320px] max-w-full rounded-lg object-contain" draggable={false} />
+ <img src={dataUrl} alt="" className="max-h-[320px] max-w-full rounded-lg object-contain" draggable={false}  loading="lazy" decoding="async"/>
  </div>
  <div className="mt-3 flex items-center justify-between text-sm">
  <span className="opacity-60">{t("canvas.editors.source")}</span>

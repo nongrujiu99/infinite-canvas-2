@@ -42,7 +42,7 @@ export function CanvasCreateContextMenu({ position, onClose, onCreate }: { posit
 
  return (
  <div data-canvas-create-menu className="fixed z-[80] min-w-48 overflow-hidden rounded-xl border py-1 shadow-2xl" style={{ left: position.x, top: position.y, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }} onPointerDown={(event) => event.stopPropagation()}>
- <div className="px-3 pb-1 pt-2 text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.createMenu.addToCanvas")}</div>
+ <div className="px-3 pb-1 pt-2 text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.createMenu.addToCanvas")}</div>
  {EMPTY_NODE_OPTIONS.map((option) => <MenuButton key={option.type} icon={option.icon} label={t(`canvas.createMenu.${option.label}`)} onClick={() => onCreate(option.type)} />)}
  </div>
  );
@@ -78,7 +78,7 @@ export function CanvasNodeContextMenu({ menu, canCaptureVideoFrame, canProcessIm
  ) : null}
  {canProcessImage ? (
  <>
- <div className="px-3 pb-1 pt-2 text-[11px] font-medium" style={{ color: theme.node.muted }}>{t("canvas.operations.category")}</div>
+ <div className="px-3 pb-1 pt-2 text-xs font-medium" style={{ color: theme.node.muted }}>{t("canvas.operations.category")}</div>
  {IMAGE_OPERATIONS.map((operation) => <MenuButton key={operation.kind} icon={operation.icon} label={t(`canvas.operations.${operation.kind}`)} onClick={() => onImageOperation(operation.kind)} />)}
  <div className="my-1 border-t" style={{ borderColor: theme.toolbar.border }} />
  </>

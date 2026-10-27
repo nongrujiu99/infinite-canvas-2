@@ -24,8 +24,8 @@ export function AppTopNav() {
  <header className="sticky top-0 z-20 h-15 shrink-0 border-b border-border bg-background/92 backdrop-blur-xl">
  <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-5 sm:px-8">
  <div className="flex min-w-0 items-center">
- <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-primary">
- <img src="/logo-wordmark.svg" alt={t("meta.title")} className="h-6 w-auto shrink-0" />
+ <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 rounded-lg text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-primary">
+ <img src="/logo-wordmark.svg" alt={t("meta.title")} className="h-6 w-auto shrink-0"  loading="lazy" decoding="async"/>
  </Link>
 
  <button
@@ -47,7 +47,7 @@ export function AppTopNav() {
  key={tool.slug}
  to={`/${tool.slug}`}
  className={cn(
- "relative flex h-15 shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
+ "relative flex h-15 shrink-0 items-center gap-2 rounded-lg text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
  active ? "font-semibold text-foreground after:bg-primary" : "text-muted-foreground after:bg-transparent hover:text-foreground",
  )}
  >

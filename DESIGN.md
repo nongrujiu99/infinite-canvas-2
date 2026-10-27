@@ -22,28 +22,27 @@ colors:
   destructive: "oklch(0.577 0.245 27.325)"
   destructive-dark: "oklch(0.704 0.191 22.216)"
 typography:
-  display:
+  page:
     fontFamily: "SF Pro Display, PingFang SC, Microsoft YaHei, sans-serif"
-    fontSize: "3rem"
-    fontWeight: 600
-    lineHeight: 1.08
-    letterSpacing: "-0.025em"
-  title:
-    fontFamily: "SF Pro Display, PingFang SC, Microsoft YaHei, sans-serif"
-    fontSize: "1.25rem"
+    fontSize: "1.375rem"
     fontWeight: 600
     lineHeight: 1.3
-    letterSpacing: "-0.015em"
+    letterSpacing: "-0.02em"
+  section:
+    fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 600
+    lineHeight: 1.4
   body:
     fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.55
   label:
     fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "0.75rem"
-    fontWeight: 500
-    lineHeight: 1.4
+    fontWeight: 400
+    lineHeight: 1.55
 rounded:
   control: "12px"
   surface: "14px"
@@ -134,10 +133,12 @@ The palette derives its active colors from the Nodeter logo and pairs them with 
 
 ### Hierarchy
 
-- **Display** (600, 3rem, 1.08): Project-level page titles only.
-- **Title** (600, 1.25rem, 1.3): Project cards, nodes, and principal panel headings.
-- **Body** (400, 0.875rem, 1.5): Descriptions and operational content.
-- **Label** (500, 0.75rem, 1.4): Parameters, metadata, and secondary controls.
+- **Page** (600, 1.375rem, 1.3, 三个页面共用): 页面标题，每页只有一个。
+- **Section** (600, 0.875rem): 面板区块标题、卡片标题。与正文同字号，靠字重和颜色分级。
+- **Body** (400, 0.875rem, 1.55): 选项文字、描述、操作内容。
+- **Label** (400, 0.75rem, 1.55): 字段名、说明、元信息。
+
+**The Three-Size Rule.** 全站只有 22 / 14 / 12 三档字号。层级由字重（600 / 400）和颜色（foreground / muted-foreground）承担，不由「再小一号」承担。9、10、11、13、15、16px 一律不允许出现——相邻档差 1px 的阶梯等于没有阶梯。
 
 **The Quiet Label Rule.** Labels support decisions but never compete with values or actions.
 
@@ -173,7 +174,9 @@ The canvas workspace is inherently fluid. Library and configuration panels respo
 
 ## Shapes
 
-Controls use a gently curved 12px radius. Cards and feature surfaces use 14–16px corners. Small mode controls may use compact rounded rectangles, while pills are reserved for genuinely compact status or segmented choices.
+**The Three-Radius Rule.** 只有三个圆角：控件 12px、大面板与弹层 16px、真正的胶囊（状态点、色板、头像）用 full。嵌套的内层再减 4px（12 → 8），这是唯一允许的第四种值。
+
+画布工具条的小控件、标签、输入框一律 12px；1px / 2px / 3px / 18px 这类一次性数值不再新增。
 
 ## Components
 

@@ -21,7 +21,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
  const setTheme = useThemeStore((state) => state.setTheme);
  const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
  const canvasTheme = canvasThemes[theme];
- const naturalIconClass = "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10 [&_svg]:size-4";
+ const naturalIconClass = "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10 [&_svg]:size-4";
  const iconStyle: CSSProperties | undefined = variant === "canvas" ? { color: canvasTheme.node.text } : undefined;
  const locale = i18n.resolvedLanguage as AppLocale;
  const nextLocale = locale === "zh-CN" ? "en-US" : "zh-CN";
@@ -35,7 +35,7 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
  </button>
  ) : null}
  <Tooltip title={languageLabel} mouseEnterDelay={0.2}>
- <button type="button" className={`${naturalIconClass} text-[11px] font-semibold tracking-tight`} style={iconStyle} onClick={() => void changeAppLocale(nextLocale)} aria-label={languageLabel}>
+ <button type="button" className={`${naturalIconClass} text-xs font-semibold tracking-tight`} style={iconStyle} onClick={() => void changeAppLocale(nextLocale)} aria-label={languageLabel}>
  {locale === "zh-CN" ? "中" : "EN"}
  </button>
  </Tooltip>

@@ -30,7 +30,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 
     return (
         <article
-            className={`group relative flex min-h-48 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border bg-card p-5 transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${selected ? "border-primary bg-accent/55" : "border-border"}`}
+            className={`group relative flex min-h-48 cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-card p-5 transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_18px_40px_rgba(0,0,0,0.28)] ${selected ? "border-primary bg-accent/55" : "border-border"}`}
             onClick={() => !editing && open()}
         >
             <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-primary opacity-0 transition-opacity group-hover:opacity-100" />

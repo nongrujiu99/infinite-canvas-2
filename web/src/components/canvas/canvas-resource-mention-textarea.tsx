@@ -202,7 +202,7 @@ function MentionHighlightText({ value, labels, placeholder, theme }: { value: st
  <>
  {value.split(pattern).map((part, index) =>
  labels.includes(part) ? (
- <span key={`${part}-${index}`} className="rounded-md border px-1 py-0.5 font-medium" style={{ background: theme.canvas.selectionFill, borderColor: `color-mix(in srgb, ${theme.node.activeStroke} 30%, transparent)`, color: theme.toolbar.activeText }}>
+ <span key={`${part}-${index}`} className="rounded-lg border px-1 py-0.5 font-medium" style={{ background: theme.canvas.selectionFill, borderColor: `color-mix(in srgb, ${theme.node.activeStroke} 30%, transparent)`, color: theme.toolbar.activeText }}>
  {part}
  </span>
  ) : (
@@ -280,11 +280,11 @@ function MentionMenu({ textarea, caretIndex, references, activeIndex, theme, onS
 }
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
- if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
- if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+ if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-lg object-cover"  loading="lazy" decoding="async"/>;
+ if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-lg bg-black object-cover" muted preload="metadata" />;
  const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
  return (
- <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">
+ <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-black/10">
  <Icon className="size-4" />
  </span>
  );

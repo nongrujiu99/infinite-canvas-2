@@ -93,7 +93,7 @@ export function StyleImport({ config, onApply }: StyleImportProps) {
                     <Sparkles className="size-3.5 text-primary" />
                     从风格图识别
                 </h4>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">可选</span>
+                <span className="rounded-lg bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">可选</span>
             </header>
             <p className="mb-2.5 text-xs leading-5 text-muted-foreground">传一张你想要的画面风格图，按现有字段自动填好场景、光线、构图、配色和禁区，识别完直接保存成一个新的自建风格。图里的产品只当占位，不会被写进风格。</p>
 
@@ -141,12 +141,12 @@ export function StyleImport({ config, onApply }: StyleImportProps) {
                     <span className="truncate text-foreground">{phase === "recognizing" ? "正在识别这张图…" : review ? "换一张重新识别" : "选择一张风格参考图"}</span>
                     {phase === "recognizing" || review ? null : <span className="shrink-0 text-xs text-muted-foreground">· 产品占比越小越准</span>}
                 </button>
-                {review ? <img src={review.cover} alt="风格参考图" className="size-12 shrink-0 rounded-lg border border-border object-cover" /> : null}
+                {review ? <img src={review.cover} alt="风格参考图" className="size-12 shrink-0 rounded-lg border border-border object-cover"  loading="lazy" decoding="async"/> : null}
             </div>
 
             {phase === "failed" && error ? (
                 <div className="mt-2 flex items-start justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
-                    <p className="text-[11px] leading-4 text-amber-700 dark:text-amber-400">{error}</p>
+                    <p className="text-xs leading-4 text-amber-700 dark:text-amber-400">{error}</p>
                     <button
                         type="button"
                         onClick={() => {
@@ -154,7 +154,7 @@ export function StyleImport({ config, onApply }: StyleImportProps) {
                             setPhase("idle");
                             inputRef.current?.click();
                         }}
-                        className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                        className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
                     >
                         <RefreshCw className="size-3" />
                         重试
@@ -162,7 +162,7 @@ export function StyleImport({ config, onApply }: StyleImportProps) {
                 </div>
             ) : null}
 
-            {review ? <p className="mt-2 text-[11px] leading-4 text-muted-foreground">已保存为新风格，识别到：{review.filled.join("、") || "场景与光线"}。下面的字段可以直接改，改完再点保存。</p> : null}
+            {review ? <p className="mt-2 text-xs leading-4 text-muted-foreground">已保存为新风格，识别到：{review.filled.join("、") || "场景与光线"}。下面的字段可以直接改，改完再点保存。</p> : null}
         </section>
     );
 }

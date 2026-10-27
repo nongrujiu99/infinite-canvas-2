@@ -44,9 +44,9 @@ export function CopyPromptButton({ sections, className }: { sections: PromptSect
                 type="button"
                 onClick={() => void copy()}
                 aria-label={t("studio.look.detailCopyHint")}
-                className={cn("flex items-center rounded p-0.5 text-muted-foreground/40 transition hover:bg-muted hover:text-foreground", className)}
+                className={cn("flex size-6 items-center justify-center rounded-lg text-muted-foreground/40 transition hover:bg-muted hover:text-foreground", className)}
             >
-                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </button>
         </Tooltip>
     );

@@ -171,7 +171,7 @@ function Shortcut({ keys, value, theme }: { keys: string[]; value: string; theme
  <span key={`${key}-${index}`} className="flex items-center gap-1.5">
  {index ? <span className="text-xs opacity-35">+</span> : null}
  <kbd
- className="min-w-9 rounded-md border px-2.5 py-1.5 text-center text-xs font-medium leading-none shadow-[inset_0_-1px_0_rgba(0,0,0,.08),0_1px_2px_rgba(0,0,0,.06)]"
+ className="min-w-9 rounded-lg border px-2.5 py-1.5 text-center text-xs font-medium leading-none shadow-[inset_0_-1px_0_rgba(0,0,0,.08),0_1px_2px_rgba(0,0,0,.06)]"
  style={{ borderColor: theme.node.stroke, background: theme.node.fill, color: theme.node.text }}
  >
  {key}

@@ -92,7 +92,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  </SelectTrigger>
  <SelectContent
  data-canvas-no-zoom
- className="z-[1200] h-[min(var(--radix-select-content-available-height),24rem)] w-[26rem] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-border/70 bg-popover p-0 shadow-xl"
+ className="z-[1200] h-[min(var(--radix-select-content-available-height),24rem)] w-[26rem] max-w-[calc(100vw-32px)] overflow-hidden rounded-xl border border-border/70 bg-popover p-0 shadow-xl"
  viewportClassName="!h-auto !w-full !min-w-0 min-h-0 flex-1 overflow-y-auto px-2 pb-2"
  portalled={!contained}
  position="popper"
@@ -109,13 +109,13 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
  {query ? <button type="button" className="grid size-7 place-items-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground" aria-label={t("settingsPanels.model.clearSearch")} onClick={() => setQuery("")}><X className="size-3.5" /></button> : null}
  </div>
  <div className="grid h-8 grid-cols-3 rounded-lg border border-border/60 bg-muted/25 p-0.5" role="tablist" aria-label={t("settingsPanels.model.filterModels")}>
- {(["recent", "favorites", "all"] as ModelView[]).map((item) => <button key={item} type="button" role="tab" aria-selected={view === item} className={cn("rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", view === item && "bg-accent text-accent-foreground")} onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView(item); }}>{t(`settingsPanels.model.${item === "all" ? "all" : item}`)}</button>)}
+ {(["recent", "favorites", "all"] as ModelView[]).map((item) => <button key={item} type="button" role="tab" aria-selected={view === item} className={cn("rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", view === item && "bg-accent text-accent-foreground")} onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setView(item); }}>{t(`settingsPanels.model.${item === "all" ? "all" : item}`)}</button>)}
  </div>
  </div>}
  >
  {visibleOptions.length ? (
  <SelectGroup>
- {view === "recent" ? <SelectLabel className="flex items-center justify-end px-2 pb-1 pt-1"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground" onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setRecents([]); localStorage.removeItem(RECENTS_KEY); }}><Trash2 className="size-3" />{t("settingsPanels.model.clearRecent")}</button></SelectLabel> : null}
+ {view === "recent" ? <SelectLabel className="flex items-center justify-end px-2 pb-1 pt-1"><button type="button" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground" onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setRecents([]); localStorage.removeItem(RECENTS_KEY); }}><Trash2 className="size-3" />{t("settingsPanels.model.clearRecent")}</button></SelectLabel> : null}
  {visibleOptions.map((model) => <ModelItem key={`${view}:${model}`} config={config} model={model} favorite={favorites.includes(model)} onToggleFavorite={() => toggleFavorite(model, favorites, setFavorites)} onRemoveRecent={view === "recent" ? () => { const next = recents.filter((item) => item.model !== model); setRecents(next); localStorage.setItem(RECENTS_KEY, JSON.stringify(next)); } : undefined} />)}
  </SelectGroup>
  ) : (
@@ -206,7 +206,7 @@ function activateOnKeyboard(event: ReactKeyboardEvent, action: () => void) {
 
 function ModelIcon({ model }: { model: string }) {
  const icon = resolveModelIcon(modelOptionName(model));
- return icon ? <img src={icon} alt="" className="size-4 shrink-0 dark:invert" /> : <Cpu className="size-4 shrink-0 opacity-70" />;
+ return icon ? <img src={icon} alt="" className="size-4 shrink-0 dark:invert"  loading="lazy" decoding="async"/> : <Cpu className="size-4 shrink-0 opacity-70" />;
 }
 
 function resolveModelIcon(model: string) {

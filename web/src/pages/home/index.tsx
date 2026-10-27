@@ -66,11 +66,11 @@ export default function IndexPage() {
  index === 3 && "md:col-span-2",
  )}
  >
- <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+ <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"  loading="lazy" decoding="async"/>
  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent p-4 text-white">
  <div className="mb-2 flex flex-wrap gap-1.5">
  {item.tags.slice(0, 2).map((tag) => (
- <Tag key={tag} variant="filled" className="m-0 bg-white/15 text-[11px] text-white backdrop-blur">
+ <Tag key={tag} variant="filled" className="m-0 bg-white/15 text-xs text-white backdrop-blur">
  {tag}
  </Tag>
  ))}

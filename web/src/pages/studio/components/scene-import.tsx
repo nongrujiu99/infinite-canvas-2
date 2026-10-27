@@ -65,7 +65,7 @@ export function SceneImport({ config, onApply }: { config: AiConfig; onApply: (s
                     <Sparkles className="size-3.5 text-primary" />
                     从场景图识别
                 </h4>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">可选</span>
+                <span className="rounded-lg bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">可选</span>
             </header>
             <p className="mb-2.5 text-xs leading-5 text-muted-foreground">传一张现场照片（桌面、窗边、店里、户外都行），自动拆出承托面、背景、光源和交代地点的道具，并判断该归到哪一类，识别完直接存成一个自建场景。图里的产品只当占位，不会被写进场景。</p>
 
@@ -113,12 +113,12 @@ export function SceneImport({ config, onApply }: { config: AiConfig; onApply: (s
                     <span className="truncate text-foreground">{phase === "recognizing" ? "正在拆解这张场景…" : review ? "换一张重新识别" : "选择一张场景照片"}</span>
                     {phase === "recognizing" || review ? null : <span className="shrink-0 text-xs text-muted-foreground">· 有人物会更准</span>}
                 </button>
-                {review ? <img src={review.cover} alt="场景参考图" className="size-12 shrink-0 rounded-lg border border-border object-cover" /> : null}
+                {review ? <img src={review.cover} alt="场景参考图" className="size-12 shrink-0 rounded-lg border border-border object-cover"  loading="lazy" decoding="async"/> : null}
             </div>
 
             {phase === "failed" && error ? (
                 <div className="mt-2 flex items-start justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
-                    <p className="text-[11px] leading-4 text-amber-700 dark:text-amber-400">{error}</p>
+                    <p className="text-xs leading-4 text-amber-700 dark:text-amber-400">{error}</p>
                     <button
                         type="button"
                         onClick={() => {
@@ -126,7 +126,7 @@ export function SceneImport({ config, onApply }: { config: AiConfig; onApply: (s
                             setPhase("idle");
                             inputRef.current?.click();
                         }}
-                        className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                        className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
                     >
                         <RefreshCw className="size-3" />
                         重试
@@ -135,7 +135,7 @@ export function SceneImport({ config, onApply }: { config: AiConfig; onApply: (s
             ) : null}
 
             {review ? (
-                <p className="mt-2 flex items-start gap-1 text-[11px] leading-4 text-muted-foreground">
+                <p className="mt-2 flex items-start gap-1 text-xs leading-4 text-muted-foreground">
                     <Camera className="mt-0.5 size-3 shrink-0" />
                     <span>已存为自建场景，识别到：{review.filled}。下面的字段可以直接改，改完再点保存。</span>
                 </p>

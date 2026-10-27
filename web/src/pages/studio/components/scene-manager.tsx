@@ -112,7 +112,7 @@ export function SceneManagerPanel({ config }: { config: AiConfig }) {
             <aside className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
                 <div className="space-y-2 border-b border-border p-3">
                     <div className="flex items-center gap-2">
-                        <span className="flex-1 text-[11px] text-muted-foreground">共 {scenes.length} 个场景</span>
+                        <span className="flex-1 text-xs text-muted-foreground">共 {scenes.length} 个场景</span>
                         <button type="button" className="rounded-lg border border-border px-2 py-1 text-xs text-foreground hover:border-primary hover:text-primary" onClick={handleCreate}>
                             新建场景
                         </button>
@@ -125,7 +125,7 @@ export function SceneManagerPanel({ config }: { config: AiConfig }) {
                     />
                     <div className="flex flex-wrap gap-1">
                         {STATUS_FILTERS.map((item) => (
-                            <button key={item.id} type="button" className={cn("rounded-md px-2 py-0.5 text-[11px]", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.id)}>
+                            <button key={item.id} type="button" className={cn("rounded-lg px-2 py-0.5 text-xs", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.id)}>
                                 {item.label}
                             </button>
                         ))}
@@ -150,10 +150,10 @@ export function SceneManagerPanel({ config }: { config: AiConfig }) {
                             >
                                 <div className="flex items-center gap-1.5">
                                     <span className={cn("truncate text-sm", scene.enabled ? "text-foreground" : "text-muted-foreground line-through")}>{scene.name}</span>
-                                    {scene.builtIn === false ? <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">自建</span> : null}
-                                    {changed ? <span className="shrink-0 rounded bg-primary/10 px-1 text-[10px] text-primary">{changed} 项改动</span> : null}
+                                    {scene.builtIn === false ? <span className="shrink-0 rounded-lg bg-muted px-1 text-xs text-muted-foreground">自建</span> : null}
+                                    {changed ? <span className="shrink-0 rounded-lg bg-primary/10 px-1 text-xs text-primary">{changed} 项改动</span> : null}
                                 </div>
-                                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{scene.builtIn === false ? `归类：${scenes.find((item) => item.id === scene.family)?.name ?? "桌面"}` : scene.note}</p>
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground">{scene.builtIn === false ? `归类：${scenes.find((item) => item.id === scene.family)?.name ?? "桌面"}` : scene.note}</p>
                             </button>
                         );
                     })}
@@ -174,7 +174,7 @@ export function SceneManagerPanel({ config }: { config: AiConfig }) {
                             {current.id !== "reference" ? (
                                 <button
                                     type="button"
-                                    className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
+                                    className="rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
                                     onClick={() => {
                                         const source = current;
                                         const copy = duplicateScene(source);

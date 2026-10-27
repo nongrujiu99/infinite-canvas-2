@@ -21,11 +21,11 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 
 function PaletteStrip({ style }: { style: EcomStyle }) {
     // 有识别封面时优先显示它，一眼能看出这套风格是从哪张图来的
-    if (style.cover) return <img src={style.cover} alt="" className="size-5 shrink-0 rounded border border-border object-cover" />;
+    if (style.cover) return <img src={style.cover} alt="" className="size-5 shrink-0 rounded-lg border border-border object-cover"  loading="lazy" decoding="async"/>;
     const palette = style.palettes[0];
     if (!palette) return null;
     return (
-        <span className="flex shrink-0 overflow-hidden rounded border border-border">
+        <span className="flex shrink-0 overflow-hidden rounded-lg border border-border">
             {[palette.main, palette.sub, palette.accent].map((color) => (
                 <span key={color} className="size-3.5" style={{ backgroundColor: color }} />
             ))}
@@ -127,7 +127,7 @@ export function StyleManagerPanel({ config }: StyleManagerPanelProps) {
             <aside className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
                 <div className="space-y-2 border-b border-border p-3">
                     <div className="flex items-center gap-2">
-                        <span className="flex-1 text-[11px] text-muted-foreground">共 {styles.length} 套配方</span>
+                        <span className="flex-1 text-xs text-muted-foreground">共 {styles.length} 套配方</span>
                         <button type="button" className="rounded-lg border border-border px-2 py-1 text-xs text-foreground hover:border-primary hover:text-primary" onClick={handleCreate}>
                             新建风格
                         </button>
@@ -139,18 +139,18 @@ export function StyleManagerPanel({ config }: StyleManagerPanelProps) {
                         onChange={(event) => setKeyword(event.target.value)}
                     />
                     <div className="flex flex-wrap gap-1">
-                        <button type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === "all" ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag("all")}>
+                        <button type="button" className={cn("rounded-full border px-2 py-0.5 text-xs", tag === "all" ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag("all")}>
                             全部标签
                         </button>
                         {ECOM_STYLE_TAGS.map((item) => (
-                            <button key={item} type="button" className={cn("rounded-full border px-2 py-0.5 text-[11px]", tag === item ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag(item)}>
+                            <button key={item} type="button" className={cn("rounded-full border px-2 py-0.5 text-xs", tag === item ? "border-primary text-primary" : "border-border text-muted-foreground")} onClick={() => setTag(item)}>
                                 {item}
                             </button>
                         ))}
                     </div>
                     <div className="flex flex-wrap gap-1">
                         {STATUS_FILTERS.map((item) => (
-                            <button key={item.id} type="button" className={cn("rounded-md px-2 py-0.5 text-[11px]", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.id)}>
+                            <button key={item.id} type="button" className={cn("rounded-lg px-2 py-0.5 text-xs", status === item.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")} onClick={() => setStatus(item.id)}>
                                 {item.label}
                             </button>
                         ))}
@@ -175,12 +175,12 @@ export function StyleManagerPanel({ config }: StyleManagerPanelProps) {
                             >
                                 <div className="flex items-center gap-1.5">
                                     <span className={cn("truncate text-sm", style.enabled ? "text-foreground" : "text-muted-foreground line-through")}>{style.name}</span>
-                                    {!style.builtIn ? <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">自建</span> : null}
-                                    {changed ? <span className="rounded bg-primary/10 px-1 text-[10px] text-primary">{changed} 项改动</span> : null}
+                                    {!style.builtIn ? <span className="rounded-lg bg-muted px-1 text-xs text-muted-foreground">自建</span> : null}
+                                    {changed ? <span className="rounded-lg bg-primary/10 px-1 text-xs text-primary">{changed} 项改动</span> : null}
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
                                     <PaletteStrip style={style} />
-                                    <span className="truncate text-[11px] text-muted-foreground">{style.tags.join(" · ")}</span>
+                                    <span className="truncate text-xs text-muted-foreground">{style.tags.join(" · ")}</span>
                                 </div>
                             </button>
                         );
@@ -201,7 +201,7 @@ export function StyleManagerPanel({ config }: StyleManagerPanelProps) {
                             </div>
                             <button
                                 type="button"
-                                className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
+                                className="rounded-lg border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
                                 onClick={() => {
                                     const copy = duplicateStyle(current);
                                     setPending(copy);

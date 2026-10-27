@@ -53,7 +53,7 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  {t("config.channelEditor.back")}
  </button>
 
- <div className="rounded-2xl border border-border p-5">
+ <div className="rounded-xl border border-border p-5">
  <div className="flex items-center gap-2 text-base font-semibold">
  <Wifi className="size-4" />
  {t("config.channelEditor.serviceTitle")}

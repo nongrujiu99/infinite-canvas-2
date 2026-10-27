@@ -38,14 +38,14 @@ function PickerCard({ title, kind, cover, onClick }: { title: string; kind: stri
  onClick={onClick}
  >
  {cover ? (
- <img src={cover} alt={title} className="aspect-[4/3] w-full object-cover" />
+ <img src={cover} alt={title} className="aspect-[4/3] w-full object-cover"  loading="lazy" decoding="async"/>
  ) : (
  <div className="flex aspect-[4/3] items-center justify-center bg-muted p-3 text-center text-xs leading-5 text-muted-foreground ">{title}</div>
  )}
  <div className="p-2.5">
  <div className="flex items-center justify-between gap-2">
  <span className="line-clamp-1 text-xs font-medium text-foreground ">{title}</span>
- <Tag className="m-0 shrink-0 text-[10px]">{t(`assets.kinds.${kind}`)}</Tag>
+ <Tag className="m-0 shrink-0 text-xs">{t(`assets.kinds.${kind}`)}</Tag>
  </div>
  </div>
  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-medium text-white opacity-0 transition group-hover:bg-black/60 group-hover:opacity-100">{t("canvas.assetPicker.insert")}</div>

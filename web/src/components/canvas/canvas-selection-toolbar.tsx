@@ -58,7 +58,7 @@ export function CanvasSelectionToolbar({
  </svg>
  {showActions ? (
  <div
- className="absolute z-[70] flex h-12 -translate-x-1/2 -translate-y-full items-center overflow-visible rounded-[18px] border"
+ className="absolute z-[70] flex h-12 -translate-x-1/2 -translate-y-full items-center overflow-visible rounded-xl border"
  style={{ left: left + width / 2, top: top - 8, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text, boxShadow: "0 8px 28px rgba(15,23,42,.12)" }}
  onMouseDown={(event) => event.stopPropagation()}
  onPointerDown={(event) => event.stopPropagation()}

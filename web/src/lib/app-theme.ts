@@ -46,6 +46,11 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             controlItemBgActive: color.itemSelectedBg,
             controlItemBgActiveHover: color.itemSelectedHoverBg,
             borderRadius: 12,
+            // antd 默认 LG = base + 2，会溢出成 14px；面板类组件（Modal/Popover/Card）自己声明 16px
+            borderRadiusLG: 12,
+            // 小尺寸控件（Tag、small Button）默认 6px，会把 12px 的体系打散，一并拉齐
+            borderRadiusSM: 12,
+            borderRadiusXS: 8,
             motionDurationMid: "0.2s",
             motionDurationSlow: "0.28s",
         },
@@ -54,6 +59,7 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
                 primaryShadow: "none",
                 fontWeight: 500,
                 borderRadius: 12,
+                borderRadiusLG: 12,
             },
             Dropdown: {
                 colorBgElevated: color.elevatedBg,

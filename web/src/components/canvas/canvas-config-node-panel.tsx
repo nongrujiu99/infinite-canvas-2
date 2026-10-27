@@ -160,7 +160,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  />
  </div>
 
- <div className="mb-2 flex h-5 shrink-0 items-center justify-between gap-2 px-0.5 text-[11px]" style={{ color: theme.node.muted }}>
+ <div className="mb-2 flex h-5 shrink-0 items-center justify-between gap-2 px-0.5 text-xs" style={{ color: theme.node.muted }}>
  <span className="min-w-0 truncate">{summary}</span>
  </div>
 
@@ -184,19 +184,19 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  {optimizedPrompt.trim() ? (
  <div className="mb-3 shrink-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
  <div className="mb-1 flex h-6 items-center justify-between gap-2">
- <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium" style={{ color: theme.node.muted }}>
+ <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-xs font-medium" style={{ color: theme.node.muted }}>
  <Wand2 className="size-3 shrink-0" />
  {t("canvas.composer.optimizedTitle")}
  <span className="truncate opacity-60">{optimizedStale ? t("canvas.composer.optimizedStale") : t("canvas.composer.optimizedHint")}</span>
  </span>
- <Button size="small" type="text" className="!h-6 !w-auto !min-w-0 !shrink-0 !px-1.5 !text-[11px] opacity-60 hover:opacity-100" onClick={() => onConfigChange(node.id, { optimizedPrompt: "" })}>{t("canvas.composer.optimizedClear")}</Button>
+ <Button size="small" type="text" className="!h-6 !w-auto !min-w-0 !shrink-0 !px-1.5 !text-xs opacity-60 hover:opacity-100" onClick={() => onConfigChange(node.id, { optimizedPrompt: "" })}>{t("canvas.composer.optimizedClear")}</Button>
  </div>
- <Input.TextArea value={optimizedPrompt} onChange={(event) => onConfigChange(node.id, { optimizedPrompt: event.target.value })} autoSize={{ minRows: 3, maxRows: 7 }} className="!text-[11px] !leading-5" style={{ background: theme.node.fill, color: theme.node.text }} />
+ <Input.TextArea value={optimizedPrompt} onChange={(event) => onConfigChange(node.id, { optimizedPrompt: event.target.value })} autoSize={{ minRows: 3, maxRows: 7 }} className="!text-xs !leading-5" style={{ background: theme.node.fill, color: theme.node.text }} />
  </div>
  ) : null}
 
- {invalidSourceIds.length ? <div className="mb-2 shrink-0 text-[11px] leading-4 text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
- {requiresImageEditModel && !compatibleImageModels.length ? <div className="mb-2 shrink-0 text-[11px] leading-4 text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
+ {invalidSourceIds.length ? <div className="mb-2 shrink-0 text-xs leading-4 text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
+ {requiresImageEditModel && !compatibleImageModels.length ? <div className="mb-2 shrink-0 text-xs leading-4 text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
 
  <div className="canvas-generation-settings shrink-0 cursor-default rounded-xl px-2.5 py-2" style={{ background: theme.node.fill }}>
  <CompactGenerationSettings mode={mode} config={config} settings={settings} onChange={updateSettings} />
@@ -332,7 +332,7 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
  <CompactField label={t("settingsPanels.video.quality")}><Select size="small" className={fieldClass} value={resolution} options={["480", "720", "1080"].map((value) => ({ value, label: `${value}p` }))} onChange={(value) => applySize(value, ratio)} /></CompactField>
  <CompactField label={t("settingsPanels.video.seconds")}>
  <Popover trigger="click" placement="bottom" overlayClassName="canvas-seconds-popover" content={<div className="w-60 px-1 pb-1 pt-3" onMouseDown={(event) => event.stopPropagation()}><Slider min={secondsSpec.min} max={secondsSpec.max} step={secondsSpec.step} marks={secondsMarks} value={seconds} tooltip={{ formatter: (value) => `${value}s` }} onChange={(value) => onChange({ seconds: String(value) })} /></div>}>
- <button type="button" className="canvas-parameter-trigger" onMouseDown={(event) => event.stopPropagation()}><span>{seconds}s</span><span className="text-[10px] opacity-45">{secondsSpec.min}–{secondsSpec.max}s</span></button>
+ <button type="button" className="canvas-parameter-trigger" onMouseDown={(event) => event.stopPropagation()}><span>{seconds}s</span><span className="text-xs opacity-45">{secondsSpec.min}–{secondsSpec.max}s</span></button>
  </Popover>
  </CompactField>
  <CompactField label={t("settingsPanels.video.mode")}><Select size="small" className={fieldClass} value={config.videoMode || "frames"} options={["frames", "reference"].map((value) => ({ value, label: t(`settingsPanels.video.modes.${value}`) }))} onChange={(videoMode) => onChange({ videoMode })} /></CompactField>
@@ -352,7 +352,7 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
 }
 
 function CompactField({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
- return <label className={`min-w-0 ${className || "flex-1"}`}><span className="mb-1 block truncate whitespace-nowrap text-[10px] leading-4 opacity-60" title={label}>{label}</span>{children}</label>;
+ return <label className={`min-w-0 ${className || "flex-1"}`}><span className="mb-1 block truncate whitespace-nowrap text-xs leading-4 opacity-60" title={label}>{label}</span>{children}</label>;
 }
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasGenerationMode): AiConfig {

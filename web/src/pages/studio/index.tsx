@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { findEcomAngle } from "@/constant/ecom/categories";
+import { PageHeader } from "@/components/layout/page-header";
 import { composeFramedProduct } from "@/lib/ecom/frame-compose";
 import { describeSubjectBox, displaySubjectBox } from "@/lib/ecom/framing";
 import { buildEcomPrompt, normalizeExtraPrompt } from "@/lib/ecom/prompt-builder";
@@ -242,20 +243,21 @@ export default function EcomStudioPage() {
         // 小屏整页滚动，大屏两栏各自滚动：控制区缩成窄栏后，结果区不再被挤到屏幕外。
         <div className="flex h-full flex-col overflow-hidden">
             <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
-                <div className="mx-auto flex w-full max-w-[100rem] flex-col px-4 pt-3.5 pb-5 sm:px-6 lg:h-full lg:min-h-0 lg:pb-3.5">
-                    <header className="mb-3 flex shrink-0 items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-baseline gap-2.5">
-                            <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-foreground">{t("navigation.image")}</h1>
-                            <p className="hidden truncate text-[11px] text-muted-foreground sm:block">{t("studio.subtitle")}</p>
-                        </div>
-                        {/* 把原来压满整行的大号 Alert 收成一个状态点：配置与否一眼可见，但不占版面 */}
-                        <Tooltip title={channelReady ? t("studio.settings.model") : t("studio.noChannelHint")}>
-                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
-                                <span className={cn("size-1.5 rounded-full", channelReady ? "bg-emerald-500" : "bg-amber-500")} />
-                                <span className="max-w-[9rem] truncate">{modelOptionName(activeModel)}</span>
-                            </span>
-                        </Tooltip>
-                    </header>
+                <div className="mx-auto flex w-full max-w-7xl flex-col px-5 pt-5 pb-4 sm:px-8 lg:h-full lg:min-h-0 lg:pb-5">
+                    <PageHeader
+                        title={t("navigation.image")}
+                        description={t("studio.subtitle")}
+                        className="mb-3.5 shrink-0"
+                        actions={
+                            /* 把原来压满整行的大号 Alert 收成一个状态点：配置与否一眼可见，但不占版面 */
+                            <Tooltip title={channelReady ? t("studio.settings.model") : t("studio.noChannelHint")}>
+                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
+                                    <span className={cn("size-1.5 rounded-full", channelReady ? "bg-emerald-500" : "bg-amber-500")} />
+                                    <span className="max-w-[9rem] truncate">{modelOptionName(activeModel)}</span>
+                                </span>
+                            </Tooltip>
+                        }
+                    />
 
                     {/*
                      * 左侧是控制栏（自己滚动，生成条常驻底部），右侧只放结果。
@@ -265,8 +267,8 @@ export default function EcomStudioPage() {
                     <div className="grid min-h-0 gap-3 lg:flex-1 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
                             <div className="min-h-0 flex-1 overflow-y-auto">
-                                <div className="grid sm:min-h-full sm:grid-cols-2 sm:divide-x sm:divide-border/60">
-                                    <div className="flex min-w-0 flex-col divide-y divide-border/60">
+                                <div className="grid sm:min-h-full sm:grid-cols-2 sm:divide-x sm:divide-border">
+                                    <div className="flex min-w-0 flex-col divide-y divide-border">
                                         <ProductUploader config={config} />
                                         {/* 平台 × 场景是主路径；自定义配方排在它下面，选了才生效 */}
                                         <LookPicker onManageScenes={() => { setManagerTab("scene"); setManagerOpen(true); }} />
@@ -280,7 +282,7 @@ export default function EcomStudioPage() {
                                             <ExtraPromptField bare />
                                         </div>
                                     </div>
-                                    <div className="flex min-w-0 flex-col divide-y divide-border/60">
+                                    <div className="flex min-w-0 flex-col divide-y divide-border">
                                         <ReferenceSlot config={config} />
                                         <StudioSettings config={config} onModelChange={setModel} />
                                     </div>
@@ -289,8 +291,11 @@ export default function EcomStudioPage() {
 
                             <div className="shrink-0 border-t border-border bg-card p-2.5">
                                 {!channelReady ? (
-                                    <p className="mb-2 rounded-md bg-amber-500/10 px-2 py-1 text-[10px] leading-4 text-amber-700 dark:text-amber-400">
-                                        <span className="font-medium">{t("studio.noChannel")}</span> · {t("studio.noChannelHintShort")}
+                                    <p className="mb-2 flex items-start gap-1.5 rounded-lg border border-border bg-muted/60 px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+                                        <AlertTriangle className="mt-0.5 size-3 shrink-0 text-amber-500" />
+                                        <span>
+                                            <span className="font-medium text-foreground">{t("studio.noChannel")}</span> · {t("studio.noChannelHintShort")}
+                                        </span>
                                     </p>
                                 ) : null}
 
@@ -298,7 +303,7 @@ export default function EcomStudioPage() {
                                     <Button
                                         type="primary"
                                         size="large"
-                                        className="!h-9 flex-1 text-[13px] font-medium disabled:!border-transparent disabled:!bg-muted disabled:!text-muted-foreground"
+                                        className="!h-9 flex-1 !text-sm font-medium disabled:!border-transparent disabled:!bg-muted disabled:!text-muted-foreground"
                                         disabled={!ready || generating}
                                         icon={generating ? <Spin size="small" /> : <Sparkles className="size-3.5" />}
                                         onClick={() => void handleGenerate()}
@@ -312,13 +317,13 @@ export default function EcomStudioPage() {
                                     ) : null}
                                 </div>
 
-                                <p className="mt-1.5 truncate text-[10px] tabular-nums text-muted-foreground" title={recap}>
+                                <p className="mt-1.5 truncate text-xs tabular-nums text-muted-foreground" title={recap}>
                                     {recap}
                                     {!productImage ? ` · ${t("studio.generate.pickProduct")}` : ""}
                                 </p>
 
                                 {hasExtra ? (
-                                    <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-primary/90" title={normalizeExtraPrompt(extraPrompt)}>
+                                    <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-primary/90" title={normalizeExtraPrompt(extraPrompt)}>
                                         <PenLine className="size-2.5 shrink-0" />
                                         <span className="truncate">
                                             {t("studio.generate.extraIncluded")} · {normalizeExtraPrompt(extraPrompt)}
@@ -327,12 +332,12 @@ export default function EcomStudioPage() {
                                 ) : null}
 
                                 {generateError ? (
-                                    <div className="mt-1.5 rounded-md bg-destructive/8 px-2 py-1">
-                                        <p className="flex items-start gap-1.5 text-[10px] leading-4 text-destructive">
+                                    <div className="mt-1.5 rounded-lg bg-destructive/8 px-2 py-1">
+                                        <p className="flex items-start gap-1.5 text-xs leading-4 text-destructive">
                                             <AlertTriangle className="mt-0.5 size-3 shrink-0" />
                                             <span className="min-w-0 line-clamp-3">{generateError}</span>
                                         </p>
-                                        {supplyHint ? <p className="mt-0.5 pl-4 text-[10px] leading-4 text-muted-foreground">{supplyHint}</p> : null}
+                                        {supplyHint ? <p className="mt-0.5 pl-4 text-xs leading-4 text-muted-foreground">{supplyHint}</p> : null}
                                     </div>
                                 ) : null}
                             </div>

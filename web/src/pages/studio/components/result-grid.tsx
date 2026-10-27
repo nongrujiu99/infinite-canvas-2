@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useEcomStudioStore, type StudioResult } from "@/stores/studio/use-ecom-studio-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 
-const ACTION = "flex size-6 items-center justify-center rounded-md bg-background/85 text-foreground/80 backdrop-blur-sm transition hover:bg-background hover:text-foreground";
+const ACTION = "flex size-6 items-center justify-center rounded-lg bg-background/85 text-foreground/80 backdrop-blur-sm transition hover:bg-background hover:text-foreground";
 
 export function ResultGrid() {
     const { t } = useTranslation();
@@ -42,10 +42,10 @@ export function ResultGrid() {
     if (!results.length) {
         return (
             <div className="flex h-full min-h-[15rem] items-center justify-center">
-                <div className="flex w-full max-w-sm flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-6 py-12 text-center">
-                    <Images className="size-5 text-muted-foreground/50" strokeWidth={1.5} />
-                    <p className="text-[11px] text-muted-foreground">{t("studio.result.empty")}</p>
-                    <p className="text-[10px] leading-4 text-muted-foreground/70">{t("studio.result.emptyHint")}</p>
+                <div className="flex max-w-[22rem] flex-col items-center gap-1.5 px-6 text-center">
+                    <Images className="mb-1 size-5 text-muted-foreground/40" strokeWidth={1.5} />
+                    <p className="text-sm font-medium text-foreground">{t("studio.result.empty")}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{t("studio.result.emptyHint")}</p>
                 </div>
             </div>
         );
@@ -54,8 +54,8 @@ export function ResultGrid() {
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 px-0.5">
-                <span className="text-[11px] tabular-nums text-muted-foreground">{t("studio.result.count", { count: results.length })}</span>
-                <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" onClick={clearResults}>
+                <span className="text-xs tabular-nums text-muted-foreground">{t("studio.result.count", { count: results.length })}</span>
+                <Button size="small" type="text" className="!h-6 !px-1.5 text-xs" onClick={clearResults}>
                     {t("studio.result.clear")}
                 </Button>
             </div>
@@ -90,7 +90,7 @@ export function ResultGrid() {
                                 </Tooltip>
                             </div>
                         </div>
-                        <figcaption className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground">
+                        <figcaption className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
                             <span className="min-w-0 truncate">{item.styleName}</span>
                             <span className="opacity-40">·</span>
                             <span className="shrink-0 tabular-nums">{item.ratio}</span>
@@ -102,12 +102,12 @@ export function ResultGrid() {
             <Modal open={Boolean(promptOf)} title={t("studio.result.promptTitle")} footer={null} onCancel={() => setPromptOf(null)} width={720}>
                 {/* 手写补充单独标出来：看 prompt 时能分清哪几行是自己写的，复现时不用通篇找 */}
                 {promptOf?.extraPrompt ? (
-                    <p className="mb-2 rounded-md bg-primary/8 px-2.5 py-1.5 text-[11px] leading-5 text-foreground/85">
-                        <span className="mr-1.5 text-[10px] text-muted-foreground">{t("studio.style.extra")}</span>
+                    <p className="mb-2 rounded-lg bg-primary/8 px-2.5 py-1.5 text-xs leading-5 text-foreground/85">
+                        <span className="mr-1.5 text-xs text-muted-foreground">{t("studio.style.extra")}</span>
                         {promptOf.extraPrompt}
                     </p>
                 ) : null}
-                <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted/50 p-3 text-[11px] leading-5 whitespace-pre-wrap text-foreground/85">{promptOf?.prompt}</pre>
+                <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted/50 p-3 text-xs leading-5 whitespace-pre-wrap text-foreground/85">{promptOf?.prompt}</pre>
             </Modal>
         </div>
     );

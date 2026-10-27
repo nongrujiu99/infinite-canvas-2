@@ -48,7 +48,7 @@ function ReferenceItem({ node, compact, invalid, dragging, onDragStart, onDragEn
  <Popover placement="topLeft" mouseEnterDelay={0.15} content={<ReferencePreview node={node} content={content} />}>
  <div draggable className={`${compact ? "size-9 rounded-lg" : "size-12 rounded-xl"} group relative grid shrink-0 cursor-grab place-items-center border active:cursor-grabbing`} style={{ background: theme.toolbar.activeBg, borderColor: invalid ? "#ef4444" : theme.toolbar.border, opacity: dragging ? 0.35 : invalid ? 0.6 : 1 }} onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; onDragStart(); }} onDragEnd={onDragEnd} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); onDrop(); }}>
  <span className="grid size-full place-items-center overflow-hidden rounded-[inherit]">
- {(resource?.kind === "image" || node.type === CanvasNodeType.Image) && thumbnail ? <img src={thumbnail} alt="" className="size-full object-cover" /> : (resource?.kind === "video" || node.type === CanvasNodeType.Video) && content ? <video src={content} className="size-full object-cover" muted /> : <Icon className="size-4 opacity-65" />}
+ {(resource?.kind === "image" || node.type === CanvasNodeType.Image) && thumbnail ? <img src={thumbnail} alt="" className="size-full object-cover"  loading="lazy" decoding="async"/> : (resource?.kind === "video" || node.type === CanvasNodeType.Video) && content ? <video src={content} className="size-full object-cover" muted /> : <Icon className="size-4 opacity-65" />}
  </span>
  <button type="button" className="absolute right-0 top-0 grid size-5 place-items-center rounded-full border opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }} aria-label={t("canvas.references.disconnect")} title={t("canvas.references.disconnect")} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onRemove(); }}><X className="size-3" /></button>
  </div>
@@ -59,7 +59,7 @@ function ReferenceItem({ node, compact, invalid, dragging, onDragStart, onDragEn
 function ReferencePreview({ node, content }: { node: CanvasNodeData; content?: string }) {
  const { t } = useTranslation();
  const resource = getNodeDefinition(node.type)?.resource?.(node);
- if ((resource?.kind === "image" || node.type === CanvasNodeType.Image) && content) return <img src={content} alt={node.title} className="max-h-52 w-72 rounded-lg object-contain" />;
+ if ((resource?.kind === "image" || node.type === CanvasNodeType.Image) && content) return <img src={content} alt={node.title} className="max-h-52 w-72 rounded-lg object-contain"  loading="lazy" decoding="async"/>;
  if ((resource?.kind === "video" || node.type === CanvasNodeType.Video) && content) return <video src={content} className="max-h-52 w-72 rounded-lg" muted controls />;
  if ((resource?.kind === "audio" || node.type === CanvasNodeType.Audio) && content) return <audio src={content} className="w-72" controls />;
  return <div className="max-h-52 w-72 overflow-auto whitespace-pre-wrap text-sm">{resource?.text || node.metadata?.content || node.metadata?.prompt || node.title || t("canvas.references.empty")}</div>;

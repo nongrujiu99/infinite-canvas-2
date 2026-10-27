@@ -36,7 +36,7 @@ export function ConnectionCreateMenu({
  const { t } = useTranslation();
  return (
  <div
- className="thin-scrollbar absolute z-[120] max-h-[70vh] w-[300px] overflow-y-auto rounded-[18px] border p-3 shadow-2xl backdrop-blur"
+ className="thin-scrollbar absolute z-[120] max-h-[70vh] w-[300px] overflow-y-auto rounded-xl border p-3 shadow-2xl backdrop-blur"
  data-connection-create-menu
  style={{ left: pending.position.x, top: pending.position.y, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
  onMouseDown={(event) => event.stopPropagation()}
@@ -69,7 +69,7 @@ export function ConnectionCreateOption({ theme, icon, title, description, onClic
  return (
  <button
  type="button"
- className="flex h-16 w-full cursor-pointer items-center gap-3 rounded-2xl px-3 text-left transition"
+ className="flex h-16 w-full cursor-pointer items-center gap-3 rounded-xl px-3 text-left transition"
  style={{ color: theme.node.text }}
  onClick={onClick}
  onMouseEnter={(event) => (event.currentTarget.style.background = theme.node.fill)}
@@ -106,7 +106,7 @@ export function NodeCreateMenu({ position, onCreate, onClose }: { position: Posi
  return (
  <div
  ref={menuRef}
- className="absolute z-[120] max-h-[70vh] w-[300px] overflow-y-auto rounded-[18px] border p-3 shadow-2xl backdrop-blur thin-scrollbar"
+ className="absolute z-[120] max-h-[70vh] w-[300px] overflow-y-auto rounded-xl border p-3 shadow-2xl backdrop-blur thin-scrollbar"
  data-canvas-no-zoom
  style={{ left: position.x, top: position.y, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
  onPointerDown={(event) => event.stopPropagation()}

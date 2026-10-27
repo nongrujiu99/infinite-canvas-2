@@ -9,6 +9,7 @@ import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
 import { CanvasDeleteProjectsDialog } from "@/components/canvas/canvas-delete-projects-dialog";
 import { CanvasProjectCard } from "@/components/canvas/canvas-project-card";
+import { PageHeader } from "@/components/layout/page-header";
 import type { CanvasExportFile } from "@/types/canvas-export";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
@@ -61,13 +62,13 @@ export default function CanvasPage() {
 
  return (
  <main className="h-full overflow-auto bg-background text-foreground">
- <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-12">
- <header className="flex flex-wrap items-center justify-between gap-6 border-b border-border pb-7">
- <div className="min-w-0">
- <h1 className="text-balance text-4xl font-semibold tracking-[-0.025em] sm:text-5xl">{t("canvas.title")}</h1>
- <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{t("canvas.library")}</p>
- </div>
- <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+ <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 py-7 sm:px-8 sm:py-9">
+ <PageHeader
+ title={t("canvas.title")}
+ description={t("canvas.library")}
+ className="border-b border-border pb-6"
+ actions={
+ <>
  {selectedIds.length ? (
  <>
  <Button disabled={!hydrated} icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects(projects.filter((project) => selectedIds.includes(project.id)), `${t("canvas.title")}-${selectedIds.length}`)}>
@@ -89,11 +90,12 @@ export default function CanvasPage() {
  <Button disabled={!hydrated} icon={<Eye className="size-4" />} onClick={openFeaturePreview}>
  {t("canvas.featurePreview.open")}
  </Button>
- <Button disabled={!hydrated} type="primary" size="large" className="!px-5 !font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
+ <Button disabled={!hydrated} type="primary" className="!font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
  {t("canvas.create")}
  </Button>
- </div>
- </header>
+ </>
+ }
+ />
 
  {!hydrated ? (
  <section className="flex min-h-[360px] items-center justify-center border-y border-border text-sm text-muted-foreground ">{t("canvas.loading")}</section>
@@ -104,13 +106,11 @@ export default function CanvasPage() {
  ))}
  </div>
  ) : (
- <section className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
- <span className="mb-6 grid size-14 place-items-center rounded-2xl bg-accent text-accent-foreground"><Plus className="size-6" /></span>
- <h2 className="text-2xl font-semibold tracking-tight">{t("canvas.empty")}</h2>
- <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">{t("canvas.emptyDescription")}</p>
- <Button type="primary" size="large" className="mt-7 !px-5 !font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
- {t("canvas.create")}
- </Button>
+ <section className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 text-center">
+ <span className="mb-4 grid size-12 place-items-center rounded-full bg-accent text-accent-foreground"><Plus className="size-5" /></span>
+ <h2 className="text-sm font-semibold text-foreground">{t("canvas.empty")}</h2>
+ <p className="mt-2 max-w-md text-xs leading-5 text-muted-foreground">{t("canvas.emptyDescription")}</p>
+ {/* 页头已经有「新建画布」，这里不再放第二个主键——同一屏两个同义主按钮只是噪音 */}
  </section>
  )}
  </div>

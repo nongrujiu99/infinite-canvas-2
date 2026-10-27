@@ -148,7 +148,7 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
             actions={
                 digests.length ? (
                     <Tooltip title={t("studio.reference.saveAsStyleHint")}>
-                        <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" icon={<BookmarkPlus className="size-3.5" />} loading={savingStyle} onClick={() => void saveAsStyle()}>
+                        <Button size="small" type="text" className="!h-6 !px-1.5 text-xs" icon={<BookmarkPlus className="size-3.5" />} loading={savingStyle} onClick={() => void saveAsStyle()}>
                             {t("studio.reference.saveAsStyle")}
                         </Button>
                     </Tooltip>
@@ -174,8 +174,8 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                         const summary = digestSummary(item.digest);
                         return (
                             <div key={item.image.id} className="group flex items-center gap-2 rounded-lg border border-border bg-muted/20 p-1">
-                                <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                                    <img src={item.image.dataUrl} alt={item.image.name} className="size-full object-cover" />
+                                <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+                                    <img src={item.image.dataUrl} alt={item.image.name} className="size-full object-cover"  loading="lazy" decoding="async"/>
                                     {item.status === "analyzing" ? (
                                         <span className="absolute inset-0 flex items-center justify-center bg-background/65">
                                             <Spin size="small" />
@@ -187,7 +187,7 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                                         <Select
                                             size="small"
                                             variant="borderless"
-                                            className="w-full !text-[11px]"
+                                            className="w-full !text-xs"
                                             popupMatchSelectWidth={false}
                                             value={item.mode}
                                             onChange={(value) => setReferenceMode(item.image.id, value)}
@@ -209,7 +209,7 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                                     type="button"
                                     onClick={() => removeReference(item.image.id)}
                                     aria-label={t("studio.reference.remove")}
-                                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-60 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                                    className="flex size-6 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-60 transition hover:bg-muted hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -221,7 +221,7 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                         <button
                             type="button"
                             onClick={() => inputRef.current?.click()}
-                            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-[11px] text-muted-foreground transition hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
+                            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
                         >
                             {uploading ? <Spin size="small" /> : <ImagePlus className="size-3.5" />}
                             {t("studio.reference.add")}
@@ -243,7 +243,7 @@ export function ReferenceSlot({ config }: { config: AiConfig }) {
                     )}
                 >
                     {uploading ? <Spin size="small" /> : <ImagePlus className="size-5 shrink-0 text-muted-foreground" />}
-                    <span className="truncate text-[11px] text-muted-foreground">{t("studio.reference.empty")}</span>
+                    <span className="truncate text-xs text-muted-foreground">{t("studio.reference.empty")}</span>
                 </button>
             )}
         </StudioSection>

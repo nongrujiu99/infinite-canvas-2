@@ -42,7 +42,7 @@ export function PromptCard({
  <h2 className="line-clamp-1 text-sm font-semibold text-foreground">{item.title}</h2>
  {!compact ? <span className="shrink-0 text-xs text-muted-foreground">{formatPromptDate(item.updatedAt, i18n.resolvedLanguage)}</span> : null}
  </div>
- {!compact ? <><p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{item.description || item.prompt}</p><div className="mt-3 flex flex-wrap gap-1.5">{item.tags.map((tag) => <Tag key={tag} className="m-0 text-[11px]">{tag}</Tag>)}</div></> : null}
+ {!compact ? <><p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{item.description || item.prompt}</p><div className="mt-3 flex flex-wrap gap-1.5">{item.tags.map((tag) => <Tag key={tag} className="m-0 text-xs">{tag}</Tag>)}</div></> : null}
  </div>
  </button>
  {!compact ? <div className="mt-auto flex items-center gap-2 px-4 pb-4"><Button block={actionType === "primary"} type={actionType} size="small" icon={actionIcon} onClick={onCopy}>{actionLabel || t("common.copy")}</Button>{extraAction}</div> : null}

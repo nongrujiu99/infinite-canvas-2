@@ -118,7 +118,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
  return (
  <div
  key={node.id}
- className="absolute rounded-[1px]"
+ className="absolute rounded-sm"
  style={{
  left: pos.x,
  top: pos.y,

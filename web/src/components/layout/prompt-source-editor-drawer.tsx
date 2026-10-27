@@ -62,7 +62,7 @@ export function PromptSourceEditorDrawer({ open, source, onSave, onClose }: { op
  </div>
  <div>
  <div className="mb-2 text-sm font-medium">{t("config.promptSources.editor.jsonFormat")}</div>
- <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs leading-5 text-muted-foreground ">{`[
+ <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground ">{`[
  {
  "id": "product-photo-1",
  "title": "Product photo",

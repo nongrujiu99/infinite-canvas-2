@@ -34,7 +34,7 @@ export function ExtraPromptField({ bare = false }: { bare?: boolean }) {
             {show ? (
                 <>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="flex min-w-0 items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground">
+                        <span className="flex min-w-0 items-center gap-1 text-xs font-medium tracking-wide text-muted-foreground">
                             <span className="truncate">{t("studio.style.extra")}</span>
                             <Tooltip title={t("studio.style.extraHint")}>
                                 <Info className="size-3 shrink-0 cursor-help opacity-60" />
@@ -42,11 +42,11 @@ export function ExtraPromptField({ bare = false }: { bare?: boolean }) {
                         </span>
                         <span className="flex shrink-0 items-center gap-1.5">
                             {extraPrompt.trim() ? (
-                                <button type="button" onClick={() => setExtraPrompt("")} className="text-[10px] text-muted-foreground transition hover:text-foreground">
+                                <button type="button" onClick={() => setExtraPrompt("")} className="text-xs text-muted-foreground transition hover:text-foreground">
                                     {t("studio.style.extraClear")}
                                 </button>
                             ) : null}
-                            <span className={cn("text-[10px] tabular-nums", extraPrompt.length > ECOM_EXTRA_PROMPT_MAX * 0.9 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/60")}>
+                            <span className={cn("text-xs tabular-nums", extraPrompt.length > ECOM_EXTRA_PROMPT_MAX * 0.9 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/60")}>
                                 {extraPrompt.length}/{ECOM_EXTRA_PROMPT_MAX}
                             </span>
                             {!extraPrompt.trim() ? (
@@ -62,13 +62,13 @@ export function ExtraPromptField({ bare = false }: { bare?: boolean }) {
                         autoSize={{ minRows: 2, maxRows: 5 }}
                         maxLength={ECOM_EXTRA_PROMPT_MAX}
                         placeholder={t("studio.style.extraPlaceholder")}
-                        className="!text-[11px] !leading-4"
+                        className="!text-xs !leading-4"
                     />
-                    {productEditWarning ? <p className="mt-1 text-[10px] leading-4 text-amber-700 dark:text-amber-400">{t("studio.style.extraProductEditHint")}</p> : null}
+                    {productEditWarning ? <p className="mt-1 text-xs leading-4 text-amber-700 dark:text-amber-400">{t("studio.style.extraProductEditHint")}</p> : null}
                 </>
             ) : (
                 <button type="button" onClick={() => setOpen(true)} className="group flex w-full items-center justify-between gap-2 text-left">
-                    <span className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground transition group-hover:text-foreground">
+                    <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground transition group-hover:text-foreground">
                         <Plus className="size-3 shrink-0" />
                         <span className="shrink-0">{t("studio.style.extra")}</span>
                         <span className="truncate opacity-60">· {t("studio.style.extraCollapsedHint")}</span>

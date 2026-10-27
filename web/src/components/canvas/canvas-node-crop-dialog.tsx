@@ -93,7 +93,7 @@ export function CanvasNodeCropDialog({ dataUrl, open, onClose, onConfirm }: { da
  <div className="relative" style={viewport.contentStyle}>
  <div ref={boxRef} className="absolute isolate overflow-hidden rounded-lg bg-black select-none [backface-visibility:hidden] [contain:layout_paint] [transform:translateZ(0)]" style={viewport.stageStyle}>
  <div className="absolute left-0 top-0 [backface-visibility:hidden]" style={viewport.mediaStyle}>
- <img src={dataUrl} alt="" className="block h-full w-full object-contain opacity-90" draggable={false} />
+ <img src={dataUrl} alt="" className="block h-full w-full object-contain opacity-90" draggable={false}  loading="lazy" decoding="async"/>
  </div>
  <CropMask crop={crop} />
  <div className="absolute cursor-move border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,.3),0_0_28px_rgba(0,0,0,.28)]" style={cropStyle(crop)} onPointerDown={(event) => startDrag("move", event)}>

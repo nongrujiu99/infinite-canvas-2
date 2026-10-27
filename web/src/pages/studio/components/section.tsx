@@ -25,6 +25,7 @@ export function StudioSection({
     children,
     className,
     collapsible = false,
+    defaultCollapsed = false,
     collapseKey,
 }: {
     index: string;
@@ -34,19 +35,21 @@ export function StudioSection({
     children: ReactNode;
     className?: string;
     collapsible?: boolean;
+    /** 首次进入时的折叠状态；用户点过之后以本地记录为准 */
+    defaultCollapsed?: boolean;
     collapseKey?: string;
 }) {
     const { t } = useTranslation();
     const key = collapseKey ?? index;
-    const collapsed = useSectionCollapseStore((state) => Boolean(state.collapsed[key]));
+    const collapsed = useSectionCollapseStore((state) => state.collapsed[key] ?? defaultCollapsed);
     const toggle = useSectionCollapseStore((state) => state.toggle);
     const folded = collapsible && collapsed;
 
     const heading = (
         <>
-            <span className="font-mono text-[10px] font-semibold tabular-nums tracking-[0.14em] text-primary/55">{index}</span>
-            <h2 className="shrink-0 text-[13px] font-semibold tracking-tight text-foreground">{title}</h2>
-            {note ? <span className="truncate text-[11px] text-muted-foreground">{note}</span> : null}
+            <span className="text-xs font-medium tabular-nums text-muted-foreground/60">{index}</span>
+            <h2 className="shrink-0 text-sm font-semibold text-foreground">{title}</h2>
+            {note ? <span className="truncate text-xs text-muted-foreground">{note}</span> : null}
             {collapsible ? folded ? <ChevronDown className="size-3 shrink-0 self-center text-muted-foreground" /> : <ChevronUp className="size-3 shrink-0 self-center text-muted-foreground/70" /> : null}
         </>
     );
@@ -60,7 +63,7 @@ export function StudioSection({
                         onClick={() => toggle(key)}
                         aria-expanded={!folded}
                         aria-label={folded ? t("studio.section.expand") : t("studio.section.collapse")}
-                        className="group flex min-w-0 items-baseline gap-2 text-left"
+                        className="group -my-1 flex min-w-0 items-baseline gap-2 py-1 text-left"
                     >
                         {heading}
                     </button>
@@ -85,7 +88,7 @@ export function SectionManageButton({ hint, onClick }: { hint: string; onClick: 
     const { t } = useTranslation();
     return (
         <Tooltip title={hint}>
-            <button type="button" onClick={onClick} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
+            <button type="button" onClick={onClick} className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground">
                 <Settings2 className="size-3" />
                 {t("studio.section.manage")}
             </button>

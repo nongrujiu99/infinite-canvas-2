@@ -10,7 +10,7 @@ import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { CopyPromptButton } from "./copy-prompt-button";
 import { SectionManageButton, StudioSection } from "./section";
 
-const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground";
+const FIELD_LABEL = "mb-1 block text-xs font-medium text-muted-foreground";
 
 /**
  * 平台 × 场景。
@@ -71,12 +71,20 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
             }
         >
             {customStyle ? (
-                <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/8 px-2 py-1.5">
-                    <span className="min-w-0 flex-1 text-[10px] leading-4 text-amber-700 dark:text-amber-400">{t("studio.look.customActive", { name: customStyle.name })}</span>
-                    <button type="button" onClick={() => selectStyle(undefined)} className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] text-foreground/80 transition hover:bg-muted hover:text-foreground">
-                        <RotateCcw className="size-2.5" />
-                        {t("studio.look.backToLook")}
-                    </button>
+                <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 py-1 pl-2 pr-1">
+                    <span title={t("studio.look.customActive", { name: customStyle.name })} className="min-w-0 flex-1 truncate text-xs text-foreground">
+                        {t("studio.look.customActive", { name: customStyle.name })}
+                    </span>
+                    <Tooltip title={t("studio.look.backToLook")}>
+                        <button
+                            type="button"
+                            onClick={() => selectStyle(undefined)}
+                            aria-label={t("studio.look.backToLook")}
+                            className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground"
+                        >
+                            <RotateCcw className="size-3" />
+                        </button>
+                    </Tooltip>
                 </div>
             ) : null}
 
@@ -89,16 +97,16 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                             <button
                                 type="button"
                                 onClick={() => selectPlatform(platform.id)}
-                                className={cn("flex min-w-0 items-center gap-1 rounded-md border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
+                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
                             >
-                                <span className="size-2 shrink-0 rounded-sm" style={{ background: platform.palettes[0]?.accent ?? "#999" }} />
-                                <span className={cn("min-w-0 flex-1 truncate text-[11px]", active ? "font-medium text-primary" : "text-foreground/85")}>{platform.name}</span>
+                                <span className="size-2 shrink-0 rounded-full" style={{ background: platform.palettes[0]?.accent ?? "#999" }} />
+                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-primary" : "text-foreground")}>{platform.name}</span>
                             </button>
                         </Tooltip>
                     );
                 })}
             </div>
-            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{platformsUsed.note}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{platformsUsed.note}</p>
             <span className={cn(FIELD_LABEL, "mt-2.5")}>{t("studio.look.scene")}</span>
             <div className="grid grid-cols-2 gap-1">
                 {scenes.map((scene) => {
@@ -109,35 +117,35 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                             <button
                                 type="button"
                                 onClick={() => selectScene(scene.id)}
-                                className={cn("flex min-w-0 items-center gap-1 rounded-md border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
+                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
                             >
                                 <span className={cn("size-1 shrink-0 rounded-full", fits ? "bg-emerald-500/80" : "bg-transparent")} />
-                                <span className={cn("min-w-0 flex-1 truncate text-[11px]", active ? "font-medium text-primary" : "text-foreground/85")}>{scene.name}</span>
-                                {scene.builtIn === false ? <span className="shrink-0 rounded bg-muted px-0.5 text-[9px] leading-3 text-muted-foreground">自建</span> : null}
+                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-primary" : "text-foreground")}>{scene.name}</span>
+                                {scene.builtIn === false ? <span className="shrink-0 rounded-full bg-muted px-1 text-xs leading-4 text-muted-foreground">自建</span> : null}
                             </button>
                         </Tooltip>
                     );
                 })}
             </div>
 
-            {sceneId && !allScenes.some((scene) => scene.id === sceneId) ? <p className="mt-1 text-[10px] leading-4 text-amber-700 dark:text-amber-400">{t("studio.look.sceneMissing")}</p> : null}
+            {sceneId && !allScenes.some((scene) => scene.id === sceneId) ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("studio.look.sceneMissing")}</p> : null}
 
-            {look.usesReferenceScene ? <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{t("studio.look.referenceSceneOn")}</p> : null}
-            {sceneId === "reference" && !look.usesReferenceScene ? <p className="mt-1 text-[10px] leading-4 text-amber-700 dark:text-amber-400">{t("studio.look.referenceSceneEmpty")}</p> : null}
+            {look.usesReferenceScene ? <p className="mt-1 text-xs leading-4 text-muted-foreground">{t("studio.look.referenceSceneOn")}</p> : null}
+            {sceneId === "reference" && !look.usesReferenceScene ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("studio.look.referenceSceneEmpty")}</p> : null}
 
             {/* 联动开关放在摘要上方：先看到「补了什么」，再决定要不要关 */}
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-border/70 px-2 py-1.5">
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/70 px-2 py-1.5">
                 <Link2 className={cn("size-3 shrink-0", linkScene ? "text-primary" : "text-muted-foreground/50")} />
                 <span className="min-w-0 flex-1">
-                    <span className="block text-[11px] text-foreground/85">{t("studio.look.link")}</span>
-                    <span className="block truncate text-[10px] text-muted-foreground">{linkHint}</span>
+                    <span className="block text-xs text-foreground/85">{t("studio.look.link")}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{linkHint}</span>
                 </span>
-                <Switch size="small" checked={linkScene} onChange={setLinkScene} />
+                <Switch size="small" checked={linkScene} onChange={setLinkScene} aria-label={t("studio.look.link")} />
             </div>
 
             {dressing.matched.length ? (
                 <Tooltip title={dressing.props.join("\n") || t("studio.look.noProps")}>
-                    <p className="mt-1 truncate text-[10px] leading-4 text-muted-foreground">
+                    <p className="mt-1 truncate text-xs leading-4 text-muted-foreground">
                         {t("studio.look.matched")}{" "}
                         {dressing.matched
                             .slice(0, 3)

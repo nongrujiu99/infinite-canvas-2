@@ -159,6 +159,8 @@ export default {
         loading: "Loading...",
         loadMore: "Scroll down to load more",
         end: "You've reached the end",
+        tagsMore: "Show {{count}} more tags",
+        tagsCollapse: "Collapse tags",
     },
     assets: {
         title: "My Assets",
@@ -1202,7 +1204,7 @@ export default {
             linkOffNone: "Linking off — no props at all",
             matched: "Based on",
             noProps: "No scene props right now",
-            customActive: "Using custom recipe \"{{name}}\" — the recipe sets the scene, surface and light; the platform's colour treatment and finish standard still apply",
+            customActive: "Recipe \"{{name}}\" drives the scene, surface and light",
             backToLook: "Switch to platform + scene",
             referenceSceneOn: "Scene taken from the reference breakdown",
             referenceSceneEmpty: "No usable scene reference yet — falling back to the studio sweep",

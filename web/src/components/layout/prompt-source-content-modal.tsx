@@ -75,7 +75,7 @@ export function PromptSourceContentModal({ source, onClose }: { source: PromptSo
  title: t("config.promptSources.content.cover"),
  dataIndex: "coverUrl",
  width: 72,
- render: (coverUrl: string) => (coverUrl ? <img src={coverUrl} alt="" className="size-12 rounded object-cover" /> : <div className="size-12 rounded bg-muted " />),
+ render: (coverUrl: string) => (coverUrl ? <img src={coverUrl} alt="" className="size-12 rounded-lg object-cover"  loading="lazy" decoding="async"/> : <div className="size-12 rounded-lg bg-muted " />),
  },
  {
  title: t("config.promptSources.content.titleColumn"),

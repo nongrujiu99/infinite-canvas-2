@@ -324,7 +324,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  }}
  >
  {!referenceSelectionState ? (
- <div className="absolute inset-x-2 top-[-30px] z-[65] flex h-6 min-w-0 items-center gap-1.5 text-[11px]" style={{ color: theme.node.muted }} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+ <div className="absolute inset-x-2 top-[-30px] z-[65] flex h-6 min-w-0 items-center gap-1.5 text-xs" style={{ color: theme.node.muted }} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
  {isEditingTitle ? (
  <input
  ref={titleInputRef}
@@ -358,7 +358,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  )}
  <span className="min-w-0 flex-1 truncate opacity-70">{nodeInfoSummary(data, t)}</span>
  {onDownload && [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio].includes(data.type as CanvasNodeType) && data.metadata?.content ? (
- <button type="button" className="grid size-6 shrink-0 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("common.download")} onClick={() => onDownload(data)}>
+ <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("common.download")} onClick={() => onDownload(data)}>
  <Download className="size-3.5" />
  </button>
  ) : null}
@@ -366,7 +366,7 @@ export const CanvasNode = React.memo(function CanvasNode({
  ) : null}
 
  <div
- className="relative h-full w-full overflow-visible rounded-3xl border-2"
+ className="relative h-full w-full overflow-visible rounded-xl border-2"
  style={{
  background: isGroup ? "transparent" : hasImageContent || hasVideoContent ? "transparent" : theme.node.fill,
  borderColor: isGroup ? (isGroupDropTarget || isActive ? theme.canvas.selectionStroke : theme.node.stroke) : hasImageContent ? imageBorderColor : isActive ? theme.canvas.selectionStroke : isRelated ? theme.node.muted : theme.node.stroke,
@@ -482,7 +482,7 @@ function GroupNodeContent({ node, theme, groupChildCount }: NodeContentRendererP
  <div className="flex h-7 max-w-full items-center gap-2 px-1 text-xs font-medium" style={{ color: theme.node.text }}>
  <Group className="size-3.5 shrink-0" style={{ color: theme.node.muted }} />
  <span className="truncate">{node.title || t("canvas.node.group")}</span>
- <span className="shrink-0 text-[11px] font-normal" style={{ color: theme.node.muted }}>
+ <span className="shrink-0 text-xs font-normal" style={{ color: theme.node.muted }}>
  {t("canvas.node.nodeCount", { count: groupChildCount })}
  </span>
  </div>
@@ -495,7 +495,7 @@ function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
  return (
  <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
  <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
- <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span>
+ <span className="text-xs tracking-[0.2em]">{t("canvas.node.generating")}</span>
  </div>
  );
 }
@@ -543,7 +543,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
  .filter((text) => text.id !== primaryTextId)
  .map((text, index) => <ExpandedTextCard key={text.id} node={node} text={text} index={index} onSetPrimary={() => onSetBatchPrimary?.(text.id)} />)
  : null}
- <div className="flex h-full w-full flex-col overflow-hidden rounded-3xl">
+ <div className="flex h-full w-full flex-col overflow-hidden rounded-xl">
  {isEditingContent ? (
  <CanvasResourceMentionTextarea
  ref={textareaRef}
@@ -625,7 +625,7 @@ function ExpandedTextCard({ node, text, index, onSetPrimary }: { node: CanvasNod
 
  return (
  <div
- className="absolute z-20 overflow-hidden rounded-3xl border shadow-[0_18px_50px_rgba(24,25,56,.14)]"
+ className="absolute z-20 overflow-hidden rounded-xl border shadow-[0_18px_50px_rgba(24,25,56,.14)]"
  style={
  {
  left: x,
@@ -668,7 +668,7 @@ function TextSlotStatus({ text }: { text: CanvasNodeText }) {
  return (
  <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
  {failed ? <span className="text-xs leading-5">{text.errorDetails || t("canvas.node.failed")}</span> : loading ? <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} /> : <span className="text-xs">{t("apiErrors.noContent")}</span>}
- {loading ? <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
+ {loading ? <span className="text-xs tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
  </div>
  );
 }
@@ -697,7 +697,7 @@ function EmptyImageContent({ theme, onUpload, isGenerationTarget }: NodeContentR
  return (
  <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
  {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyImage")} borderColor={theme.node.stroke} onUpload={onUpload} />}
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyImage")}</span>
+ <span className="text-xs tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyImage")}</span>
  </div>
  );
 }
@@ -708,11 +708,11 @@ function VideoNodeContent({ node, theme, onUpload, onRetry, isGenerationTarget }
  return (
  <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
  {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyVideo")} borderColor={theme.node.stroke} onUpload={onUpload} />}
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyVideo")}</span>
+ <span className="text-xs tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyVideo")}</span>
  {node.metadata?.videoTaskId ? <button type="button" className="pointer-events-auto rounded-lg px-2 py-1 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" onMouseDown={(event) => event.stopPropagation()} onClick={() => onRetry?.(node)}>{t("canvas.nodeToolbar.queryVideoTask")}</button> : null}
  </div>
  );
- return <video src={node.metadata.content} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-video={node.id} data-canvas-no-zoom />;
+ return <video src={node.metadata.content} controls className="h-full w-full rounded-xl bg-black object-contain" data-canvas-video={node.id} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme, onUpload, isGenerationTarget }: NodeContentRendererProps) {
@@ -721,7 +721,7 @@ function AudioNodeContent({ node, theme, onUpload, isGenerationTarget }: NodeCon
  return (
  <div className="pointer-events-none flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
  {isGenerationTarget ? <GenerationWaitingIcon borderColor={theme.node.stroke} /> : <UploadButton label={t("canvas.node.emptyAudio")} borderColor={theme.node.stroke} onUpload={onUpload} />}
- <span className="text-[10px] tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyAudio")}</span>
+ <span className="text-xs tracking-[0.18em] opacity-50">{t(isGenerationTarget ? "canvas.node.waitingGeneration" : "canvas.node.emptyAudio")}</span>
  </div>
  );
  return (
@@ -737,14 +737,14 @@ function AudioNodeContent({ node, theme, onUpload, isGenerationTarget }: NodeCon
 
 function UploadButton({ label, borderColor, onUpload }: { label: string; borderColor: string; onUpload?: () => void }) {
  return (
- <button type="button" className="pointer-events-auto flex size-14 items-center justify-center rounded-2xl border transition hover:scale-105" style={{ borderColor }} aria-label={label} onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
+ <button type="button" className="pointer-events-auto flex size-14 items-center justify-center rounded-xl border transition hover:scale-105" style={{ borderColor }} aria-label={label} onMouseDown={(event) => event.stopPropagation()} onClick={onUpload}>
  <Plus className="size-6 opacity-55" />
  </button>
  );
 }
 
 function GenerationWaitingIcon({ borderColor }: { borderColor: string }) {
- return <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ borderColor }}><Sparkles className="size-5 opacity-45" /></div>;
+ return <div className="flex size-14 items-center justify-center rounded-xl border" style={{ borderColor }}><Sparkles className="size-5 opacity-45" /></div>;
 }
 
 function ImageContent({
@@ -799,7 +799,7 @@ function ImageContent({
  .filter((image) => image.id !== primaryImageId)
  .map((image, index) => <ExpandedImageCard key={image.id} node={node} image={image} index={index} scale={scale} onView={() => onViewBatchImage?.(image.id)} onSetPrimary={() => onSetBatchPrimary?.(image.id)} onDuplicate={() => onDuplicateBatchImage?.(image.id)} onDownload={() => onDownloadBatchImage?.(image.id)} onRetry={() => onRetryBatchImage?.(image.id)} onDelete={() => onDeleteBatchImage?.(image.id)} />)
  : null}
- <div className="h-full w-full overflow-hidden rounded-3xl">
+ <div className="h-full w-full overflow-hidden rounded-xl">
  {primaryContent ? (
  <img
  src={primarySource}
@@ -861,7 +861,7 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
 
  return (
  <div
- className={`absolute z-20 overflow-hidden rounded-3xl ${image.content ? "" : "border shadow-[0_18px_50px_rgba(24,25,56,.18)]"}`}
+ className={`absolute z-20 overflow-hidden rounded-xl ${image.content ? "" : "border shadow-[0_18px_50px_rgba(24,25,56,.18)]"}`}
  style={
  {
  left: x,
@@ -884,18 +884,18 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
  onView();
  }}
  >
- {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
+ {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain"  loading="lazy" decoding="async"/> : <ImageSlotStatus image={image} />}
  {image.content ? (
  <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
- <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
+ <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>
  <Download className="size-3 shrink-0" />
  <span className="truncate">{t("common.download")}</span>
  </button>
- <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
+ <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.createCopy")} onClick={(event) => (event.stopPropagation(), onDuplicate())}>
  <Copy className="size-3 shrink-0" />
  <span className="truncate">{t("canvas.node.createCopy")}</span>
  </button>
- <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
+ <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-xs font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("canvas.node.setPrimary")} onClick={(event) => (event.stopPropagation(), onSetPrimary())}>
  <Star className="size-3 shrink-0" style={{ color: theme.canvas.selectionStroke }} />
  <span className="truncate">{t("canvas.node.setPrimary")}</span>
  </button>
@@ -929,7 +929,7 @@ function ImageSlotStatus({ image }: { image?: CanvasNodeImage }) {
  return (
  <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
  {failed ? <span className="text-xs leading-5">{image.errorDetails || t("canvas.node.failed")}</span> : <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />}
- {!failed ? <span className="text-[10px] tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
+ {!failed ? <span className="text-xs tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
  </div>
  );
 }

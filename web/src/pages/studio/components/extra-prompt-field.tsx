@@ -10,10 +10,15 @@ import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 /**
  * 手写补充描述。
  *
- * 它是「在这套画面之上再加一句话」，不属于任何单独一层，所以做成独立控件：
- * 平台路径和自定义配方路径都要用，塞在其中一边会让另一条路径拿不到。
+ * 它不是「平台」或「场景」的附属项：内容会进 `[Operator notes]`，
+ * 组合路径、选配方、带参考图、多件一组四条路径共用同一段注入，
+ * 而作用域只到场景层（道具、桌面、背景、氛围）。所以单独成块，
+ * 不挂在 02 里——挂在 02 会让人以为它只对平台场景生效，
+ * 而 02 一旦折叠，一个全局输入还会跟着一起消失。
+ *
+ * bare 用于区块已经自带分隔线与内边距的场合，避免画出第二条线。
  */
-export function ExtraPromptField() {
+export function ExtraPromptField({ bare = false }: { bare?: boolean }) {
     const { t } = useTranslation();
     const extraPrompt = useEcomStudioStore((state) => state.extraPrompt);
     const setExtraPrompt = useEcomStudioStore((state) => state.setExtraPrompt);
@@ -25,7 +30,7 @@ export function ExtraPromptField() {
     const show = open || Boolean(extraPrompt.trim());
 
     return (
-        <div className="mt-2 border-t border-border/60 pt-2">
+        <div className={cn(bare ? "" : "mt-2 border-t border-border/60 pt-2")}>
             {show ? (
                 <>
                     <div className="mb-1 flex items-center justify-between gap-2">

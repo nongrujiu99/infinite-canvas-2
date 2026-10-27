@@ -18,6 +18,7 @@ import { uploadImage } from "@/services/image-storage";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { isModelChannelConfigured, modelOptionName, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
+import { ExtraPromptField } from "./components/extra-prompt-field";
 import { LookPicker } from "./components/look-picker";
 import { ProductUploader } from "./components/product-uploader";
 import { ReferenceSlot } from "./components/reference-slot";
@@ -270,6 +271,14 @@ export default function EcomStudioPage() {
                                         {/* 平台 × 场景是主路径；自定义配方排在它下面，选了才生效 */}
                                         <LookPicker onManageScenes={() => { setManagerTab("scene"); setManagerOpen(true); }} />
                                         <StyleGrid categoryId={analysis?.category} coveredFields={coveredFields} onOpenManager={() => { setManagerTab("style"); setManagerOpen(true); }} />
+                                        {/*
+                                         * 手写补充独立成块，不挂在 02 里。
+                                         * 它进的是 [Operator notes]，四条生成路径共用，作用域只到场景层；
+                                         * 放在 02 会让人以为只对平台场景生效，02 一折叠还会把它一起收走。
+                                         */}
+                                        <div className="px-3.5 py-2.5 sm:px-4">
+                                            <ExtraPromptField bare />
+                                        </div>
                                     </div>
                                     <div className="flex min-w-0 flex-col divide-y divide-border/60">
                                         <ReferenceSlot config={config} />

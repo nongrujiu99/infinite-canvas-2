@@ -7,7 +7,6 @@ import { useEcomLook } from "@/lib/ecom/use-look";
 import { cn } from "@/lib/utils";
 import { useActiveEcomScenes } from "@/stores/studio/use-ecom-scene-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
-import { ExtraPromptField } from "./extra-prompt-field";
 import { PromptDetail } from "./prompt-detail";
 import { StudioSection } from "./section";
 
@@ -140,8 +139,6 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                     </p>
                 </Tooltip>
             ) : null}
-
-            <ExtraPromptField />
 
             {/*
              * 三层各自写进提示词什么，直接摊开。

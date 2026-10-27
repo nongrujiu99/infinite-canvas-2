@@ -51,6 +51,8 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
         <StudioSection
             index="02"
             title={t("studio.look.title")}
+            collapsible
+            collapseKey="look"
             actions={
                 onManageScenes ? (
                     <Tooltip title="管理场景：内置可改、也能自己加">
@@ -91,7 +93,6 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                 })}
             </div>
             <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{platformsUsed.note}</p>
-
             <span className={cn(FIELD_LABEL, "mt-2.5")}>{t("studio.look.scene")}</span>
             <div className="grid grid-cols-2 gap-1">
                 {scenes.map((scene) => {

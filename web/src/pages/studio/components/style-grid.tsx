@@ -40,6 +40,8 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
         <StudioSection
             index="05"
             title={t("studio.style.titleCustom")}
+            collapsible
+            collapseKey="recipe"
             actions={
                 <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" icon={<Settings2 className="size-3.5" />} onClick={onOpenManager}>
                     {t("studio.style.manage")}

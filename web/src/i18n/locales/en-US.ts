@@ -1186,6 +1186,10 @@ export default {
             modelHint: "Analysis is done by an LLM: currently using {{model}}, which must accept image input. Switch it under Vision model below.",
             visionHint: "If it keeps failing, the model probably does not accept images. Switch to a multimodal model, or just pick a category manually and keep generating.",
         },
+        section: {
+            collapse: "Collapse this section",
+            expand: "Expand this section",
+        },
         look: {
             title: "Platform & scene",
             platform: "Platform look",

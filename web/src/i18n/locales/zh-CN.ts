@@ -1170,6 +1170,10 @@ export default {
             modelHint: "识别由大模型完成：当前使用 {{model}}，需支持图片输入。可在下方「识别模型」里更换。",
             visionHint: "若反复失败，多半是当前模型不支持图片输入，换一个多模态模型即可；也可直接手动选品类继续出图。",
         },
+        section: {
+            collapse: "收起这个区块",
+            expand: "展开这个区块",
+        },
         look: {
             title: "平台与场景",
             platform: "平台风格",

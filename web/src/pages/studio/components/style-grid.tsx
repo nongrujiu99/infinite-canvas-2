@@ -9,7 +9,7 @@ import { sortStylesByCategory } from "@/lib/ecom/style-match";
 import { cn } from "@/lib/utils";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
-import { PromptDetail } from "./prompt-detail";
+import { CopyPromptButton } from "./copy-prompt-button";
 import { StudioSection } from "./section";
 
 /** 参考图能覆盖的字段，与 prompt 区块一一对应。 */
@@ -35,6 +35,15 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
     const sorted = useMemo(() => sortStylesByCategory(styles, categoryId), [categoryId, styles]);
     const current = sorted.find((item) => item.id === styleId);
     const covered = coveredFields.filter((field) => COVERABLE.includes(field));
+    // 配方是整包，复制出来就是「它到底把画面定成了什么样」
+    const recipeSections = current
+        ? [
+              { key: "scene", label: t("studio.look.detailScene"), text: current.scene },
+              { key: "light", label: t("studio.look.detailLight"), text: current.lighting },
+              { key: "composition", label: t("studio.look.detailComposition"), text: current.composition },
+              { key: "keywords", label: t("studio.look.detailKeywords"), text: current.keywords.join(", ") },
+          ]
+        : [];
 
     return (
         <StudioSection
@@ -43,9 +52,12 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
             collapsible
             collapseKey="recipe"
             actions={
-                <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" icon={<Settings2 className="size-3.5" />} onClick={onOpenManager}>
-                    {t("studio.style.manage")}
-                </Button>
+                <>
+                    <CopyPromptButton sections={recipeSections} />
+                    <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" icon={<Settings2 className="size-3.5" />} onClick={onOpenManager}>
+                        {t("studio.style.manage")}
+                    </Button>
+                </>
             }
         >
             <p className="mb-1.5 text-[10px] leading-4 text-muted-foreground">{t("studio.style.customHint")}</p>
@@ -120,17 +132,7 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
 
                     {covered.length ? <p className="mt-1.5 text-[10px] leading-4 text-amber-700/90 dark:text-amber-400/90">{t("studio.style.overriddenByReference", { fields: covered.map((field) => t(`studio.style.field.${field}`)).join("、") })}</p> : null}
 
-                    {/* 配方是整包，用户最想知道它到底把画面定成了什么样 */}
-                    <PromptDetail
-                        label={t("studio.look.detailRecipe")}
-                        summary={current.name}
-                        sections={[
-                            { key: "scene", label: t("studio.look.detailScene"), text: current.scene },
-                            { key: "light", label: t("studio.look.detailLight"), text: current.lighting },
-                            { key: "composition", label: t("studio.look.detailComposition"), text: current.composition },
-                            { key: "keywords", label: t("studio.look.detailKeywords"), text: current.keywords.join(", ") },
-                        ]}
-                    />
+                    {/* 配方原文的整段内容走标题行的复制按钮，底部不再常驻入口 */}
                 </>
             ) : (
                 <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t("studio.style.customIdle")}</p>

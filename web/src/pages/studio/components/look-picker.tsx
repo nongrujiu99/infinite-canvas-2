@@ -7,7 +7,7 @@ import { useEcomLook } from "@/lib/ecom/use-look";
 import { cn } from "@/lib/utils";
 import { useActiveEcomScenes } from "@/stores/studio/use-ecom-scene-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
-import { PromptDetail } from "./prompt-detail";
+import { CopyPromptButton } from "./copy-prompt-button";
 import { StudioSection } from "./section";
 
 const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground";
@@ -46,6 +46,17 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
     // 场景列表按「是否适合当前品类」把合适的排前面，但保持全部可选——限制选择会让冷门品类无场景可用
     const scenes = [...allScenes].sort((a, b) => Number(b.fitCategories.includes(category ?? "other")) - Number(a.fitCategories.includes(category ?? "other")));
 
+    /*
+     * 用 notes / effectiveStyle（实际下发值）而不是 look 里的原值：
+     * 配方接管后平台备注会被重拼、道具整段让位，拿原值复制就是在骗人。
+     */
+    const promptSections = [
+        { key: "platform", label: t("studio.look.detailPlatform"), text: notes.platformNote },
+        { key: "scene", label: t("studio.look.detailScene"), text: effectiveStyle.scene },
+        { key: "props", label: t("studio.look.detailProps"), text: notes.propsNote },
+        { key: "color", label: t("studio.look.detailColor"), text: notes.colorNotes },
+    ];
+
     return (
         <StudioSection
             index="02"
@@ -53,14 +64,17 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
             collapsible
             collapseKey="look"
             actions={
-                onManageScenes ? (
-                    <Tooltip title="管理场景：内置可改、也能自己加">
-                        <button type="button" onClick={onManageScenes} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                            <Settings2 className="size-3" />
-                            {t("studio.look.manageScenes")}
-                        </button>
-                    </Tooltip>
-                ) : null
+                <>
+                    <CopyPromptButton sections={promptSections} />
+                    {onManageScenes ? (
+                        <Tooltip title="管理场景：内置可改、也能自己加">
+                            <button type="button" onClick={onManageScenes} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                                <Settings2 className="size-3" />
+                                {t("studio.look.manageScenes")}
+                            </button>
+                        </Tooltip>
+                    ) : null}
+                </>
             }
         >
             {customStyle ? (
@@ -141,19 +155,9 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
             ) : null}
 
             {/*
-             * 三层各自写进提示词什么，直接摊开。
-             * 用的是 notes / effectiveStyle（实际下发值）而不是 look 里的原值：
-             * 配方接管后平台备注会被重拼、道具整段让位，拿原值展示就是在骗人。
+             * 三层各自写进提示词什么，不在这里摊开：
+             * 整段原文改用标题行的复制按钮取，底部不再常驻入口。
              */}
-            <PromptDetail
-                summary={customStyle ? customStyle.name : `${platformsUsed.name} · ${look.scene.name}`}
-                sections={[
-                    { key: "platform", label: t("studio.look.detailPlatform"), text: notes.platformNote },
-                    { key: "scene", label: t("studio.look.detailScene"), text: effectiveStyle.scene },
-                    { key: "props", label: t("studio.look.detailProps"), text: notes.propsNote },
-                    { key: "color", label: t("studio.look.detailColor"), text: notes.colorNotes },
-                ]}
-            />
         </StudioSection>
     );
 }

@@ -1,5 +1,5 @@
 import { Switch, Tooltip } from "antd";
-import { Link2, RotateCcw, Settings2 } from "lucide-react";
+import { Link2, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ECOM_PLATFORMS } from "@/constant/ecom/platforms";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useActiveEcomScenes } from "@/stores/studio/use-ecom-scene-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { CopyPromptButton } from "./copy-prompt-button";
-import { StudioSection } from "./section";
+import { SectionManageButton, StudioSection } from "./section";
 
 const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground";
 
@@ -66,14 +66,7 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
             actions={
                 <>
                     <CopyPromptButton sections={promptSections} />
-                    {onManageScenes ? (
-                        <Tooltip title="管理场景：内置可改、也能自己加">
-                            <button type="button" onClick={onManageScenes} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                                <Settings2 className="size-3" />
-                                {t("studio.look.manageScenes")}
-                            </button>
-                        </Tooltip>
-                    ) : null}
+                    {onManageScenes ? <SectionManageButton hint="管理场景：内置可改、也能自己加" onClick={onManageScenes} /> : null}
                 </>
             }
         >

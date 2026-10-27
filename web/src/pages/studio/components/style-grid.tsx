@@ -1,5 +1,5 @@
-import { Button, Switch, Tooltip } from "antd";
-import { Check, Settings2 } from "lucide-react";
+import { Switch, Tooltip } from "antd";
+import { Check } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { CopyPromptButton } from "./copy-prompt-button";
-import { StudioSection } from "./section";
+import { SectionManageButton, StudioSection } from "./section";
 
 /** 参考图能覆盖的字段，与 prompt 区块一一对应。 */
 const COVERABLE: EcomStyleField[] = ["scene", "lighting", "composition", "palettes"];
@@ -54,9 +54,7 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
             actions={
                 <>
                     <CopyPromptButton sections={recipeSections} />
-                    <Button size="small" type="text" className="!h-6 !px-1.5 text-[11px]" icon={<Settings2 className="size-3.5" />} onClick={onOpenManager}>
-                        {t("studio.style.manage")}
-                    </Button>
+                    <SectionManageButton hint="管理视觉配方：内置可改、也能自己加" onClick={onOpenManager} />
                 </>
             }
         >

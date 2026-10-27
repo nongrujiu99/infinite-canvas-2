@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { Tooltip } from "antd";
+import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -70,5 +71,24 @@ export function StudioSection({
             </header>
             {folded ? null : children}
         </section>
+    );
+}
+
+/**
+ * 区块头的「管理」入口。
+ *
+ * 02 与 05 各有一个，以前一个是手写按钮、一个是 antd Button，
+ * 同一列里并排看字号、图标大小、内边距全不一样，像是两个不同层级的操作。
+ * 统一收到这里，两边只剩文案与 tooltip 的差别。
+ */
+export function SectionManageButton({ hint, onClick }: { hint: string; onClick: () => void }) {
+    const { t } = useTranslation();
+    return (
+        <Tooltip title={hint}>
+            <button type="button" onClick={onClick} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                <Settings2 className="size-3" />
+                {t("studio.section.manage")}
+            </button>
+        </Tooltip>
     );
 }

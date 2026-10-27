@@ -1173,6 +1173,7 @@ export default {
         section: {
             collapse: "收起这个区块",
             expand: "展开这个区块",
+            manage: "管理",
         },
         look: {
             title: "平台与场景",
@@ -1189,7 +1190,6 @@ export default {
             backToLook: "改用平台场景",
             referenceSceneOn: "场景取自参考图拆解结果",
             referenceSceneEmpty: "还没有可用的场景参考图，本次暂用影棚场景",
-            manageScenes: "管理",
             sceneMissing: "当前场景已被删除或停用，本次按桌面场景生成",
             detailCopy: "复制",
             detailCopied: "已复制",
@@ -1207,7 +1207,6 @@ export default {
             titleCustom: "视觉配方（可选）",
             customHint: "选中一套配方会整体覆盖上面的平台与场景。只有需要固定复用某套观感时才用这里。",
             customIdle: "未选中配方，当前按上面的平台与场景生成。",
-            manage: "管理风格",
             fitsCategory: "适合当前品类",
             palette: "配色",
             paletteAuto: "自动",

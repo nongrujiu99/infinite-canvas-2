@@ -1189,6 +1189,7 @@ export default {
         section: {
             collapse: "Collapse this section",
             expand: "Expand this section",
+            manage: "Manage",
         },
         look: {
             title: "Platform & scene",
@@ -1205,7 +1206,6 @@ export default {
             backToLook: "Switch to platform + scene",
             referenceSceneOn: "Scene taken from the reference breakdown",
             referenceSceneEmpty: "No usable scene reference yet — falling back to the studio sweep",
-            manageScenes: "Manage",
             sceneMissing: "This scene was deleted or disabled — falling back to the desk scene",
             detailCopy: "Copy",
             detailCopied: "Copied",
@@ -1223,7 +1223,6 @@ export default {
             titleCustom: "Visual recipes (optional)",
             customHint: "Picking a recipe overrides the platform and scene above as a whole. Use it only when you want to reuse one fixed look.",
             customIdle: "No recipe selected — generating from the platform and scene above.",
-            manage: "Manage styles",
             fitsCategory: "Fits this category",
             palette: "Palette",
             paletteAuto: "Auto",

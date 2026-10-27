@@ -39,9 +39,29 @@ export type EcomScene = {
     surfaceNoun: string;
     /** 承托面的固定修饰，例如 "with a matte porous surface"。 */
     surfaceNote?: string;
-    /** 背景环境。 */
+    /**
+     * 背景的**空间基本面**：材质、色调、明暗结构。不可被移除。
+     *
+     * 只写「墙是什么做的、什么颜色」，不写墙前面摆了什么。
+     * 和 `surfaceMaterial` / `surfaceNoun` 同一套拆法：能被平台拿掉的放下面。
+     */
     backdrop: string;
-    /** 场景自带的物理光源——光从哪来、是什么性质。 */
+    /**
+     * 背景里那个**能认出来的物件**，用来交代地点（显示器、沥水架、衣帽钩）。
+     *
+     * 这是「像随手拍」的来源，也是「像实景」的来源，取决于平台：
+     * 小红书要它，亚马逊绝不要它。平台通过 `EcomPlatform.backdropPolicy` 决定留不留，
+     * 留不留靠**不发这段文字**实现，而不是发一段「不要出现显示器」——
+     * 后者是负向指令，模型基本不执行。
+     */
+    backdropDetail?: string;
+    /**
+     * 这个地点**有什么光、在哪个方向**——只写空间事实，不写软硬、落点与明暗结果。
+     *
+     * 光质、光比、要不要打灯归平台（`EcomPlatform.ambientPolicy`）。
+     * 两层各写一句并列拼进 [Lighting]，会拼出「无阴影棚拍」+「左侧窗光扫过桌面」
+     * 这种自相矛盾的一段，模型只会听更具体的场景那半句。
+     */
     lightSource: string;
     /** 景深与空间关系。 */
     depth: string;
@@ -61,13 +81,14 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "最通用的工作位场景。产品放在书桌上，背景是虚化的工作台。",
         surfaceMaterial: "smooth matte wooden",
         surfaceNoun: "desktop",
-        surfaceNote: "with faint open grain and a plainly visible front edge",
-        backdrop: "a softly blurred workspace: the lower edge of a monitor, a run of cable, a plain painted wall",
-        lightSource: "soft daylight from a window on the left, raking across the desk surface and falling off toward the right",
+        surfaceNote: "with a plainly visible front edge",
+        backdrop: "a plain matte painted wall standing close behind, softly out of focus",
+        backdropDetail: "the lower edge of a monitor",
+        lightSource: "a window on the left side of the desk",
         depth: "shallow depth of field with the desk surface filling the lower two thirds and the background clearly out of focus",
         props: ["a closed notebook lying flat", "a pen resting at a slight angle"],
         fitCategories: [...ALL],
-        avoid: ["food crumbs", "scattered papers", "readable text on background devices", "crooked desk edge"],
+        avoid: ["food crumbs", "scattered papers", "readable text on background devices", "crooked desk edge", "stray cables", "a visible power strip"],
     },
     {
         id: "window",
@@ -76,8 +97,9 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceMaterial: "pale wooden",
         surfaceNoun: "windowsill",
         surfaceNote: "set right against the window glass",
-        backdrop: "a window with a sheer curtain diffusing the daylight, faint foliage outside rendered as soft green bokeh",
-        lightSource: "direct but fabric-diffused sunlight, casting a soft leaf-shadow pattern across the surface",
+        backdrop: "a window with a sheer curtain diffusing the daylight",
+        backdropDetail: "faint foliage outside rendered as soft green bokeh",
+        lightSource: "an unobstructed window behind a sheer curtain",
         depth: "mid depth, the sill sharp in the foreground while the outside world dissolves into bright soft light",
         props: ["a small ceramic cup", "a folded linen cloth"],
         fitCategories: [...ALL],
@@ -90,8 +112,9 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceMaterial: "light oak",
         surfaceNoun: "bedside table",
         surfaceNote: "with a rounded front edge",
-        backdrop: "a plaster wall and a linen headboard softly out of focus, with a warm bedside lamp glowing off-frame",
-        lightSource: "a warm low lamp from the right plus faint ambient room light from the doorway",
+        backdrop: "a plaster wall and a linen headboard softly out of focus",
+        backdropDetail: "a warm bedside lamp glowing off-frame",
+        lightSource: "a warm low lamp on the right and light spilling from an open doorway",
         depth: "shallow, the table edge anchoring the near foreground and the room falling into soft shadow",
         props: ["a hardback book lying face down", "a small glass of water"],
         fitCategories: ["audio", "power", "smart-home", "desk-accessory", "other"],
@@ -103,9 +126,10 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "石英台面加瓷砖背墙，清爽干净，适合家居与小家电。",
         surfaceMaterial: "pale quartz",
         surfaceNoun: "countertop",
-        surfaceNote: "with a fine uniform speckle",
-        backdrop: "a matte tiled splashback with one faint grout line, a blurred dish rack at the far edge",
-        lightSource: "cool daylight from an unseen window plus a warm accent from under-cabinet lighting",
+        surfaceNote: "with a thin square edge",
+        backdrop: "a matte tiled splashback with one faint grout line",
+        backdropDetail: "a blurred dish rack at the far edge",
+        lightSource: "an unseen window and under-cabinet strip lights",
         depth: "medium depth, the countertop receding into soft focus along its length",
         props: ["a linen tea towel folded once", "a small wooden board"],
         fitCategories: ["smart-home", "power", "audio", "other"],
@@ -117,9 +141,10 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "大理石台面加薄雾，干净微冷，适合个护与小型电器。",
         surfaceMaterial: "honed marble",
         surfaceNoun: "vanity top",
-        surfaceNote: "with soft veining and a slightly rounded edge",
-        backdrop: "a soft-focus tiled wall with the faint edge of a mirror and a trace of steam in the air",
-        lightSource: "diffused overhead light scattered by moisture, cool and even with almost no hard shadow",
+        surfaceNote: "with a slightly rounded edge",
+        backdrop: "a soft-focus tiled wall with a trace of steam in the air",
+        backdropDetail: "the faint edge of a mirror",
+        lightSource: "an overhead fixture above the vanity",
         depth: "shallow, the vanity front edge anchoring the foreground",
         props: ["a folded cotton towel", "a small stone dish"],
         fitCategories: ["smart-home", "power", "audio", "other"],
@@ -132,8 +157,9 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceMaterial: "narrow walnut",
         surfaceNoun: "console",
         surfaceNote: "with a visible thin top edge",
-        backdrop: "a plaster wall with a slim mirror frame and a blurred coat hook, hallway receding behind",
-        lightSource: "warm late-afternoon light raking in from the side, producing one long soft shadow",
+        backdrop: "a plaster wall, with a hallway receding behind into soft focus",
+        backdropDetail: "a slim mirror frame and a blurred coat hook",
+        lightSource: "late-afternoon light arriving from the side",
         depth: "shallow, the console in the near plane and the hallway softly dissolved",
         props: ["a small ceramic tray", "a set of keys resting on it"],
         fitCategories: ["smart-home", "power", "audio", "desk-accessory", "other"],
@@ -145,9 +171,10 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "洞石茶几加布艺沙发，暖午后光，适合家居氛围图。",
         surfaceMaterial: "low travertine",
         surfaceNoun: "coffee table",
-        surfaceNote: "with a matte porous surface",
-        backdrop: "a linen sofa and a plaster wall dissolving into soft focus, one cushion slightly indented",
-        lightSource: "gentle indirect afternoon daylight from a large window, warm but not golden",
+        surfaceNote: "with a thick slab edge",
+        backdrop: "a linen sofa and a plaster wall dissolving into soft focus",
+        backdropDetail: "one cushion slightly indented",
+        lightSource: "a large window feeding in indirect afternoon light",
         depth: "medium-shallow, the table sharp and the sofa falling away into blur",
         props: ["a stack of two magazines", "a ceramic vase with dried stems"],
         fitCategories: ["audio", "smart-home", "power", "other"],
@@ -161,7 +188,7 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceNoun: "ledge",
         surfaceNote: "or a washed linen cloth spread over grass",
         backdrop: "soft green foliage and open sky, heavily blurred into clean tonal shapes",
-        lightSource: "natural daylight with the sun behind thin cloud, giving a gentle specular sheen without hard shadow",
+        lightSource: "open sky behind thin cloud",
         depth: "medium, the leaf bokeh layered behind the product with clear separation",
         props: ["a sprig of greenery lying flat", "the folded corner of the linen cloth"],
         fitCategories: ["power", "audio", "smart-home", "other"],
@@ -174,8 +201,9 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceMaterial: "small round marble",
         surfaceNoun: "cafe table",
         surfaceNote: "with a brushed metal rim",
-        backdrop: "a warm blurred interior with wood panelling, hanging pendant lights and a bright window behind",
-        lightSource: "window light from the right mixing with warm interior tungsten, producing mixed colour temperature",
+        backdrop: "a warm blurred interior with wood panelling and a bright window behind",
+        backdropDetail: "hanging pendant lights",
+        lightSource: "a window on the right and warm interior tungsten fixtures",
         depth: "shallow, the table edge in the near foreground and the room collapsing into warm blur",
         props: ["a ceramic coffee cup with a saucer", "a folded newspaper"],
         fitCategories: ["audio", "power", "desk-accessory", "mini-keyboard", "other"],
@@ -187,9 +215,9 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "中控台加深色内饰，冷调天光，适合车载与便携充电类。",
         surfaceMaterial: "dark leather-wrapped",
         surfaceNoun: "centre console",
-        surfaceNote: "with a fine stitched seam",
+        surfaceNote: "between the front seats",
         backdrop: "a car interior dissolving into shadow with faint daylight through the windscreen",
-        lightSource: "cool daylight through glass from the front plus a very faint cabin ambient glow",
+        lightSource: "daylight entering through the windscreen, plus a faint cabin ambient glow",
         depth: "very shallow, the console filling the lower frame while the cabin disappears into darkness",
         props: ["a charging cable coiled loosely", "a pair of sunglasses folded closed"],
         fitCategories: ["power", "audio", "smart-home", "other"],
@@ -201,9 +229,10 @@ export const ECOM_SCENES: EcomScene[] = [
         note: "橡胶地面加金属器械虚化，冷硬高对比，适合运动类产品。",
         surfaceMaterial: "matte black rubber",
         surfaceNoun: "gym floor",
-        surfaceNote: "with a fine speckled texture",
-        backdrop: "blurred steel equipment and a bare concrete wall, one rack upright out of focus",
-        lightSource: "high cool overhead lighting with strong directional falloff and pooled shadows on the floor",
+        surfaceNote: "running wall to wall",
+        backdrop: "a bare concrete wall",
+        backdropDetail: "blurred steel equipment, one rack upright out of focus",
+        lightSource: "high overhead fixtures",
         depth: "medium, the floor texture sharp in the near plane and the equipment blurred behind",
         props: ["a rolled towel", "a matte water bottle"],
         fitCategories: ["power", "audio", "smart-home", "other"],
@@ -217,7 +246,7 @@ export const ECOM_SCENES: EcomScene[] = [
         surfaceNoun: "paper sweep",
         surfaceNote: "curving up into the backdrop with no visible seam",
         backdrop: "an unbroken backdrop carrying a smooth gentle gradient from the surface into the wall",
-        lightSource: "two large soft sources left and right with a subtle top light, producing an almost shadowless result",
+        lightSource: "two large soft sources on the left and right with a subtle top light",
         depth: "no depth cues at all: surface and background are the same continuous material",
         props: [],
         fitCategories: [...ALL],

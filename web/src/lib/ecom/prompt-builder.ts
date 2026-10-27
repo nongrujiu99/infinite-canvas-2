@@ -1,6 +1,7 @@
 import { findEcomAngle, findEcomCategory, type EcomAngleId, type EcomCategoryId } from "@/constant/ecom/categories";
 import type { EcomPalette, EcomStyle } from "@/constant/ecom/styles";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
+import { describeColor } from "@/lib/ecom/main-color";
 import { buildFramingBlock } from "@/lib/ecom/framing";
 import type { EcomAnglePolicy, EcomProductAnalysis, EcomReferenceDigest, EcomReferenceMode, EcomSubjectAnchor, EcomSubjectBox, EcomSubjectScale } from "@/types/ecom";
 
@@ -200,6 +201,13 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
 
     const finishText = [analysis.material, analysis.finish].filter(Boolean).join(", ");
     /*
+     * 只剩色号时模型几乎读不出颜色：「#CFAFA1」对它是无意义字符，实测暖杏粉被画成
+     * 冷玫紫。补一句色相族名，再点名它「不是紫、不是薰衣草」，颜色才咬得住。
+     * 拿不到主色时整句不出现，[Color] 与旧版逐字一致。
+     */
+    const colorAnchor = describeColor(analysis.mainColor);
+    const colorAnchorSentence = colorAnchor ? ` The body colour is ${colorAnchor.family} — ${colorAnchor.note}. It is not ${colorAnchor.wrong.slice(0, 3).join(", not ")}. Whatever colour the set carries, it never shifts the product's own hue toward any of those.` : "";
+    /*
      * 构图默认为「自动 + 居中」，此时 buildFramingBlock 返回空串，整段不出现——
      * 没动过这两个控件的用户拿到的提示词与旧版逐字一致。
      */
@@ -242,7 +250,7 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
         // 放在场景块之后、光线块之前：位置就在它要修饰的内容旁边，模型不会把它当成全局改图指令
         ...(extraBlock ? [extraBlock] : []),
         `[Lighting]\n${style.lighting}${lightingText ? ` ${lightingText}` : ""}`,
-        `[Color]\nKeep ${multiItem ? "every unit's body color" : "the product body color"} exactly as in ${productLabel}${analysis.mainColor ? ` (${analysis.mainColor})` : ""}; do not shift ${multiItem ? "their hue" : "its hue"}, saturate ${multiItem ? "them" : "it"} or add gradients onto ${multiItem ? "them" : "it"}.\nMulti-part colouring must survive: if the product has a differently coloured base, panel, trim or keycap set, keep every part in its own original colour and never pull those parts toward the environment palette.\nEnvironment: ${envPalette.main} dominant, ${envPalette.sub} secondary, ${envPalette.accent} accent.${colorNotes.trim() ? `\n${colorNotes.trim()}` : ""}`,
+        `[Color]\nKeep ${multiItem ? "every unit's body color" : "the product body color"} exactly as in ${productLabel}${analysis.mainColor ? ` (${analysis.mainColor})` : ""}; do not shift ${multiItem ? "their hue" : "its hue"}, saturate ${multiItem ? "them" : "it"} or add gradients onto ${multiItem ? "them" : "it"}.${colorAnchorSentence}\nMulti-part colouring must survive: if the product has a differently coloured base, panel, trim or keycap set, keep every part in its own original colour and never pull those parts toward the environment palette.\nEnvironment: ${envPalette.main} dominant, ${envPalette.sub} secondary, ${envPalette.accent} accent.${colorNotes.trim() ? `\n${colorNotes.trim()}` : ""}`,
         `[Composition]\n${compositionText || style.composition}`,
     ];
     if (textureText) blocks.push(`[Env surface]\n${textureText} — applies to the background and support surface only, never to the product.`);

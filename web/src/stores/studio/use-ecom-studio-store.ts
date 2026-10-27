@@ -49,6 +49,12 @@ type EcomStudioStore = {
     analysisError?: string;
     /** 用户手动指定过品类后，重新识别不再覆盖它。 */
     categoryLocked: boolean;
+    /**
+     * 本地采样的产品主色（纯像素统计，不走网络）。
+     * 识别成功时以模型给的值优先，识别失败或模型没给色时用它兜底——
+     * 没有色号时 [Color] 只剩一句「保持原样」，浅色产品几乎一定会被改色。
+     */
+    productColor?: string;
 
     /**
      * 自建的「视觉配方」风格 id。
@@ -103,6 +109,8 @@ type EcomStudioStore = {
     setAnalysis: (analysis: EcomProductAnalysis | undefined) => void;
     setAnalysisStatus: (status: AnalysisStatus, error?: string) => void;
     setCategory: (category: EcomCategoryId, subject?: string) => void;
+    /** 写入本地采样的主色；已有 analysis 时顺手补进去，保持单一数据源。 */
+    setProductColor: (hex?: string) => void;
 
     selectStyle: (id?: string) => void;
     setPaletteIndex: (index: number) => void;
@@ -179,10 +187,16 @@ export const useEcomStudioStore = create<EcomStudioStore>()(
                     if (state.productImage?.storageKey === image?.storageKey && state.productImage?.dataUrl === image?.dataUrl) return state;
                     return {
                         productImage: image,
-                        analysis: image ? state.analysis : undefined,
+                        /*
+                         * 换图保留品类这类文字结论（用户可能已经手动锁过），但必须清掉主色：
+                         * 色号是唯一和这张图强绑定的字段，留着上一件的颜色会直接把新图锁错。
+                         */
+                        analysis: image ? (state.analysis ? { ...state.analysis, mainColor: undefined } : undefined) : undefined,
                         analysisStatus: image ? state.analysisStatus : "idle",
                         analysisError: undefined,
                         categoryLocked: false,
+                        // 采样色属于这张产品图，换图必须清掉，否则会拿上一件的色号锁新图
+                        productColor: undefined,
                         references: [],
                         // 已生成的结果自带风格与提示词快照，跟当前产品图无关；删产品图不该把历史记录一起清掉
                         results: state.results,
@@ -190,8 +204,27 @@ export const useEcomStudioStore = create<EcomStudioStore>()(
                         anglePolicy: "keep",
                     };
                 }),
-            setAnalysis: (analysis) => set({ analysis, analysisStatus: analysis ? "done" : "idle" }),
+            // 模型没给主色时用本地采样补上：色号是 [Color] 唯一可量化的锚点
+            setAnalysis: (analysis) =>
+                set((state) => ({
+                    analysis: analysis && !analysis.mainColor && state.productColor ? { ...analysis, mainColor: state.productColor } : analysis,
+                    analysisStatus: analysis ? "done" : "idle",
+                })),
             setAnalysisStatus: (status, error) => set({ analysisStatus: status, analysisError: error }),
+            setProductColor: (productColor) =>
+                set((state) => {
+                    if (!productColor) return { productColor };
+                    /*
+                     * 识别可能整个失败（没配渠道、模型不返回 JSON），此时 analysis 是空的，
+                     * 主色就没有落脚点——而它恰恰是失败时唯一还靠得住的锁色依据。
+                     * 所以给一份最小占位：品类仍是 other，subject 留空（不虚构主体，
+                     * 提示词里那段本来就会因为空串自动略过）。
+                     */
+                    if (!state.analysis) return { productColor, analysis: { category: "other" as const, subject: "", mainColor: productColor } };
+                    // 已经有模型给的主色就不覆盖它：模型能排除屏幕反光这类干扰
+                    if (state.analysis.mainColor) return { productColor };
+                    return { productColor, analysis: { ...state.analysis, mainColor: productColor } };
+                }),
             setCategory: (category, subject) =>
                 set((state) => ({
                     categoryLocked: true,
@@ -200,6 +233,8 @@ export const useEcomStudioStore = create<EcomStudioStore>()(
                         ...state.analysis,
                         category,
                         subject: subject || state.analysis?.subject || "",
+                        // 识别整体失败时 analysis 是空的，用户手动选品类会创建这一份，主色得一起带上
+                        mainColor: state.analysis?.mainColor ?? state.productColor,
                     },
                 })),
 
@@ -275,6 +310,7 @@ export const useEcomStudioStore = create<EcomStudioStore>()(
                     analysisStatus: "idle",
                     analysisError: undefined,
                     categoryLocked: false,
+                    productColor: undefined,
                     references: [],
                     results: [],
                     generating: false,

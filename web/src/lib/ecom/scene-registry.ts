@@ -26,7 +26,7 @@ export const EMPTY_SCENE_STATE: EcomSceneState = { overrides: {}, custom: [] };
 /** 可作为行为归类的内置场景。「参考图场景」的环境来自参考图，不能当模板。 */
 export const ECOM_SCENE_FAMILIES: EcomSceneId[] = ECOM_SCENES.filter((scene) => scene.id !== "reference").map((scene) => scene.id as EcomSceneId);
 
-const EDITABLE_FIELDS: (keyof Omit<EcomScene, "id" | "builtIn">)[] = ["name", "note", "family", "surfaceMaterial", "surfaceNoun", "surfaceNote", "backdrop", "lightSource", "depth", "props", "fitCategories", "avoid", "enabled"];
+const EDITABLE_FIELDS: (keyof Omit<EcomScene, "id" | "builtIn">)[] = ["name", "note", "family", "surfaceMaterial", "surfaceNoun", "surfaceNote", "backdrop", "backdropDetail", "lightSource", "depth", "props", "fitCategories", "avoid", "enabled"];
 
 function equal(a: unknown, b: unknown) {
     return JSON.stringify(a) === JSON.stringify(b);
@@ -115,6 +115,7 @@ export function createSceneDraft(seed?: Partial<EcomScene>): EcomScene {
         surfaceNoun: seed?.surfaceNoun ?? base.surfaceNoun,
         surfaceNote: seed?.surfaceNote ?? base.surfaceNote,
         backdrop: seed?.backdrop ?? base.backdrop,
+        backdropDetail: seed?.backdropDetail ?? base.backdropDetail,
         lightSource: seed?.lightSource ?? base.lightSource,
         depth: seed?.depth ?? base.depth,
         props: seed?.props ? [...seed.props] : [...base.props],
@@ -143,6 +144,8 @@ export function sceneFromDigest(digest: EcomSceneDigest, options?: { existingNam
         // 空串是有效值：这张图没有额外修饰，不能把模板场景的修饰带过来
         surfaceNote: digest.surfaceNote ?? "",
         backdrop: digest.backdrop,
+        // 没识别出具体器具就留空：空串会让平台层少一段可删的内容，比瞎编一件更好
+        backdropDetail: digest.backdropDetail ?? "",
         lightSource: digest.lightSource,
         depth: digest.depth,
         // 影棚类不摆道具；识别出道具就用自己的，没识别出来才回落到归类的默认道具
@@ -185,7 +188,7 @@ export function validateSceneDraft(scene: EcomScene): string[] {
     if (!scene.surfaceNoun.trim()) errors.push("承托物不能为空，例如 desktop / coffee table");
     if (!scene.surfaceMaterial.trim()) errors.push("承托面材质不能为空，例如 matte oak");
     if (!scene.backdrop.trim()) errors.push("背景不能为空，它决定产品后面是什么");
-    if (!scene.lightSource.trim()) errors.push("光源不能为空，它决定光从哪来");
+    if (!scene.lightSource.trim()) errors.push("可用光源不能为空：它说明这个地点有什么光、在哪个方向");
     if (scene.fitCategories.length === 0) errors.push("至少选择一个适配品类");
     return Array.from(new Set(errors));
 }

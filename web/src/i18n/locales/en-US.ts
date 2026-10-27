@@ -1171,6 +1171,8 @@ export default {
             lowConfidence: "low confidence, please confirm",
             itemCount: "{{count}} items",
             angleUnknown: "Angle not detected, the original view will be kept",
+            mainColor: "Body colour {{hex}} — sampled locally, used to lock the product hue",
+            mainColorSampled: "Body colour {{hex}} — the model did not return one, sampled locally instead",
         },
         analysis: {
             running: "Reading category, material and camera angle…",

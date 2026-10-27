@@ -12,6 +12,37 @@ import type { EcomPalette } from "./styles";
  */
 export type EcomPlatformId = "tmall" | "amazon" | "xiaohongshu" | "douyin" | "brand-kv" | "dtc";
 
+/**
+ * 平台怎么处置场景里的自然光。
+ *
+ * 场景只声明「这个地点有什么光、在哪个方向」，光质与用法归平台——
+ * 之前两层各写一句并列拼进 [Lighting]，亚马逊会一边写「无阴影棚拍」
+ * 一边写「左侧窗光扫过桌面」，模型只能挑一句听，最后六个平台全被窗光同化。
+ *
+ *   replace — 完全棚布光，场景那盏灯不存在（亚马逊、抖音）
+ *   reshape — 借场景的光位，但提亮柔化到「可控棚光」的程度（天猫、品牌 KV）
+ *   use     — 只用现场光，不许打灯（小红书、独立站）
+ */
+export type EcomAmbientPolicy = "replace" | "reshape" | "use";
+
+/**
+ * 背景里那个「能认出来的物件」留不留。
+ *
+ * 场景的 `backdropDetail` 会写一件具体器具（显示器下缘、沥水架、衣帽钩）来交代地点。
+ * 它既是「像真实空间」的来源，也是「像手机随手拍」的来源——差别只在留不留。
+ *
+ *   narrative — 全留。生活感来自这些物件（小红书、抖音的实景图）
+ *   abstract  — 丢掉物件，只留材质与明暗过渡（天猫、独立站）
+ *   seamless  — 连材质都不强调，产品后面是一整片干净色、向边缘柔和衰减（亚马逊、品牌 KV）
+ *
+ * 拿掉的方式是**不把这段文字写进提示词**，而不是写一句「不要出现显示器」。
+ * 负向指令模型基本不执行——抖音那条「只许几何色块」被自己的道具推导违反，就是同一个坑。
+ */
+export type EcomBackdropPolicy = "narrative" | "abstract" | "seamless";
+
+/** 道具语法。平台只放行其中几类，推导出的道具先过语法再过数量。 */
+export type EcomPropKind = "geometry" | "material" | "everyday" | "device" | "plant";
+
 export type EcomPlatform = {
     id: EcomPlatformId;
     name: string;
@@ -41,6 +72,15 @@ export type EcomPlatform = {
     propLimit: number;
     /** 是否允许手 / 人入镜。 */
     human: boolean;
+    /** 怎么处置场景自带的自然光。 */
+    ambientPolicy: EcomAmbientPolicy;
+    /**
+     * 放行哪几类道具。空数组表示不限品类，只受 propLimit 约束。
+     * 只截断数量不筛品类，会出现「抖音只许几何色块，画里却摆着笔记本和绿植」。
+     */
+    propGrammar: EcomPropKind[];
+    /** 场景背景里那件「交代地点的器具」留不留。 */
+    backdropPolicy: EcomBackdropPolicy;
     /** 切换平台时建议的比例；只作为默认建议，不覆盖用户已选值。 */
     defaultRatio: string;
     palettes: EcomPalette[];
@@ -62,6 +102,9 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         safeArea: "Keep the top 22% of the frame as a low-detail band: no props, no strong highlights and no busy texture there, so headline copy can sit on it later.",
         propLimit: 3,
         human: false,
+        ambientPolicy: "reshape",
+        propGrammar: ["everyday", "device", "material"],
+        backdropPolicy: "abstract",
         defaultRatio: "1:1",
         palettes: [
             { name: "明亮白", main: "#FFFFFF", sub: "#F4F4F2", accent: "#D9D2C5" },
@@ -81,8 +124,11 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         styling: "No decorative props. If the product needs a surface to rest on, that surface is plain and neutral and reads as backdrop rather than styling.",
         realism: "Documentary accuracy: real texture, real material grain, honest contact shadow. No beauty retouching that hides flaws, no HDR, no CGI sheen.",
         safeArea: "",
-        propLimit: 1,
+        propLimit: 0,
         human: false,
+        ambientPolicy: "replace",
+        propGrammar: [],
+        backdropPolicy: "seamless",
         defaultRatio: "1:1",
         palettes: [
             { name: "纯白", main: "#FFFFFF", sub: "#F2F2F2", accent: "#D9D9D9" },
@@ -104,6 +150,9 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         safeArea: "Keep the upper 30% of the frame calm and low-contrast so a large title can be placed there later.",
         propLimit: 5,
         human: true,
+        ambientPolicy: "use",
+        propGrammar: ["everyday", "material", "plant"],
+        backdropPolicy: "narrative",
         defaultRatio: "3:4",
         palettes: [
             { name: "奶油燕麦", main: "#F7F1E8", sub: "#E8DCCB", accent: "#B79B7E" },
@@ -125,6 +174,9 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         safeArea: "Keep the middle 25% band free of critical detail so on-screen text and stickers can be overlaid later without covering the product.",
         propLimit: 3,
         human: false,
+        ambientPolicy: "replace",
+        propGrammar: ["geometry"],
+        backdropPolicy: "abstract",
         defaultRatio: "3:4",
         palettes: [
             { name: "冷白撞红", main: "#F5F5F7", sub: "#1F1F23", accent: "#FF4D3D" },
@@ -146,6 +198,9 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         safeArea: "Reserve the left 38% of the frame, or the top 40% when the product sits low, as an unbroken low-texture field for headline and logo lockup.",
         propLimit: 2,
         human: false,
+        ambientPolicy: "reshape",
+        propGrammar: ["material", "geometry"],
+        backdropPolicy: "seamless",
         defaultRatio: "4:5",
         palettes: [
             { name: "米灰金", main: "#F4F1EC", sub: "#D8D2C8", accent: "#8C7B63" },
@@ -167,6 +222,9 @@ export const ECOM_PLATFORMS: EcomPlatform[] = [
         safeArea: "Keep the top 20% quiet for a small wordmark and a single line of copy.",
         propLimit: 3,
         human: true,
+        ambientPolicy: "use",
+        propGrammar: ["material", "everyday"],
+        backdropPolicy: "abstract",
         defaultRatio: "4:5",
         palettes: [
             { name: "沙陶绿", main: "#EFE9DF", sub: "#D9CFC0", accent: "#7E8B72" },

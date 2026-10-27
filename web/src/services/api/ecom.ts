@@ -458,8 +458,9 @@ function buildScenePrompt() {
   "surfaceMaterial": English adjective phrase for the material of the resting surface, e.g. "chipped white laminate",
   "surfaceNoun": English bare noun for what the product rests on, e.g. "desk" / "coffee table" / "windowsill",
   "surfaceNote": short English modifier without a leading preposition, or "",
-  "backdrop": one English sentence on what is behind the product and how far away it sits,
-  "lightSource": one English sentence on where the light comes from, its quality and its colour temperature,
+  "backdrop": one English phrase for the material and tone of what stands closest behind the product, with no furniture and no equipment in it, e.g. "a plain matte painted wall standing close behind",
+  "backdropDetail": one short English noun phrase for the single most telling object that says where this is (a monitor edge, a dish rack, a coat hook), or "" if the place has none,
+  "lightSource": one short English sentence on what light exists in this place and from which direction — no softness, no contrast, no colour temperature, those belong to the platform,
   "depth": one English sentence on depth of field and how the space reads,
   "props": 1-3 short English noun phrases for the ordinary objects that establish this place,
   "fitCategories": 1-4 category ids from the list below,
@@ -477,6 +478,8 @@ function buildScenePrompt() {
         "- Never name the product in any field, and never list a second copy of the product as a prop.",
         '- "props" are the objects that tell you where you are (a mug, a folded towel, a coiled cable, a book). No brands, no readable text, no people, no food mess.',
         '- "family" must be an existing place id, never a new name. A seamless paper or fabric backdrop means "studio".',
+        '- "backdrop" is only the material and tone of what stands behind the product. Never put furniture, appliances, cables or utensils in it — those belong in "backdropDetail", one object at most.',
+        '- "backdropDetail" is the one object that says where this is. Leave it as "" when the place has nothing distinctive in it.',
         "- Keep every English field under 25 words, concrete and photographic. No poetic language.",
     ].join("\n");
 }
@@ -495,6 +498,7 @@ export async function analyzeScene(config: AiConfig, image: ReferenceImage, opti
         surfaceNoun: normalizeString(parsed.surfaceNoun),
         surfaceNote: normalizeString(parsed.surfaceNote),
         backdrop: normalizeString(parsed.backdrop),
+        backdropDetail: normalizeString(parsed.backdropDetail),
         lightSource: normalizeString(parsed.lightSource),
         depth: normalizeString(parsed.depth),
         props: normalizeStringList(parsed.props, 3),

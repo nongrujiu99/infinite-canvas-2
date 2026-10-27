@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 
 import { ECOM_CATEGORIES, findEcomAngle } from "@/constant/ecom/categories";
+import { sampleMainColor } from "@/lib/ecom/main-color";
 import { cn } from "@/lib/utils";
 import { analyzeProduct } from "@/services/api/ecom";
 import { uploadImage } from "@/services/image-storage";
@@ -31,6 +32,7 @@ export function ProductUploader({ config }: { config: AiConfig }) {
     const setAnalysis = useEcomStudioStore((state) => state.setAnalysis);
     const setAnalysisStatus = useEcomStudioStore((state) => state.setAnalysisStatus);
     const setCategory = useEcomStudioStore((state) => state.setCategory);
+    const setProductColor = useEcomStudioStore((state) => state.setProductColor);
     const visionModelId = useEcomStudioStore((state) => state.visionModel);
 
     // 识别走多模态模型：用户在设置里选过就用它，否则按 text 能力取渠道里的默认文本模型
@@ -73,6 +75,12 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                 const uploaded = await uploadImage(file);
                 const image = { id: nanoid(), name: file.name, type: uploaded.mimeType, dataUrl: uploaded.url, storageKey: uploaded.storageKey };
                 setProduct(image);
+                /*
+                 * 先本地采一遍主色再识别：识别可能失败、也可能不给色号，而色号是 [Color]
+                 * 里唯一可量化的锚点。纯像素统计只要几十毫秒，等它比赌模型更划算。
+                 */
+                const sampled = await sampleMainColor(image.dataUrl);
+                if (sampled) setProductColor(sampled);
                 void runAnalysis(image);
             } catch (error) {
                 message.error(error instanceof Error ? error.message : t("studio.product.uploadFailed"));
@@ -80,7 +88,7 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                 setUploading(false);
             }
         },
-        [message, runAnalysis, setProduct, t],
+        [message, runAnalysis, setProduct, setProductColor, t],
     );
 
     // 未配置渠道时不做无意义的识别请求；凭据挂在渠道上，按识别模型反查
@@ -159,6 +167,15 @@ export function ProductUploader({ config }: { config: AiConfig }) {
                         <Select size="small" className="w-full" value={analysis?.category ?? "other"} onChange={(value) => setCategory(value)} options={ECOM_CATEGORIES.map((item) => ({ value: item.id, label: item.name }))} />
                         <div className="flex flex-wrap items-center gap-1">
                             {analysis?.finish ? <Chip>{analysis.finish}</Chip> : null}
+                            {/* 主色直接显示出来：取错了能立刻发现，不用等出图再对色 */}
+                            {analysis?.mainColor ? (
+                                <Tooltip title={t(analysisStatus === "failed" ? "studio.product.mainColorSampled" : "studio.product.mainColor", { hex: analysis.mainColor })}>
+                                    <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                        <span className="size-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: analysis.mainColor }} />
+                                        {analysis.mainColor}
+                                    </span>
+                                </Tooltip>
+                            ) : null}
                             {/* 只在多件时出现：让用户能一眼确认模型数对了几件，数错就直接重新识别 */}
                             {(analysis?.itemCount ?? 1) > 1 ? <Chip>{t("studio.product.itemCount", { count: analysis?.itemCount })}</Chip> : null}
                             {sourceAngle ? (

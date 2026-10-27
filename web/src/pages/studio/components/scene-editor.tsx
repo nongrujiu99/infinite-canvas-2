@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ECOM_CATEGORIES, type EcomCategoryId } from "@/constant/ecom/categories";
 import { ECOM_SCENES, type EcomScene, type EcomSceneId } from "@/constant/ecom/scenes";
 import { composeSurface } from "@/constant/ecom/scene-rules";
-import { composeSceneText } from "@/lib/ecom/look-composer";
+import { composeBackdrop, composeSceneText } from "@/lib/ecom/look-composer";
 import { ECOM_SCENE_FAMILIES, sceneFamilyOf, validateSceneDraft } from "@/lib/ecom/scene-registry";
 
 import { SceneImport } from "./scene-import";
@@ -73,8 +73,9 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
 
     const preview = useMemo(() => {
         const surface = composeSurface({ baseMaterial: draft.surfaceMaterial, noun: draft.surfaceNoun, note: draft.surfaceNote });
-        return composeSceneText({ surface, backdrop: draft.backdrop, depth: draft.depth });
-    }, [draft.backdrop, draft.depth, draft.surfaceMaterial, draft.surfaceNote, draft.surfaceNoun]);
+        // 预览按「全部保留」拼：编辑器要让人看见自己写的每一项，平台取舍在生成时才发生
+        return composeSceneText({ surface, backdrop: composeBackdrop(null, draft), depth: draft.depth });
+    }, [draft.backdrop, draft.backdropDetail, draft.depth, draft.surfaceMaterial, draft.surfaceNote, draft.surfaceNoun]);
 
     const submit = () => {
         const next = validateSceneDraft(draft);
@@ -135,13 +136,26 @@ export function SceneEditor({ scene, dirtyFields, onSave, onCancel, onReset, con
                     </label>
                 </FieldCard>
 
-                <FieldCard title="环境与光" dirty={isDirty("backdrop") || isDirty("lightSource") || isDirty("depth")} hint="背景决定产品后面是什么；光源决定光从哪来，会和平台光质叠加；景深决定空间关系。">
+                <FieldCard
+                    title="环境与光"
+                    dirty={isDirty("backdrop") || isDirty("backdropDetail") || isDirty("lightSource") || isDirty("depth")}
+                    hint="背景只写产品后面那面墙/台的材质与色调；能认出来的器具（显示器、沥水架）单独放下一栏，由平台决定留不留——亚马逊和品牌 KV 一律拿掉。光源只写这个地点有什么光、在哪个方向。"
+                >
                     <label className="block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">背景</span>
+                        <span className="text-[11px] text-muted-foreground">背景（材质与色调，不写器具）</span>
                         <textarea className={cn(INPUT, "h-16 resize-none")} value={draft.backdrop} onChange={(event) => patch({ backdrop: event.target.value })} />
                     </label>
                     <label className="mt-2 block space-y-1">
-                        <span className="text-[11px] text-muted-foreground">光源</span>
+                        <span className="text-[11px] text-muted-foreground">交代地点的器具（可留空，只写一件，不写线缆）</span>
+                        <input
+                            className={INPUT}
+                            value={draft.backdropDetail ?? ""}
+                            placeholder="the lower edge of a monitor"
+                            onChange={(event) => patch({ backdropDetail: event.target.value || undefined })}
+                        />
+                    </label>
+                    <label className="mt-2 block space-y-1">
+                        <span className="text-[11px] text-muted-foreground">可用光源（只写有什么光、在哪，不写软硬）</span>
                         <textarea className={cn(INPUT, "h-14 resize-none")} value={draft.lightSource} onChange={(event) => patch({ lightSource: event.target.value })} />
                     </label>
                     <label className="mt-2 block space-y-1">

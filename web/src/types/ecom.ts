@@ -89,6 +89,8 @@ export type EcomSceneDigest = {
     surfaceNoun?: string;
     surfaceNote?: string;
     backdrop?: string;
+    /** 背景里那件「能认出来的器具」，用来交代地点；平台可以要求整段拿掉。 */
+    backdropDetail?: string;
     lightSource?: string;
     depth?: string;
     props?: string[];

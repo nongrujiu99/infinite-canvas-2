@@ -1155,6 +1155,8 @@ export default {
             lowConfidence: "判断不确定，请确认",
             itemCount: "{{count}} 件",
             angleUnknown: "未识别出机位，生成时保持原图视角",
+            mainColor: "主色 {{hex}}（本地采样，用于锁住产品色相）",
+            mainColorSampled: "主色 {{hex}}（识别没给色，已用本地采样兜底）",
         },
         analysis: {
             running: "正在识别品类、材质与机位…",

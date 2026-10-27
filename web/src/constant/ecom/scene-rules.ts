@@ -1,5 +1,5 @@
 import type { EcomCategoryId } from "./categories";
-import type { EcomPlatformId } from "./platforms";
+import type { EcomPlatformId, EcomPropKind } from "./platforms";
 import type { EcomSceneId } from "./scenes";
 
 /**
@@ -24,6 +24,14 @@ export type EcomProductTraits = {
     glossy: boolean;
     category: EcomCategoryId;
 };
+
+/**
+ * 规则道具必须自带品类。
+ *
+ * 平台的 propGrammar 是白名单：抖音只放行几何体，所以「笔记本」「编织线」这类
+ * 生活物要被拦下来。只按数量截断拦不住——数字对了，画面还是那一套桌面陈设。
+ */
+export type EcomSceneProp = { text: string; kind: EcomPropKind };
 
 /**
  * 有明确「台面」的室内场景。
@@ -110,7 +118,7 @@ export type EcomSceneRule = {
      * 织物和纸不可能做成一张茶几，只能盖在茶几上，所以这两种拼句方式不同。
      */
     surfaceLayer?: boolean;
-    props?: string[];
+    props?: EcomSceneProp[];
     avoid?: string[];
     /**
      * 命中后清空全部道具。
@@ -134,7 +142,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         category: ["audio"],
         excludeScenes: OUTDOORISH,
         // 绝不能再摆一副耳机：产品本身就是耳机，模型会画成两副并挑错主体
-        props: ["the corner of a record sleeve", "a short coiled cable with a braided jacket"],
+        props: [
+            { text: "the corner of a record sleeve", kind: "everyday" },
+            { text: "a short coiled cable with a braided jacket", kind: "device" },
+        ],
         avoid: ["a second pair of headphones", "two identical speakers facing the viewer"],
         weight: 92,
     },
@@ -142,7 +153,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         id: "cat-power",
         label: "充电语境",
         category: ["power"],
-        props: ["a second device lying face down while it charges", "a neatly coiled braided cable"],
+        props: [
+            { text: "a second device lying face down while it charges", kind: "device" },
+            { text: "a neatly coiled braided cable", kind: "device" },
+        ],
         avoid: ["a tangled nest of cables"],
         weight: 92,
     },
@@ -151,7 +165,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         label: "电脑配件语境",
         category: ["mini-keyboard"],
         excludeScenes: OUTDOORISH,
-        props: ["the near edge of a laptop", "a mouse resting out of focus"],
+        props: [
+            { text: "the near edge of a laptop", kind: "device" },
+            { text: "a mouse resting out of focus", kind: "device" },
+        ],
         avoid: ["a second identical keypad"],
         weight: 90,
     },
@@ -160,7 +177,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         label: "演示语境",
         category: ["presenter"],
         excludeScenes: OUTDOORISH,
-        props: ["a closed laptop lid", "a folded paper agenda"],
+        props: [
+            { text: "a closed laptop lid", kind: "device" },
+            { text: "a folded paper agenda", kind: "everyday" },
+        ],
         avoid: ["readable slide text"],
         weight: 90,
     },
@@ -169,7 +189,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         label: "客厅语境",
         category: ["remote"],
         excludeScenes: OUTDOORISH,
-        props: ["the folded edge of a throw blanket", "a coffee-table book lying flat"],
+        props: [
+            { text: "the folded edge of a throw blanket", kind: "everyday" },
+            { text: "a coffee-table book lying flat", kind: "everyday" },
+        ],
         avoid: ["a television screen showing content"],
         weight: 86,
     },
@@ -178,7 +201,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         label: "桌搭语境",
         category: ["desk-accessory"],
         excludeScenes: OUTDOORISH,
-        props: ["a pair of glasses folded shut", "a short stack of sticky notes"],
+        props: [
+            { text: "a pair of glasses folded shut", kind: "everyday" },
+            { text: "a short stack of sticky notes", kind: "everyday" },
+        ],
         avoid: ["a second identical accessory"],
         weight: 88,
     },
@@ -186,7 +212,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         id: "cat-smart-home",
         label: "智能家居语境",
         category: ["smart-home"],
-        props: ["a phone lying face down with an unreadable screen", "a plain wall switch panel out of focus"],
+        props: [
+            { text: "a phone lying face down with an unreadable screen", kind: "device" },
+            { text: "a plain wall switch panel out of focus", kind: "everyday" },
+        ],
         avoid: ["readable app interface", "visible wiring"],
         weight: 88,
     },
@@ -199,7 +228,10 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         tone: ["dark"],
         scenes: TABLE_SCENES,
         surfaceMaterial: "dark stained ash",
-        props: ["a graphite machined pen", "a slim anodised clip"],
+        props: [
+            { text: "a graphite machined pen", kind: "everyday" },
+            { text: "a slim anodised clip", kind: "everyday" },
+        ],
         avoid: ["white cotton cloth", "pale unfinished wood", "mirror-finish surfaces that double the product"],
         hint: "Lift the dark metal off the background with one soft rim of light along its top edge; never let the body dissolve into the backdrop.",
         weight: 80,
@@ -211,7 +243,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         tone: ["light", "neutral"],
         scenes: TABLE_SCENES,
         surfaceMaterial: "pale honed limestone",
-        props: ["a thin steel ruler lying at an angle"],
+        props: [{ text: "a thin steel ruler lying at an angle", kind: "everyday" }],
         avoid: ["a warm yellow cast that makes the metal read as brass"],
         weight: 78,
     },
@@ -231,7 +263,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         material: ["leather"],
         scenes: TABLE_SCENES,
         surfaceMaterial: "walnut",
-        props: ["a small brass paper clip"],
+        props: [{ text: "a small brass paper clip", kind: "everyday" }],
         avoid: ["faux leather with a plastic sheen"],
         weight: 72,
     },
@@ -242,7 +274,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         scenes: TABLE_SCENES,
         surfaceMaterial: "washed linen",
         surfaceLayer: true,
-        props: ["the folded corner of a wool blanket"],
+        props: [{ text: "the folded corner of a wool blanket", kind: "everyday" }],
         avoid: ["synthetic satin sheen"],
         weight: 72,
     },
@@ -253,7 +285,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         scenes: TABLE_SCENES,
         // 软质材料做不成台面：给它换材质只会拼出「哑光层板窗台」这种句子。
         // 这条只负责道具与禁区，承托面留给场景本身。
-        props: ["a soft matte coaster"],
+        props: [{ text: "a soft matte coaster", kind: "everyday" }],
         avoid: ["high-gloss plastic reflections nearby"],
         weight: 74,
     },
@@ -263,7 +295,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         material: ["wood"],
         scenes: TABLE_SCENES,
         surfaceMaterial: "warm oak",
-        props: ["a small wooden block"],
+        props: [{ text: "a small wooden block", kind: "material" }],
         avoid: ["printed veneer that fakes wood grain"],
         weight: 70,
     },
@@ -273,7 +305,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         material: ["ceramic"],
         scenes: TABLE_SCENES,
         surfaceMaterial: "honed travertine",
-        props: ["a small unglazed ceramic dish"],
+        props: [{ text: "a small unglazed ceramic dish", kind: "material" }],
         avoid: ["glaze reflections that read as plastic"],
         weight: 70,
     },
@@ -292,7 +324,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         scenes: TABLE_SCENES,
         surfaceMaterial: "uncoated kraft paper",
         surfaceLayer: true,
-        props: ["a kraft paper corner turned up"],
+        props: [{ text: "a kraft paper corner turned up", kind: "material" }],
         avoid: ["printed text on the paper"],
         weight: 68,
     },
@@ -303,7 +335,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         glossy: true,
         scenes: TABLE_SCENES,
         surfaceMaterial: "smooth acrylic",
-        props: ["a colour-matched acrylic cube"],
+        props: [{ text: "a colour-matched acrylic cube", kind: "geometry" }],
         avoid: ["scratches", "visible dust"],
         weight: 72,
     },
@@ -314,7 +346,7 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
         glossy: false,
         scenes: TABLE_SCENES,
         surfaceMaterial: "fine-grain matte laminate",
-        props: ["a folded uncoated paper card"],
+        props: [{ text: "a folded uncoated paper card", kind: "material" }],
         weight: 70,
     },
 
@@ -335,10 +367,65 @@ export const ECOM_SCENE_RULES: EcomSceneRule[] = [
     },
     {
         id: "tone-warm",
-        label: "暖色产品 → 锁住色相",
+        /*
+         * 原来的写法是「环境不许推动产品的色相：暖产品别加暖光，冷产品别加冷光」。
+         * 本意是别染色，但模型会把它执行成「环境是暖的，那就把产品做冷一点拉开区分」——
+         * 实测暖杏粉的产品在暖桌面上被画成冷玫紫，色相偏了 56°，正是这条被反向执行的结果。
+         * 改成把「可改的范围」写清楚：只许改亮度与反光强度，色相一个方向都不许动。
+         */
+        label: "产品色相 → 锁住",
         tone: ["neutral", "light", "dark"],
-        hint: "The environment must not push the product's own hue: no warm gel on a warm product, no cool cast on a cool one.",
+        hint: "The product's own hue is fixed by the reference photo and is not something the set is allowed to adjust. The environment may change how much light falls on the product and how strong the reflections are, and nothing else: a warm set never warms the product further, and a warm set is never a reason to cool the product down so that it separates from its surroundings.",
         weight: 40,
+    },
+
+    // ---- 平台道具语法：抖音与品牌 KV 的白名单会把生活道具全筛掉，
+    //      没有这几条就只剩平台描述在喊「只要几何色块」，模型却没有可放的物件 ----
+    {
+        id: "plat-douyin-graphic",
+        label: "抖音 → 几何色块",
+        platforms: ["douyin"],
+        props: [
+            { text: "one bold colour-blocked geometric plane standing behind the product", kind: "geometry" },
+            { text: "a single hard-edged cube clearly smaller than the product", kind: "geometry" },
+        ],
+        avoid: ["soft lifestyle props", "textiles", "plants or flowers", "domestic clutter"],
+        weight: 96,
+    },
+    {
+        id: "plat-kv-symbolic",
+        label: "品牌 KV → 符号道具",
+        platforms: ["brand-kv"],
+        props: [
+            { text: "one symbolic geometric plane chosen for meaning rather than realism", kind: "geometry" },
+            { text: "a single fold of matte fabric", kind: "material" },
+        ],
+        avoid: ["everyday household objects", "domestic clutter"],
+        weight: 96,
+    },
+
+    {
+        id: "plat-xhs-lived-in",
+        label: "小红书 → 生活痕迹",
+        platforms: ["xiaohongshu"],
+        props: [
+            { text: "a mug with a faint coffee ring beside it", kind: "everyday" },
+            { text: "a magazine folded open at one page", kind: "everyday" },
+            { text: "a small trailing plant just out of focus", kind: "plant" },
+        ],
+        avoid: ["studio-perfect arrangement", "merchandised grouping"],
+        weight: 94,
+    },
+    {
+        id: "plat-dtc-material",
+        label: "独立站 → 材质片",
+        platforms: ["dtc"],
+        props: [
+            { text: "a folded length of raw linen", kind: "material" },
+            { text: "a small unglazed clay dish", kind: "material" },
+        ],
+        avoid: ["plastic objects", "branded packaging"],
+        weight: 94,
     },
 
     // ---- 场景特化 ----
@@ -425,6 +512,7 @@ export function resolveSceneDressing({
     sceneProps,
     sceneAvoid,
     propLimit,
+    propGrammar = [],
 }: {
     traits: EcomProductTraits;
     /** 场景的行为归类，不是场景 id——自建场景靠它继承规则。 */
@@ -439,6 +527,8 @@ export function resolveSceneDressing({
     sceneProps: string[];
     sceneAvoid: string[];
     propLimit: number;
+    /** 平台放行的道具品类；空数组表示不限。 */
+    propGrammar?: EcomPropKind[];
 }): EcomSceneDressing {
     const hit = ECOM_SCENE_RULES.filter((rule) => matches(rule, traits, sceneFamily, platformId)).sort((a, b) => b.weight - a.weight);
 
@@ -458,8 +548,11 @@ export function resolveSceneDressing({
         props.push(text);
     };
 
+    // 场景自带道具一律按「交代地点的生活物」过语法：抖音只放行几何体时，桌上那本笔记本就该消失
+    const allows = (kind: EcomPropKind) => propGrammar.length === 0 || propGrammar.includes(kind);
+
     // 场景中性道具最多取一件：它只负责交代地点，多取就会盖过产品本身
-    if (budget > 0 && sceneProps.length) push(sceneProps[0]);
+    if (budget > 0 && sceneProps.length && allows("everyday")) push(sceneProps[0]);
 
     /*
      * 影棚不许被材质规则改写成「深色木桌面」——那是另一个场景的东西。
@@ -479,7 +572,8 @@ export function resolveSceneDressing({
         for (const rule of hit) {
             for (const prop of rule.props ?? []) {
                 if (props.length >= budget) break;
-                push(prop);
+                if (!allows(prop.kind)) continue;
+                push(prop.text);
             }
             if (props.length >= budget) break;
         }
@@ -497,7 +591,7 @@ export function resolveSceneDressing({
             if (rule.clearsProps) return true;
             if (rule.hint) return true;
             if (rule.surfaceMaterial) return rule.id === surfaceRule?.id;
-            if (rule.props?.length) return rule.props.some((prop) => props.includes(prop.trim()));
+            if (rule.props?.length) return rule.props.some((prop) => props.includes(prop.text.trim()));
             return false;
         })
         .map((rule) => ({ id: rule.id, label: rule.label }));

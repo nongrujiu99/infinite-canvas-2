@@ -40,7 +40,7 @@ function referenceSceneText(digests: EcomReferenceDigest[]) {
  * 把「平台审美语言 × 物理场景 × 属性联动」合成一份配方。
  *
  * 分工刻意做成不重叠，避免同一件事在提示词里说两遍（说两遍模型就会挑一条听）：
- *   - 光 → [Lighting]，由 platform.lighting + scene.lightSource 组成
+ *   - 光 → [Lighting]，平台定光质与用法，场景只提供「有什么光、在哪个方向」
  *   - 构图与文案安全区 → [Composition]
  *   - 平台总述 / 色彩处理 / 道具纪律 / 修图标准 → [Platform look]
  *   - 场景里具体摆什么 → [Scene] 与 [Scene props]
@@ -92,6 +92,7 @@ export function composeLook({
               sceneAvoid: scene.avoid,
               // 属性联动关掉后只留场景中性道具，数量上限仍受平台约束
               propLimit: linkProps ? platform.propLimit : Math.min(1, platform.propLimit),
+              propGrammar: platform.propGrammar,
           });
 
     /*
@@ -99,7 +100,7 @@ export function composeLook({
      * 材质规则（深色金属→深色木面）就是靠替换这一项让质感和产品对上，
      * 这里直接用场景值，那条规则等于白算。
      */
-    const sceneText = usesReferenceScene ? "" : composeSceneText({ surface: dressing.surface, backdrop: scene.backdrop, depth: scene.depth });
+    const sceneText = usesReferenceScene ? "" : composeSceneText({ surface: dressing.surface, backdrop: composeBackdrop(platform, scene), depth: scene.depth });
 
     const style: EcomStyle = {
         id: `look:${platform.id}:${scene.id}`,
@@ -109,7 +110,7 @@ export function composeLook({
         scene: sceneText,
         // 场景自带承托面，不再额外加展示台：那会变成「桌面上的桌面上」两层台子
         riser: "",
-        lighting: usesReferenceScene ? platform.lighting : `${platform.lighting} ${sentence(scene.lightSource)}`,
+        lighting: usesReferenceScene ? platform.lighting : composeLighting(platform, scene),
         composition: [platform.composition, platform.safeArea].filter(Boolean).join(" "),
         keywords: platform.keywords,
         palettes: platform.palettes,
@@ -141,6 +142,49 @@ export function composeLook({
         colorNotes: dressing.hints.join(" "),
         usesReferenceScene,
     };
+}
+
+/**
+ * 拼 [Lighting]。
+ *
+ * 场景只说「这个地点有什么光、在哪个方向」，光质与用法归平台。
+ * 两层各写一句并列拼进去，亚马逊会一边写「无阴影棚拍」一边写「左侧窗光扫过桌面」，
+ * 模型永远听更具体的那半句，六个平台最后长成同一套光。
+ */
+function composeLighting(platform: EcomPlatform, scene: EcomScene) {
+    const ambient = scene.lightSource.trim().replace(/[.!?]$/, "");
+    if (!ambient || platform.ambientPolicy === "replace") return platform.lighting;
+    if (platform.ambientPolicy === "reshape")
+        return `${platform.lighting} Light in this setting comes from ${ambient} — borrow that direction, but lift and soften it until it reads as controlled studio light rather than available daylight.`;
+    return `The only light source is ${ambient}. It is used exactly as found and is never replaced by studio lighting. ${platform.lighting}`;
+}
+
+/**
+ * 拼「产品背后是什么」那一段。
+ *
+ * 场景把背景拆成两段：`backdrop`（墙 / 面的材质与明暗，不可移除）和
+ * `backdropDetail`（显示器下缘、沥水架、衣帽钩这类能认出来的器具，用来交代地点）。
+ * 后者是「像实景」和「像手机随手拍」的同一个来源，留不留由平台的 `backdropPolicy` 决定。
+ *
+ * 拿掉的手段是**不把那段文字写进提示词**，而不是补一句「不要出现显示器」。
+ * 负向指令模型基本不执行——这次桌面图里的显示器和线缆就是场景自己点名要的，
+ * 平台层当时没有任何字段能拦住它。
+ */
+export function composeBackdrop(platform: Pick<EcomPlatform, "backdropPolicy"> | null | undefined, scene: Pick<EcomScene, "backdrop" | "backdropDetail">) {
+    const core = scene.backdrop.trim().replace(/[.!?]+$/, "");
+    const detail = (scene.backdropDetail ?? "").trim().replace(/[.!?]+$/, "");
+    const policy = platform?.backdropPolicy ?? "narrative";
+
+    if (policy === "narrative") {
+        if (!core) return detail;
+        if (!detail) return core;
+        return `${core}, with ${detail} somewhere deeper in the soft focus`;
+    }
+    // 场景没写背景时兜一句最低限度的底，别让 [Scene] 只剩「Behind it,」半句话
+    if (!core) return "a plain matte surface with a gentle tonal falloff";
+    if (policy === "abstract")
+        return `${core}, and nothing else in it — no piece of equipment, no wire, no loose object between it and the product. The whole background reads as one continuous field of tone, lightest just behind the product and falling off gently toward the edges of the frame`;
+    return `${core}, carried through as one unbroken field from the surface straight up into the background: no seam, no visible edge, no object and no visible light source in it. The tone is lightest just behind the product and falls off gently toward the edges of the frame`;
 }
 
 /**

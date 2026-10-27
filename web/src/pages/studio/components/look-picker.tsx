@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useActiveEcomScenes } from "@/stores/studio/use-ecom-scene-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
 import { ExtraPromptField } from "./extra-prompt-field";
+import { PromptDetail } from "./prompt-detail";
 import { StudioSection } from "./section";
 
 const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground";
@@ -20,7 +21,7 @@ const FIELD_LABEL = "mb-1 block text-[10px] font-medium tracking-wide text-muted
  */
 export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) {
     const { t } = useTranslation();
-    const { look, platformsUsed, dressing, customStyle } = useEcomLook();
+    const { look, platformsUsed, dressing, customStyle, notes, effectiveStyle } = useEcomLook();
     const allScenes = useActiveEcomScenes();
     const platformId = useEcomStudioStore((state) => state.platformId);
     const sceneId = useEcomStudioStore((state) => state.sceneId);
@@ -140,6 +141,21 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
             ) : null}
 
             <ExtraPromptField />
+
+            {/*
+             * 三层各自写进提示词什么，直接摊开。
+             * 用的是 notes / effectiveStyle（实际下发值）而不是 look 里的原值：
+             * 配方接管后平台备注会被重拼、道具整段让位，拿原值展示就是在骗人。
+             */}
+            <PromptDetail
+                summary={customStyle ? customStyle.name : `${platformsUsed.name} · ${look.scene.name}`}
+                sections={[
+                    { key: "platform", label: t("studio.look.detailPlatform"), text: notes.platformNote },
+                    { key: "scene", label: t("studio.look.detailScene"), text: effectiveStyle.scene },
+                    { key: "props", label: t("studio.look.detailProps"), text: notes.propsNote },
+                    { key: "color", label: t("studio.look.detailColor"), text: notes.colorNotes },
+                ]}
+            />
         </StudioSection>
     );
 }

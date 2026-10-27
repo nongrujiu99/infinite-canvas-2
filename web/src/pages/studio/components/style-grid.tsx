@@ -9,6 +9,7 @@ import { sortStylesByCategory } from "@/lib/ecom/style-match";
 import { cn } from "@/lib/utils";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore } from "@/stores/studio/use-ecom-studio-store";
+import { PromptDetail } from "./prompt-detail";
 import { StudioSection } from "./section";
 
 /** 参考图能覆盖的字段，与 prompt 区块一一对应。 */
@@ -116,6 +117,18 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
                     </div>
 
                     {covered.length ? <p className="mt-1.5 text-[10px] leading-4 text-amber-700/90 dark:text-amber-400/90">{t("studio.style.overriddenByReference", { fields: covered.map((field) => t(`studio.style.field.${field}`)).join("、") })}</p> : null}
+
+                    {/* 配方是整包，用户最想知道它到底把画面定成了什么样 */}
+                    <PromptDetail
+                        label={t("studio.look.detailRecipe")}
+                        summary={current.name}
+                        sections={[
+                            { key: "scene", label: t("studio.look.detailScene"), text: current.scene },
+                            { key: "light", label: t("studio.look.detailLight"), text: current.lighting },
+                            { key: "composition", label: t("studio.look.detailComposition"), text: current.composition },
+                            { key: "keywords", label: t("studio.look.detailKeywords"), text: current.keywords.join(", ") },
+                        ]}
+                    />
                 </>
             ) : (
                 <p className="mt-2 text-[10px] leading-4 text-muted-foreground">{t("studio.style.customIdle")}</p>

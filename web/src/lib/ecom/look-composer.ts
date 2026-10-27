@@ -37,6 +37,30 @@ function referenceSceneText(digests: EcomReferenceDigest[]) {
 }
 
 /**
+ * 拼 [Platform look]：平台管的是**画面规矩**，不是画面内容。
+ *
+ * `recipeTakesScene` 用于「用户显式选了一套视觉配方」的路径。配方自带场景、承托面和光，
+ * 所以它在「摆什么」上高于平台的道具纪律；但它不能连色彩处理和修图标准一起带走——
+ * 亚马逊主图恰恰是唯一必须靠配方（纯净白底）表达的场合，而那时把
+ * `Strictly neutral white balance` 和 `No beauty retouching` 一起清掉，
+ * 等于在最需要纪律的平台上把纪律全关了。
+ */
+export function composePlatformNote(platform: Pick<EcomPlatform, "look" | "color" | "styling" | "realism">, recipeTakesScene = false) {
+    return [
+        `[Platform look]`,
+        platform.look,
+        `Colour treatment: ${platform.color}`,
+        `Prop discipline: ${platform.styling}`,
+        `Finish standard: ${platform.realism}`,
+        ...(recipeTakesScene
+            ? [
+                  `A named recipe already fixes the scene, the support surface and the lighting. Where that recipe disagrees with the prop discipline above, the recipe decides what is placed in the frame and the prop discipline yields. Colour treatment and finish standard are never overridden by a recipe — they still apply in full.`,
+              ]
+            : []),
+    ].join("\n");
+}
+
+/**
  * 把「平台审美语言 × 物理场景 × 属性联动」合成一份配方。
  *
  * 分工刻意做成不重叠，避免同一件事在提示词里说两遍（说两遍模型就会挑一条听）：
@@ -121,7 +145,7 @@ export function composeLook({
         enabled: true,
     };
 
-    const platformNote = [`[Platform look]`, platform.look, `Colour treatment: ${platform.color}`, `Prop discipline: ${platform.styling}`, `Finish standard: ${platform.realism}`].join("\n");
+    const platformNote = composePlatformNote(platform);
 
     const propsNote = dressing.props.length
         ? [

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import type { EcomStyle } from "@/constant/ecom/styles";
-import { composeLook, type EcomLook } from "@/lib/ecom/look-composer";
+import { composeLook, composePlatformNote, type EcomLook } from "@/lib/ecom/look-composer";
 import { useActiveEcomScenes } from "@/stores/studio/use-ecom-scene-store";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
 import { useEcomStudioStore, useStudioDigests } from "@/stores/studio/use-ecom-studio-store";
@@ -31,11 +31,27 @@ export function useEcomLook() {
 
     const customStyle = useMemo<EcomStyle | undefined>(() => (styleId ? styles.find((item) => item.id === styleId) : undefined), [styleId, styles]);
 
-    /** 平台层的三个区块只在没有自定义配方时下发；自定义配方自带完整的场景与光。 */
-    const notes = useMemo(
-        () => (customStyle ? { platformNote: "", propsNote: "", colorNotes: "" } : { platformNote: look.platformNote, propsNote: look.propsNote, colorNotes: look.colorNotes }),
-        [customStyle, look.colorNotes, look.platformNote, look.propsNote],
-    );
+    /*
+     * 配方接管「画面内容」，不接管「画面规矩」。
+     *
+     * 原来三个区块一起清空，代价是选了配方就丢掉整个平台：
+     * 亚马逊主图（纯白底、无道具）恰恰是唯一必须用配方的场合，
+     * 而那时白平衡、禁修图、颜色必须真实这些纪律会一起消失，
+     * 等于在最需要纪律的平台上把纪律全关了。
+     *
+     * 现在的分工：
+     *   - platformNote → 永远下发。配方只让「道具纪律」这一条让位（composePlatformNote 里写明）
+     *   - colorNotes   → 永远下发。它是产品材质与色调推导出来的，与场景无关
+     *   - propsNote    → 只有组合路径下发。配方自带场景，推导出来的道具没有位置关系
+     */
+    const notes = useMemo(() => {
+        if (!customStyle) return { platformNote: look.platformNote, propsNote: look.propsNote, colorNotes: look.colorNotes };
+        return {
+            platformNote: composePlatformNote(look.platform, true),
+            propsNote: "",
+            colorNotes: look.colorNotes,
+        };
+    }, [customStyle, look.colorNotes, look.platform, look.platformNote, look.propsNote]);
 
     return {
         look,

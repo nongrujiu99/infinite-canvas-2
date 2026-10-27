@@ -159,6 +159,9 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
             "distorted geometry",
             "stretched or squashed proportions",
             "invented texture or invented details",
+            // 结构件与装配状态是「纹理」和「按键数量」都盖不住的另一类错误
+            "added hardware or attachment loop",
+            "floating or half-fitted part",
             "changed surface finish",
             "extra or missing buttons",
             "altered logo",
@@ -224,9 +227,27 @@ export function buildEcomPrompt({ analysis, style, angle, palette, digests = [],
      * 单件与多件的产品锁分开写，而不是在单件那句后面追加一句：
      * "one unique product instance" 和「保留整组」是互相矛盾的，追加只会让模型挑一条听。
      */
+    /*
+     * 产品锁一直只防「拆」不防「没装好」和「多出来」。
+     *
+     * 出图里键帽悬在机身上方 3-5mm、下面露出白色轴座，机身右端还凭空多出一个挂环。
+     * 这在客制化 / 精密品类眼里等同于半成品或缺件，但原措辞只说了
+     * 「每个可见件都属于产品，不许拆成独立底座」——防的是把部件卸下来当垫块，
+     * 模型于是认为「件数对、位置对」就已完成任务。
+     *
+     * 两段共用同一个常量：单件与多件路径各写一份，迟早改一处漏一处。
+     * `already visible in image1` 这个限定不能省——裸轴键盘、透明外壳本来就是露轴的，
+     * 一刀切禁「露轴体」会把真实产品的特征当成错误抹掉。
+     */
+    const assemblyLock = [
+        `Every part that is attached in ${productLabel} must read as fully assembled and fully seated: keycaps sit flush down on their stems, covers and panels are closed, feet and connectors are in place.`,
+        `Never render a part floating above its seat, lifted, half-fitted or pushed apart, and never expose a stem, switch housing, spring, screw hole or fastener that is not already visible in ${productLabel}.`,
+        `Do not invent hardware: no hanging loop, strap lug, handle, hook, clasp, extra port, extra seam, screw or bracket that ${productLabel} does not have — anything that reads as a separate part must already exist in ${productLabel}.`,
+    ].join("\n");
+
     const productLock = multiItem
-        ? `[Product lock]\n${productLabel} holds ${itemCount} separate product units and every one of them must be rendered: same count (${itemCount}), same models, same relative sizes, same grouping and same placement in the frame.\nDo not add, drop, merge, duplicate, replace or redesign any unit. Showing only part of the set is a failure, and so is inventing a unit that is not in ${productLabel}.\nEach unit keeps its own silhouette, component count and proportions, and never degrades into a background prop, a reflection or a piece of scenery.\nKeep the width-to-height ratio, thickness, corner radius, seams and parting lines of every unit exactly as photographed. Never stretch, squash, thin or fatten any body.\nEvery visible piece belongs to its own unit — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.${productShape ? `\n${productShape}` : ""}${itemRoster}`
-        : `[Product lock]\nKeep the exact same product as ${productLabel}: same silhouette, same component count, same proportions, one unique product instance.\nDo not add, duplicate, replace or redesign it.\nKeep its width-to-height ratio, thickness, corner radius, seams and parting lines exactly as photographed. Never stretch, squash, thin or fatten the body.\nEvery visible piece belongs to the product — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.${productShape ? `\n${productShape}` : ""}`;
+        ? `[Product lock]\n${productLabel} holds ${itemCount} separate product units and every one of them must be rendered: same count (${itemCount}), same models, same relative sizes, same grouping and same placement in the frame.\nDo not add, drop, merge, duplicate, replace or redesign any unit. Showing only part of the set is a failure, and so is inventing a unit that is not in ${productLabel}.\nEach unit keeps its own silhouette, component count and proportions, and never degrades into a background prop, a reflection or a piece of scenery.\nKeep the width-to-height ratio, thickness, corner radius, seams and parting lines of every unit exactly as photographed. Never stretch, squash, thin or fatten any body.\nEvery visible piece belongs to its own unit — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.\n${assemblyLock}${productShape ? `\n${productShape}` : ""}${itemRoster}`
+        : `[Product lock]\nKeep the exact same product as ${productLabel}: same silhouette, same component count, same proportions, one unique product instance.\nDo not add, duplicate, replace or redesign it.\nKeep its width-to-height ratio, thickness, corner radius, seams and parting lines exactly as photographed. Never stretch, squash, thin or fatten the body.\nEvery visible piece belongs to the product — its own base, bottom plate, feet, trim, bezel, panel or attached cable. Keep each piece in place, in its own shape and its own colour, and never detach one of them into a separate stand, plinth or platform.\n${assemblyLock}${productShape ? `\n${productShape}` : ""}`;
 
     const blocks = [
         `[Priority]\nPreserving ${multiItem ? `the product set in ${productLabel} — all ${itemCount} units —` : `the product in ${productLabel}`} outranks every instruction below. Where the scene, lighting or style request conflicts with keeping ${multiItem ? "the set" : "the product"} intact, keep ${multiItem ? "the set" : "the product"} and soften the conflict.`,

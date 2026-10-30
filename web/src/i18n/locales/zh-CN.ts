@@ -714,7 +714,7 @@ export default {
             editInstructions: "修改要求",
             maskPlaceholder: "例如：把选中区域改成金属材质，保持原图光影",
             maskScopeHint: "涂抹范围就是这次改动的上限：只涂要改的那一个物体，别涂到旁边的同类物；描述里点名位置（如「手里的那瓶」）比只说「产品」更准。",
-            maskOverwriteHint: "生成结果直接覆盖当前这张图，不再新建节点；上一版会留在节点顶部的「版本」里，随时可以回退。",
+            maskOverwriteHint: "生成结果直接覆盖当前这张图，不再新建节点；只有涂抹范围内的像素会被替换，范围外保持原样，上一版会留在节点顶部的「版本」里。",
             maskPromptRequired: "请输入修改要求",
             maskRequired: "请先涂抹局部区域",
             maskExport: "导出到画布",

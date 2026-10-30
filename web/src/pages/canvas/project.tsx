@@ -68,6 +68,7 @@ import {
  resolveNodePrompt,
  sourceNodeReferenceImages,
 } from "@/lib/canvas/canvas-generation-helpers";
+import { compositeMaskEdit } from "@/lib/canvas/mask-composite";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { registerBuiltinNodes } from "@/components/canvas/nodes/builtin-nodes";
 import { CanvasRefreshShell } from "@/components/canvas/canvas-refresh-shell";
@@ -2155,8 +2156,11 @@ function InfiniteCanvasPage() {
  try {
  const image = await requestEdit(generationConfig, prompt, references, { signal: controller.signal, mask: apiMask, maskPrompt: nativeMaskPrompt }).then((items) => items[0]);
  receivedResult = true;
- setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, content: image.dataUrl, storageKey: undefined, pendingRemoteResult: true } } : item));
- const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
+ // 遮罩外强制回贴原图：提示词只能劝模型别越界，像素合成才是硬约束
+ const composed = await compositeMaskEdit(node.metadata.content, image.dataUrl, payload.apiMaskDataUrl);
+ const finalUrl = composed || image.dataUrl;
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, content: finalUrl, storageKey: undefined, pendingRemoteResult: true } } : item));
+ const uploaded = await uploadImage(finalUrl, { signal: controller.signal });
  const size = generatedImageNodeSize(uploaded.width, uploaded.height);
  const primaryImageId = node.metadata?.primaryImageId || node.metadata?.images?.[0]?.id;
  setNodes((prev) => prev.map((item) => item.id === node.id ? {

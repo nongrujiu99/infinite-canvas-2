@@ -5,6 +5,8 @@ description: Implemented changes that still need manual verification
 
 # Pending Tests
 
+- Pixels outside the painted area must not change: use an image with two copies of the same product (or a product plus another object on the table), paint only one of them and write “remove this”. Only the painted one should disappear; everything else must stay pixel-identical — same colour, lighting and texture, where this used to delete the other instance as well. The reverse also holds: an object the brush did not fully cover stays, because the painted area is the hard limit.
+
 - Local edit adds no nodes: try all four entry points on an image node (right-click “Local edit”, the scan icon in the node header, dragging from the node's right port and picking “Local edit” in the create menu, and the toolbar's operations panel). Each should open the mask editor directly with zero new nodes, where it used to leave an operation card, a mask annotation node and a result node behind. The toolbar entry with nothing selected should say “Select an image first” instead of creating an empty card.
 
 - Local edit overwrites in place with version history: paint an area, describe it, generate. The source image node itself should become the result, its size should follow the new image's ratio, and the node count should stay the same. The header should show “Versions 1”; opening it lists the previous image with its description and timestamp, and clicking restores it — after which the count becomes 2, because a restore is itself recorded. Version thumbnails must survive a page reload instead of turning into broken images.

@@ -725,7 +725,7 @@ export default {
             editInstructions: "Edit instructions",
             maskPlaceholder: "For example: change the selected area to metal while preserving the original lighting",
             maskScopeHint: "What you paint is the hard limit of the edit: paint only the one object you want to change and avoid brushing over similar objects next to it. Naming its position (\"the bottle in the hand\") works better than just \"the product\".",
-            maskOverwriteHint: "The result overwrites this image in place instead of adding nodes. The previous version stays under Versions at the top of the node, so you can always restore it.",
+            maskOverwriteHint: "The result overwrites this image in place instead of adding nodes. Only pixels inside the painted area are replaced; everything outside stays exactly as it was, and the previous version stays under Versions.",
             maskPromptRequired: "Enter edit instructions",
             maskRequired: "Paint the area to edit first",
             maskExport: "Export to canvas",

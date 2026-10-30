@@ -97,10 +97,10 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                             <button
                                 type="button"
                                 onClick={() => selectPlatform(platform.id)}
-                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
+                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary" : "border-border/80 hover:border-foreground/25")}
                             >
                                 <span className="size-2 shrink-0 rounded-full" style={{ background: platform.palettes[0]?.accent ?? "#999" }} />
-                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-primary" : "text-foreground")}>{platform.name}</span>
+                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-white" : "text-foreground")}>{platform.name}</span>
                             </button>
                         </Tooltip>
                     );
@@ -117,11 +117,11 @@ export function LookPicker({ onManageScenes }: { onManageScenes?: () => void }) 
                             <button
                                 type="button"
                                 onClick={() => selectScene(scene.id)}
-                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary/8 ring-1 ring-primary/40" : "border-border/80 hover:border-foreground/25")}
+                                className={cn("flex min-h-8 min-w-0 items-center gap-1 rounded-lg border px-1.5 py-1 text-left transition", active ? "border-primary bg-primary" : "border-border/80 hover:border-foreground/25")}
                             >
                                 <span className={cn("size-1 shrink-0 rounded-full", fits ? "bg-emerald-500/80" : "bg-transparent")} />
-                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-primary" : "text-foreground")}>{scene.name}</span>
-                                {scene.builtIn === false ? <span className="shrink-0 rounded-full bg-muted px-1 text-xs leading-4 text-muted-foreground">自建</span> : null}
+                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-white" : "text-foreground")}>{scene.name}</span>
+                                {scene.builtIn === false ? <span className={cn("shrink-0 rounded-full px-1 text-xs leading-4", active ? "bg-white/25 text-white" : "bg-muted text-muted-foreground")}>自建</span> : null}
                             </button>
                         </Tooltip>
                     );

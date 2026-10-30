@@ -97,7 +97,8 @@ export default function PromptsPage() {
 
 function PromptFilter({ label, options, selected, onChange }: { label: string; options: string[]; selected: string; onChange: (value: string) => void }) {
  const { t } = useTranslation();
- return <div><div className="mb-2 text-xs font-semibold text-muted-foreground">{label}</div><div className="flex flex-wrap gap-1.5">{options.map((option) => <Tag.CheckableTag key={option} checked={selected === option} className={cn("prompt-filter-tag", selected === option && "is-active")} onChange={() => onChange(option)}>{option === ALL_PROMPTS_OPTION ? t("common.all") : option}</Tag.CheckableTag>)}</div></div>;
+ /* 分类是纵向列表，选中要高亮整行——PS 的列表选中就是一整条蓝底，而不是文字上浮一个小药丸 */
+ return <div><div className="mb-2 text-xs font-semibold text-muted-foreground">{label}</div><div className="flex flex-col gap-0.5">{options.map((option) => <Tag.CheckableTag key={option} checked={selected === option} className={cn("prompt-filter-tag w-full text-left", selected === option && "is-active")} onChange={() => onChange(option)}>{option === ALL_PROMPTS_OPTION ? t("common.all") : option}</Tag.CheckableTag>)}</div></div>;
 }
 
 function PromptGrid({ items, onOpen, onCopy, renderActions, emptyText }: { items: Prompt[]; onOpen: (item: Prompt) => void; onCopy: (item: Prompt) => void; renderActions: (item: Prompt) => ReactNode; emptyText: string }) {

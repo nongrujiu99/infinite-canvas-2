@@ -1,62 +1,65 @@
 ---
 name: Infinite Canvas Precision Studio
-description: A focused multimodal creation workspace built from logo-derived indigo, cyan signals, and cool neutral surfaces.
+description: A Photoshop-2020-derived workspace: neutral gray chrome, hairline separators, near-square controls, one selection blue.
 colors:
-  primary: "#4f46e5"
-  primary-dark: "#818cf8"
-  signal: "#22d3ee"
-  canvas-light: "#f5f7ff"
-  canvas-dark: "#080b16"
-  surface-light: "#ffffff"
-  surface-dark: "#111528"
-  text-light: "#17162b"
-  text-dark: "#f2f4ff"
-  muted-light: "#656b84"
-  muted-dark: "#a3a9c2"
-  border-light: "#dce0f2"
-  border-dark: "#2a304b"
-  background-light: "#f7f8ff"
-  background-dark: "#080b16"
-  success: "#22c55e"
-  warning: "#f59e0b"
-  destructive: "oklch(0.577 0.245 27.325)"
-  destructive-dark: "oklch(0.704 0.191 22.216)"
+  primary: "#1473e6"
+  primary-dark: "#1a6ecc"
+  ring: "#2680eb"
+  workspace-light: "#e2e2e2"
+  workspace-dark: "#1d1d1d"
+  surface-light: "#f4f4f4"
+  surface-dark: "#323232"
+  elevated-light: "#f7f7f7"
+  elevated-dark: "#3c3c3c"
+  text-light: "#1e1e1e"
+  text-dark: "#d8d8d8"
+  muted-light: "#5c5c5c"
+  muted-dark: "#a8a8a8"
+  border-light: "#cfcfcf"
+  border-dark: "#444444"
+  input-light: "#b9b9b9"
+  input-dark: "#4a4a4a"
+  success: "#2d9d78"
+  warning: "#e68619"
+  destructive: "#d7373f"
+  destructive-dark: "#e34850"
 typography:
   page:
-    fontFamily: "SF Pro Display, PingFang SC, Microsoft YaHei, sans-serif"
+    fontFamily: "Segoe UI, Adobe Clean, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "1.375rem"
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "-0.02em"
   section:
-    fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
+    fontFamily: "Segoe UI, Adobe Clean, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 600
     lineHeight: 1.4
   body:
-    fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
+    fontFamily: "Segoe UI, Adobe Clean, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.55
   label:
-    fontFamily: "SF Pro Text, PingFang SC, Microsoft YaHei, sans-serif"
+    fontFamily: "Segoe UI, Adobe Clean, PingFang SC, Microsoft YaHei, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 400
     lineHeight: 1.55
 rounded:
-  control: "12px"
-  surface: "14px"
-  feature: "16px"
+  tight: "2px"
+  control: "3px"
+  surface: "4px"
+  pill: "9999px"
 spacing:
   compact: "8px"
-  control: "12px"
+  control: "3px"
   surface: "20px"
   section: "32px"
 elevation:
-  interactive-lift: "0 16px 36px rgba(15,23,42,0.09)"
-  floating-dock: "0 12px 32px rgba(15,23,42,0.10)"
-  shadow-float: "0 18px 46px rgba(15,23,42,0.12)"
-  shadow-float-dark: "0 22px 54px rgba(0,0,0,0.42)"
+  interactive-lift: "0 2px 8px rgba(0,0,0,0.18)"
+  floating-dock: "0 2px 10px rgba(0,0,0,0.22)"
+  shadow-float: "0 2px 10px rgba(0,0,0,0.22)"
+  shadow-float-dark: "0 4px 16px rgba(0,0,0,0.55)"
 zIndex:
   canvas: 0
   node: 10
@@ -94,40 +97,42 @@ components:
 
 **Creative North Star: "The Precision Studio"**
 
-Infinite Canvas is a high-frequency creative workbench rather than a decorative gallery. Its visual system keeps the canvas quiet and spacious while making selection, connection, configuration, and execution immediately legible. Cool indigo-tinted neutrals support long sessions; Nodeter Indigo communicates intent and state, while Signal Cyan is reserved for active data flow and generation feedback.
+Infinite Canvas is a high-frequency creative workbench rather than a decorative gallery. Its visual system borrows Photoshop 2020's chrome: neutral gray panels that differ from the workspace by a single step, 1px hairline separators instead of cards and shadows, near-square controls, and exactly one chromatic accent — the selection blue.
 
-The system is dense where users make decisions and generous where they orient themselves. Controls are grouped by task, not distributed as equal-weight options, and canvas chrome stays flatter than content nodes.
+The system is dense where users make decisions and generous where they orient themselves. Color carries state, never decoration: anything that is not a selection, a warning, or the canvas itself is gray. Depth is expressed by tone (workspace < panel < elevated), not by shadow.
 
 **Key Characteristics:**
 
-- Cool, low-noise working surfaces
-- Indigo reserved for selection, focus, structure, and primary execution
-- Cyan reserved for transient data flow and generation feedback
-- Compact controls inside clear task groups
-- Flat-by-default chrome with depth appearing on floating or interactive surfaces
+- Neutral gray, zero tint — the chrome never competes with the artwork on canvas
+- One blue, used only for selection, focus, and primary execution
+- Hairline separators and tone steps replace shadows and rounded cards
+- Near-square geometry (3px controls, 4px panels); pills only for badges and status dots
+- Compact, dense controls grouped by task
 
 ## Colors
 
-The palette derives its active colors from the Nodeter logo and pairs them with cool graphite and cloud neutrals.
+The palette is Photoshop 2020's UI gray scale, in its light-gray and dark-gray brightness settings, plus the selection blue.
 
 ### Primary
 
-- **Nodeter Indigo:** The primary interaction color for buttons, active navigation, selected nodes, focus rings, and valid structure.
-- **Signal Cyan:** A restrained secondary signal for active data flow, generation progress, and other transient system feedback.
+- **Selection Blue:** The only saturated color in the chrome. Selected rows and chips are a solid blue fill with white text; focus rings and selection outlines use the brighter `#2680eb`, which never carries text.
+- **Dark-mode blue is one step deeper (`#1a6ecc`)** than PS's own `#2680eb` so that white text on a filled button still clears 4.5:1.
 
 ### Neutral
 
-- **Cloud Canvas:** The light-mode working field and muted application background.
-- **Night Canvas:** The dark-mode working field used for distraction-resistant creation.
-- **Studio Surface:** Raised cards, node panels, menus, and configuration groups.
-- **Graphite Text:** Primary copy and labels with cool gray secondary text.
+- **Workspace:** The application background — `#e2e2e2` light, `#1d1d1d` dark. Always exactly one step away from panels, so panels read as separate planes without needing shadows.
+- **Panel:** Cards, side panels, section surfaces — `#f4f4f4` / `#323232`.
+- **Elevated:** Menus, popovers, dialogs — `#f7f7f7` / `#3c3c3c`.
+- **Text:** `#1e1e1e` / `#d8d8d8`, with `#5c5c5c` / `#a8a8a8` secondary.
 
-**The Two-Role Rule.** Indigo communicates user intent and persistent state; cyan communicates transient flow. Neither is ambient decoration.
+**The One-Blue Rule.** Blue reports state or intent. It is never used as decoration, never as a background tint, and never as a second accent. Status colors (success, warning, destructive) appear only where a status is being reported.
+
+**The Tone-Not-Shadow Rule.** Separation comes from one tone step plus a 1px border. Shadows are reserved for genuinely floating surfaces (menus, tooltips, dialogs).
 
 ## Typography
 
-**Display Font:** SF Pro Display with PingFang SC and Microsoft YaHei fallbacks  
-**Body Font:** SF Pro Text with PingFang SC and Microsoft YaHei fallbacks
+**Display Font:** Segoe UI (Windows Photoshop 2020's UI face) with Adobe Clean, PingFang SC and Microsoft YaHei fallbacks  
+**Body Font:** Same stack — the whole product uses one family, like the app it imitates
 
 **Character:** Compact, modern system typography prioritizes multilingual clarity and information density. Weight and spacing establish hierarchy without ornamental display treatments.
 
@@ -148,7 +153,7 @@ The application uses a wide centered library container and an edge-to-edge canva
 
 ## Elevation & Depth
 
-The system uses tonal layering first and shadows second. Resting canvas chrome is flat. Project cards gain a soft downward shadow only on hover, and the bottom dock uses a restrained floating shadow to separate it from the working field.
+The system is flat. Panels are separated by one tone step and a 1px border; nothing lifts off the page except menus, tooltips and dialogs, which get a single tight shadow because they genuinely float above the workspace. Project cards do not gain shadows on hover — they gain a border and a slightly lighter surface.
 
 ### Shadow Vocabulary
 
@@ -174,35 +179,35 @@ The canvas workspace is inherently fluid. Library and configuration panels respo
 
 ## Shapes
 
-**The Three-Radius Rule.** 只有三个圆角：控件 12px、大面板与弹层 16px、真正的胶囊（状态点、色板、头像）用 full。嵌套的内层再减 4px（12 → 8），这是唯一允许的第四种值。
+**The Square Rule.** 圆角只有三档：控件 3px、面板与弹层 4px、真正的胶囊（状态点、徽标、头像）用 full。嵌套在小控件里的内层用 2px。8 / 10 / 12 / 14 / 16 / 18px 一律不允许出现——Photoshop 的界面是近直角的，圆角一大就变成消费级 App。
 
-画布工具条的小控件、标签、输入框一律 12px；1px / 2px / 3px / 18px 这类一次性数值不再新增。
+按钮、输入框、下拉、标签、卡片内的行一律 3px；卡片、侧栏、弹层外壳 4px。改的是 token 档位（`--radius-sm/md/lg/xl`），不是上千处 className。
 
 ## Components
 
 ### Buttons
 
-- **Shape:** Compact 12px corners with icon-and-label alignment.
-- **Primary:** Nodeter Indigo with high-contrast text and no decorative shadow.
-- **Hover / Focus:** Slight tonal shift plus a visible indigo focus outline.
+- **Shape:** Near-square 3px corners with icon-and-label alignment; heights stay compact (32px default, 36px for a page-level primary).
+- **Primary:** Selection blue fill with white text, no gradient and no shadow. Secondary and ghost buttons are gray surfaces separated by a 1px border.
+- **Hover / Focus:** One tone step lighter on hover, plus a 2px blue focus ring offset from the edge.
 - **Secondary / Ghost:** Transparent or neutral at rest, with a low-contrast hover surface.
 
 ### Cards / Containers
 
-- **Corner Style:** 16px for primary cards and configuration groups.
+- **Corner Style:** 4px for panels, 3px for the rows and controls inside them.
 - **Background:** Studio surfaces separated by a single border.
 - **Shadow Strategy:** None at rest; soft lift on interactive hover only.
 - **Internal Padding:** 20px for library cards, 10–16px for compact canvas groups.
 
 ### Inputs / Fields
 
-- **Style:** Cool neutral stroke, surface background, and 12px corners.
-- **Focus:** Border shifts to Nodeter Indigo with the shared focus outline.
+- **Style:** 1px neutral stroke on a panel surface, 3px corners, no inner shadow.
+- **Focus:** Border shifts to the selection blue with the shared focus outline.
 - **Error / Disabled:** Semantic color or reduced opacity without removing readable labels.
 
 ### Navigation
 
-Navigation is a flat horizontal rail. The active item uses a two-pixel indigo underline and stronger weight; mobile collapses secondary destinations behind the existing menu entry.
+Navigation is Photoshop's tab strip: a solid gray bar with a 1px bottom hairline, and the active item is a lighter panel-colored tab with full height and no underline. Inactive items are secondary text that brightens on hover; mobile collapses secondary destinations behind the existing menu entry.
 
 ### Generation Configuration Node
 
@@ -212,8 +217,8 @@ The signature node follows a fixed reading order: generation mode, references an
 
 ### Do:
 
-- **Do** reserve indigo for intent, selection, focus, structure, and primary execution.
-- **Do** reserve cyan for active connection flow and generation feedback.
+- **Do** reserve blue for intent, selection, focus, and primary execution — one blue, nothing else.
+- **Do** express depth with tone steps and hairlines; only floating surfaces get a shadow.
 - **Do** group parameters by task and keep the next action visible within the same node.
 - **Do** keep persistent canvas chrome visually lighter than selected content.
 

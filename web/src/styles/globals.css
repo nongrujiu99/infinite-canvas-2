@@ -12,6 +12,17 @@
  * 字号只负责「这是标题 / 这是正文 / 这是注解」这三件事。
  * text-sm(14) 与 text-xs(12) 用 Tailwind 内置档，只有页面标题需要自定义 token。
  */
+/*
+ * 字号只有三档：页面 22 / 正文与控件 14 / 说明与标签 12。
+ *
+ * 之前全站有 9、10、11、12、13、14、15、16 八档，相邻差 1px，等于没有层级——
+ * 结构信息和辅助信息一样大，只能靠灰度硬分。现在层级交给字重和颜色，
+ * 字号只负责「这是标题 / 这是正文 / 这是注解」这三件事。
+ * text-sm(14) 与 text-xs(12) 用 Tailwind 内置档，只有页面标题需要自定义 token。
+ *
+ * 圆角跟随 Photoshop 2020：控件 3px、面板 4px，只有徽标和状态点用 full。
+ * 改的是档位定义，不是全站上千处 className——rounded-lg 依旧写在原处，值变了。
+ */
 @theme inline {
     --text-page: 1.375rem;
     --text-page--line-height: 1.3;
@@ -20,10 +31,13 @@
     --color-foreground: var(--foreground);
     --color-border: var(--border);
     --color-ring: var(--ring);
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
+    --radius-sm: 2px;
+    --radius-md: 3px;
+    --radius-lg: 3px;
+    --radius-xl: 4px;
+    --radius-2xl: 4px;
+    --radius-3xl: 6px;
+    --radius-4xl: 6px;
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -53,93 +67,99 @@
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
     --color-card: var(--card);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+
+/*
+ * 两套配色都取自 Photoshop 2020 的界面配色（浅灰 / 深灰两档亮度）：
+ * 工作区比面板更暗或更亮一档，面板之间只靠 1px 灰线切分，没有阴影、没有渐变、没有有色底。
+ * 强调色是 PS 的选择蓝：浅色 #1473E6、深色 #1A6ECC（比 PS 原始的 #2680EB 深一档，
+ * 为了白字压在上面还能过 4.5:1；#2680EB 留给焦点环与选中描边，不承载文字）。
+ */
 :root {
-    --radius: 0.75rem;
-    --brand-primary: #4f46e5;
-    --brand-signal: #22d3ee;
-    --border: #dce0f2;
-    --ring: #4f46e5;
-    --background: #f3f5fc;
-    --foreground: #17162b;
-    --card: #ffffff;
-    --card-foreground: #17162b;
-    --popover: #ffffff;
-    --popover-foreground: #17162b;
-    --primary: #4f46e5;
+    --radius: 3px;
+    --font-sans: "Segoe UI", "Adobe Clean", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --brand-primary: #1473e6;
+    --brand-signal: #2680eb;
+    --border: #cfcfcf;
+    --ring: #1473e6;
+    --background: #e2e2e2;
+    --foreground: #1e1e1e;
+    --card: #f4f4f4;
+    --card-foreground: #1e1e1e;
+    --popover: #f7f7f7;
+    --popover-foreground: #1e1e1e;
+    --primary: #1473e6;
     --primary-foreground: #ffffff;
-    --secondary: #eff0fb;
-    --secondary-foreground: #292743;
-    --muted: #f1f2fa;
-    --muted-foreground: #626780;
-    --accent: #e8e9ff;
-    --accent-foreground: #4338ca;
-    --destructive: oklch(0.577 0.245 27.325);
-    --input: #d7dbef;
+    --secondary: #e4e4e4;
+    --secondary-foreground: #1e1e1e;
+    --muted: #dedede;
+    --muted-foreground: #5c5c5c;
+    --accent: #dcdcdc;
+    --accent-foreground: #1e1e1e;
+    --destructive: #d7373f;
+    --input: #b9b9b9;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: #ffffff;
-    --sidebar-foreground: #17162b;
-    --sidebar-primary: #4f46e5;
+    --sidebar: #f4f4f4;
+    --sidebar-foreground: #1e1e1e;
+    --sidebar-primary: #1473e6;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #eceeff;
-    --sidebar-accent-foreground: #4338ca;
-    --sidebar-border: #dce0f2;
-    --sidebar-ring: #4f46e5;
-    --surface-raised: #ffffff;
-    --surface-subtle: #eff0fb;
-    --brand-soft: #e8e9ff;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --shadow-float: 0 18px 46px rgba(49, 46, 129, 0.12);
+    --sidebar-accent: #dcdcdc;
+    --sidebar-accent-foreground: #1e1e1e;
+    --sidebar-border: #cfcfcf;
+    --sidebar-ring: #1473e6;
+    --surface-raised: #f4f4f4;
+    --surface-subtle: #e4e4e4;
+    --brand-soft: #d9e8fb;
+    --success: #2d9d78;
+    --warning: #e68619;
+    --shadow-float: 0 2px 10px rgba(0, 0, 0, 0.22);
 }
 
 .dark {
-    --background: #080b16;
-    --foreground: #f2f4ff;
-    --border: rgba(165, 180, 252, 0.16);
-    --ring: #818cf8;
-    --card: #111528;
-    --card-foreground: #f2f4ff;
-    --popover: #151a2f;
-    --popover-foreground: #f2f4ff;
-    --primary: #818cf8;
-    --primary-foreground: #080b16;
-    --secondary: #1a1f38;
-    --secondary-foreground: #f2f4ff;
-    --muted: #14182b;
-    --muted-foreground: #a3a9c2;
-    --accent: #24264f;
-    --accent-foreground: #c7d2fe;
-    --destructive: oklch(0.704 0.191 22.216);
-    --input: rgba(165, 180, 252, 0.2);
+    --background: #1d1d1d;
+    --foreground: #d8d8d8;
+    --border: #444444;
+    --ring: #2680eb;
+    --card: #323232;
+    --card-foreground: #d8d8d8;
+    --popover: #3c3c3c;
+    --popover-foreground: #e3e3e3;
+    --primary: #1a6ecc;
+    --primary-foreground: #ffffff;
+    --secondary: #2a2a2a;
+    --secondary-foreground: #d8d8d8;
+    --muted: #3a3a3a;
+    --muted-foreground: #a8a8a8;
+    --accent: #3f3f3f;
+    --accent-foreground: #e3e3e3;
+    --destructive: #e34850;
+    --input: #4a4a4a;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: #0f1324;
-    --sidebar-foreground: #f2f4ff;
-    --sidebar-primary: #818cf8;
-    --sidebar-primary-foreground: #080b16;
-    --sidebar-accent: #22264a;
-    --sidebar-accent-foreground: #c7d2fe;
-    --sidebar-border: rgba(165, 180, 252, 0.16);
-    --sidebar-ring: #818cf8;
-    --surface-raised: #151a2f;
-    --surface-subtle: #1a1f38;
-    --brand-soft: #24264f;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --shadow-float: 0 22px 54px rgba(2, 4, 15, 0.5);
+    --sidebar: #323232;
+    --sidebar-foreground: #d8d8d8;
+    --sidebar-primary: #1a6ecc;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #3f3f3f;
+    --sidebar-accent-foreground: #e3e3e3;
+    --sidebar-border: #444444;
+    --sidebar-ring: #2680eb;
+    --surface-raised: #383838;
+    --surface-subtle: #2a2a2a;
+    --brand-soft: #1e3a5f;
+    --success: #4aa96c;
+    --warning: #e8a33d;
+    --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.55);
 }
+
 
 @layer base {
     * {
@@ -156,8 +176,8 @@
         text-rendering: optimizeLegibility;
     }
     ::selection {
-        background: color-mix(in srgb, var(--primary) 28%, transparent);
-        color: var(--foreground);
+        background: var(--primary);
+        color: var(--primary-foreground);
     }
     :focus-visible {
         outline: 2px solid var(--ring);
@@ -203,65 +223,19 @@
         display: none;
     }
 
-    .prompt-filter-tag.ant-tag-checkable {
-        margin: 0;
-        border: 1px solid transparent;
-        border-radius: 12px;
-        padding: 5px 10px;
-        color: var(--muted-foreground);
-        font-size: 14px;
-        line-height: 1;
-        transition:
-            background 0.15s ease,
-            border-color 0.15s ease,
-            box-shadow 0.15s ease,
-            color 0.15s ease;
-    }
-
-    .prompt-filter-tag.ant-tag-checkable:hover {
-        background: var(--muted);
-        color: var(--foreground);
-    }
-
-    .prompt-filter-tag.ant-tag-checkable.is-active,
-    .prompt-filter-tag.ant-tag-checkable-checked {
-        background: var(--primary);
-        border-color: var(--primary);
-        color: var(--primary-foreground);
-        font-weight: 600;
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable {
-        color: var(--muted-foreground);
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable:hover {
-        background: var(--muted);
-        color: var(--foreground);
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable.is-active,
-    .dark .prompt-filter-tag.ant-tag-checkable-checked {
-        background: var(--primary);
-        border-color: var(--primary);
-        box-shadow: none;
-        color: var(--primary-foreground) !important;
-        font-weight: 700;
-    }
-
     .thin-scrollbar {
         scrollbar-color: color-mix(in srgb, var(--muted-foreground) 48%, transparent) transparent;
         scrollbar-width: thin;
     }
 
     .thin-scrollbar::-webkit-scrollbar {
-        height: 4px;
-        width: 4px;
+        height: 8px;
+        width: 8px;
     }
 
     .thin-scrollbar::-webkit-scrollbar-thumb {
-        background: color-mix(in srgb, var(--muted-foreground) 48%, transparent);
-        border-radius: 999px;
+        background: #4a4a4a;
+        border-radius: 0;
     }
 
     .hover-scrollbar {
@@ -270,7 +244,7 @@
     }
 
     .hover-scrollbar:hover {
-        scrollbar-color: rgba(120, 113, 108, 0.5) transparent;
+        scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
     }
 
     .hover-scrollbar::-webkit-scrollbar {
@@ -280,16 +254,16 @@
 
     .hover-scrollbar::-webkit-scrollbar-thumb {
         background: transparent;
-        border-radius: 999px;
+        border-radius: 0;
     }
 
     .hover-scrollbar:hover::-webkit-scrollbar-track {
-        background: rgba(120, 113, 108, 0.12);
-        border-radius: 999px;
+        background: color-mix(in srgb, var(--muted-foreground) 14%, transparent);
+        border-radius: 0;
     }
 
     .hover-scrollbar:hover::-webkit-scrollbar-thumb {
-        background: rgba(120, 113, 108, 0.5);
+        background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
     }
 
     .hover-scrollbar-hint {
@@ -297,8 +271,8 @@
     }
 
     .hover-scrollbar-hint::after {
-        background: rgba(120, 113, 108, 0.42);
-        border-radius: 999px;
+        background: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+        border-radius: 0;
         bottom: 4px;
         content: "";
         height: 3px;
@@ -387,7 +361,7 @@
         align-items: center;
         overflow: hidden;
         border: 1px solid var(--input);
-        border-radius: 12px;
+        border-radius: 3px;
         background: var(--secondary);
         padding-inline: 8px;
         color: var(--foreground);
@@ -409,7 +383,7 @@
         gap: 6px;
         overflow: hidden;
         border: 1px solid var(--input);
-        border-radius: 12px;
+        border-radius: 3px;
         background: var(--secondary);
         padding-inline: 8px;
         color: var(--foreground);
@@ -467,8 +441,8 @@
         width: 100%;
         padding: 4px !important;
         border: 1px solid var(--border) !important;
-        border-radius: 12px !important;
-        background: color-mix(in srgb, var(--muted) 72%, transparent) !important;
+        border-radius: 4px !important;
+        background: var(--background) !important;
     }
 
     .canvas-config-mode .ant-segmented-group {
@@ -478,7 +452,7 @@
     .canvas-config-mode .ant-segmented-item {
         min-height: 40px;
         border: 1px solid transparent !important;
-        border-radius: 8px !important;
+        border-radius: 2px !important;
         color: var(--muted-foreground) !important;
         font-size: 14px;
         font-weight: 500;
@@ -539,7 +513,7 @@
 
     .canvas-config-mode.canvas-reasoning-mode.ant-segmented {
         padding: 2px !important;
-        border-radius: 12px !important;
+        border-radius: 4px !important;
     }
 
     .canvas-config-mode.canvas-reasoning-mode .ant-segmented-group {
@@ -548,7 +522,7 @@
 
     .canvas-config-mode.canvas-reasoning-mode .ant-segmented-item {
         min-height: 22px;
-        border-radius: 8px !important;
+        border-radius: 2px !important;
         font-size: 11px;
     }
 
@@ -693,4 +667,75 @@ html [role="button"]:focus-visible,
 html [role="switch"]:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * 筛选标签（提示词库左侧的分类与标签）
+ *
+ * 这组规则必须留在图层之外：antd 的 `.ant-tag-checkable-checked` 是运行时注入的
+ * 无图层样式，`@layer utilities` 里的同名覆盖一律压不过它——实测选中态文字
+ * 拿到的是 `--ant-color-primary`（深色下 2.53:1），而不是白字。
+ * 移出图层后靠选择器权重取胜（0,3,1 对 antd 的 0,2,1）。
+ * ------------------------------------------------------------------------- */
+.prompt-filter-tag.ant-tag-checkable {
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 5px 10px;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        color 0.15s ease;
+}
+
+.prompt-filter-tag.ant-tag-checkable:hover {
+    background: var(--muted);
+    color: var(--foreground);
+}
+
+.prompt-filter-tag.ant-tag-checkable.is-active,
+.prompt-filter-tag.ant-tag-checkable-checked {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 600;
+}
+
+.dark .prompt-filter-tag.ant-tag-checkable {
+    color: var(--muted-foreground);
+}
+
+.dark .prompt-filter-tag.ant-tag-checkable:hover {
+    background: var(--muted);
+    color: var(--foreground);
+}
+
+.dark .prompt-filter-tag.ant-tag-checkable.is-active,
+.dark .prompt-filter-tag.ant-tag-checkable-checked {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: none;
+    color: var(--primary-foreground) !important;
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+ * 顶栏字标单色化
+ *
+ * Photoshop 的界面是单色的，彩色只出现在画布里。紫色加青色的字标压在灰条上，
+ * 是整屏唯一一处彩色，会把视线从内容拽走。这里把字标压成纯黑 / 纯白，
+ * 形状不变；想恢复品牌色，删掉这条规则和 className 里的 app-logo 即可。
+ * ------------------------------------------------------------------------- */
+.app-logo {
+    filter: brightness(0) saturate(100%);
+    opacity: 0.82;
+}
+
+.dark .app-logo {
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
 }

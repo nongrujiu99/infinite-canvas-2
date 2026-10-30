@@ -21,11 +21,12 @@ export function AppTopNav() {
  return (
  <>
  {!hideHeader ? (
- <header className="sticky top-0 z-20 h-15 shrink-0 border-b border-border bg-background/92 backdrop-blur-xl">
+ /* Photoshop 的顶栏是实心灰条 + 1px 深色下边线，没有半透明和模糊；页签靠底色区分选中，不靠下划线 */
+ <header className="sticky top-0 z-20 h-12 shrink-0 border-b border-border bg-card">
  <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-5 sm:px-8">
  <div className="flex min-w-0 items-center">
- <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 rounded-lg text-sm font-semibold leading-none tracking-tight text-foreground transition hover:text-primary">
- <img src="/logo-wordmark.svg" alt={t("meta.title")} className="h-6 w-auto shrink-0"  loading="lazy" decoding="async"/>
+ <Link to="/" className="flex h-full shrink-0 items-center gap-2.5 text-sm font-semibold leading-none tracking-tight text-foreground! transition hover:text-primary!">
+ <img src="/logo-wordmark.svg" alt={t("meta.title")} className="app-logo h-5 w-auto shrink-0"  loading="lazy" decoding="async"/>
  </Link>
 
  <button
@@ -38,7 +39,7 @@ export function AppTopNav() {
  <Menu className="size-5" />
  </button>
 
- <nav className="hide-scrollbar ml-9 hidden h-15 min-w-0 items-center gap-7 overflow-x-auto md:flex">
+ <nav className="hide-scrollbar ml-7 hidden h-full min-w-0 items-stretch gap-0.5 overflow-x-auto md:flex">
  {navigationTools.map((tool) => {
  const Icon = tool.icon;
  const active = tool.slug === activeToolSlug;
@@ -47,8 +48,8 @@ export function AppTopNav() {
  key={tool.slug}
  to={`/${tool.slug}`}
  className={cn(
- "relative flex h-15 shrink-0 items-center gap-2 rounded-lg text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full",
- active ? "font-semibold text-foreground after:bg-primary" : "text-muted-foreground after:bg-transparent hover:text-foreground",
+ "flex h-full shrink-0 items-center gap-2 px-3 text-sm leading-6 transition",
+ active ? "bg-muted font-medium text-foreground!" : "text-muted-foreground! hover:bg-muted/60 hover:text-foreground!",
  )}
  >
  <Icon className="size-4" />

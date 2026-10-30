@@ -27,7 +27,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
  onClick={onClose}
  className={cn(
  "flex items-center gap-3 rounded-lg px-3 py-3 text-base transition",
- active ? "bg-muted font-medium text-foreground " : "text-muted-foreground hover:bg-muted hover:text-foreground ",
+ active ? "bg-muted font-medium text-foreground! " : "text-muted-foreground! hover:bg-muted hover:text-foreground! ",
  )}
  >
  <Icon className="size-5" />

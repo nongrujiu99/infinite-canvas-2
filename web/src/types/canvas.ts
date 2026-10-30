@@ -116,6 +116,8 @@ export type CanvasNodeMetadata = {
     audioInstructions?: string;
     references?: string[];
     maskSourceNodeId?: string;
+    /** 反推提示词的原图：结果节点靠它接出「用这条提示词出图」 */
+    reverseSourceImageId?: string;
     inputOrder?: string[];
     naturalWidth?: number;
     naturalHeight?: number;

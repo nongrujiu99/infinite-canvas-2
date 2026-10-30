@@ -17,6 +17,7 @@ import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { computeMediaSize, inferMediaRatio, inferMediaScale, parsePixelSize } from "@/lib/media-size";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { cropDataUrl, resizeDataUrl, splitDataUrl, upscaleDataUrl } from "@/lib/canvas/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
@@ -41,6 +42,8 @@ import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
+import { SavePromptTemplateDialog } from "@/components/canvas/save-prompt-template-dialog";
+import { ReverseInstructionDialog } from "@/components/canvas/reverse-instruction-dialog";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -185,7 +188,7 @@ function allowedConnectedNodeTypes(handle: ConnectionHandle, nodes: CanvasNodeDa
  if (handle.handleType === "target") return [node.metadata?.operationKind === "frame" ? CanvasNodeType.Video : CanvasNodeType.Image];
  return [node.metadata?.operationKind === "reversePrompt" ? CanvasNodeType.Text : CanvasNodeType.Image];
  }
- if (resources.includes(node.type as CanvasNodeType)) return node.type === CanvasNodeType.Image && handle.handleType === "source" ? [CanvasNodeType.Config, CanvasNodeType.Operation] : [CanvasNodeType.Config];
+ if (resources.includes(node.type as CanvasNodeType)) return node.type === CanvasNodeType.Image && handle.handleType === "source" ? [CanvasNodeType.Config, CanvasNodeType.Text, CanvasNodeType.Operation] : [CanvasNodeType.Config];
  if (node.type === CanvasNodeType.Group) return [CanvasNodeType.Config];
  if (getNodeDefinition(node.type)?.resource?.(node)) return [CanvasNodeType.Config];
  return resources;
@@ -271,6 +274,7 @@ function InfiniteCanvasPage() {
  const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
  const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
  const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
+ const addPromptTemplate = usePromptLibraryStore((state) => state.addPrompt);
  const hydrated = useCanvasStore((state) => state.hydrated);
  const createProject = useCanvasStore((state) => state.createProject);
  const openProject = useCanvasStore((state) => state.openProject);
@@ -301,6 +305,8 @@ function InfiniteCanvasPage() {
  const [showImageInfo, setShowImageInfo] = useState(false);
  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
  const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+ const [promptTemplateNode, setPromptTemplateNode] = useState<CanvasNodeData | null>(null);
+ const [reverseInstructionNode, setReverseInstructionNode] = useState<CanvasNodeData | null>(null);
  const [projectLoaded, setProjectLoaded] = useState(false);
  const [dialogNodeId, setDialogNodeId] = useState<string | null>(null);
  const [cropNodeId, setCropNodeId] = useState<string | null>(null);
@@ -327,6 +333,8 @@ function InfiniteCanvasPage() {
  const viewportRef = useRef(viewport);
  const focusAnimRef = useRef<number | null>(null);
  const generateNodeRef = useRef<((nodeId: string, mode: CanvasGenerationMode, prompt: string) => Promise<void>) | null>(null);
+ // 反推节点建好后要等它进入 nodesRef 再自动开跑，先在这里排队
+ const pendingReverseRunRef = useRef(new Set<string>());
  const connectingParamsRef = useRef(connectingParams);
  const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
  const selectionBoxRef = useRef(selectionBox);
@@ -1882,32 +1890,61 @@ function InfiniteCanvasPage() {
  [handleConfigNodeChange],
  );
 
+ // 反推只要一个节点：图片 → 文本节点一条线，指令存在节点自己的 prompt 里，建完自动开跑，
+ // 结果原地流式写回这个节点。不再有生成配置节点，也不会在生成时另建结果节点。
  const createReversePromptFlow = useCallback(
  (source: CanvasNodeData, anchor: CanvasNodeData, operationId?: string) => {
  const gap = 96;
  const textSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
- const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
  const centerY = anchor.position.y + anchor.height / 2;
- const textNode = {
- ...createCanvasNode(CanvasNodeType.Text, { x: anchor.position.x + anchor.width + gap + textSpec.width / 2, y: centerY }, { content: t("canvas.projectPage.reversePreset"), prompt: t("canvas.projectPage.reversePreset"), status: NODE_STATUS_SUCCESS, fontSize: 14 }),
- title: t("canvas.projectPage.reverseTitle"),
- };
- const configNode = {
- ...createCanvasNode(CanvasNodeType.Config, { x: textNode.position.x + textNode.width + gap + configSpec.width / 2, y: centerY }, {
- generationMode: "text",
- generationSettings: { text: { model: effectiveConfig.textModel || effectiveConfig.model || defaultConfig.textModel, count: 1, textCount: 1 } },
- composerContent: t("canvas.reverseComposer", { imageId: source.id, textId: textNode.id }),
+ const resultNode = {
+ ...createCanvasNode(CanvasNodeType.Text, { x: anchor.position.x + anchor.width + gap + textSpec.width / 2, y: centerY }, {
+ prompt: t("canvas.projectPage.reversePreset"),
+ status: NODE_STATUS_IDLE,
+ fontSize: 14,
+ reverseSourceImageId: source.id,
  }),
- title: t("canvas.projectPage.reverseConfigTitle"),
+ title: t("canvas.projectPage.reverseResultTitle"),
  };
- setNodes((prev) => [...prev.map((item) => item.id === operationId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS } } : item), textNode, configNode]);
- setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: source.id, toNodeId: configNode.id }, { id: nanoid(), fromNodeId: textNode.id, toNodeId: configNode.id }]);
+ setNodes((prev) => [...prev.map((item) => (item.id === operationId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS } } : item)), resultNode]);
+ setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: source.id, toNodeId: resultNode.id }]);
+ setSelectedNodeIds(new Set([resultNode.id]));
+ setSelectedConnectionId(null);
+ setDialogNodeId(resultNode.id);
+ setActiveOperationNodeId(null);
+ // 节点要先进 nodesRef 才能被生成流程读到，所以挂到下一次渲染后再触发
+ pendingReverseRunRef.current.add(resultNode.id);
+ },
+ [t],
+ );
+
+ // 反推结果点一下就接出图：建一个生图配置节点，把提示词和原图都连进去，省掉复制粘贴
+ const usePromptAsGeneration = useCallback(
+ (node: CanvasNodeData) => {
+ const text = (node.metadata?.content || node.metadata?.texts?.find((item) => item.content)?.content || "").trim();
+ if (!text) return;
+ const sourceImageId = node.metadata?.reverseSourceImageId;
+ const sourceImage = sourceImageId ? nodesRef.current.find((item) => item.id === sourceImageId && item.type === CanvasNodeType.Image) : undefined;
+ const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
+ const configNode = {
+ ...createCanvasNode(CanvasNodeType.Config, { x: node.position.x + node.width + 96 + configSpec.width / 2, y: node.position.y + node.height / 2 }, {
+ generationMode: "image",
+ generationSettings: { image: { model: effectiveConfig.imageModel || effectiveConfig.model, size: defaultImageGenerationSize(effectiveConfig.size), quality: "high", count: 1 } },
+ composerContent: sourceImage ? t("canvas.reverseToImage", { imageId: sourceImage.id, textId: node.id }) : `@[node:${node.id}]`,
+ }),
+ title: t("canvas.projectPage.reverseToImageTitle"),
+ };
+ setNodes((prev) => [...prev, configNode]);
+ setConnections((prev) => [
+ ...prev,
+ ...(sourceImage ? [{ id: nanoid(), fromNodeId: sourceImage.id, toNodeId: configNode.id }] : []),
+ { id: nanoid(), fromNodeId: node.id, toNodeId: configNode.id },
+ ]);
  setSelectedNodeIds(new Set([configNode.id]));
  setSelectedConnectionId(null);
  setDialogNodeId(configNode.id);
- setActiveOperationNodeId(null);
  },
- [effectiveConfig.model, effectiveConfig.textModel, t],
+ [effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, t],
  );
 
  const openImageOperation = useCallback((source: CanvasNodeData, kind: CanvasOperationKind, operationId: string) => {
@@ -1942,6 +1979,45 @@ function InfiniteCanvasPage() {
  setActiveOperationNodeId(null);
  setMaskEditNodeId(node.id);
  }, []);
+
+ // 出图连提示词一起存成模板：缩略图就是这张结果图
+ const openSavePromptTemplate = useCallback((node: CanvasNodeData) => setPromptTemplateNode(node), []);
+
+ const savePromptTemplate = useCallback(
+ ({ title, prompt }: { title: string; prompt: string }) => {
+ const node = promptTemplateNode;
+ if (!node) return;
+ addPromptTemplate({
+ title,
+ prompt,
+ coverUrl: node.metadata?.content || "",
+ coverStorageKey: node.metadata?.storageKey,
+ tags: [],
+ sourceNodeId: node.id,
+ });
+ setPromptTemplateNode(null);
+ message.success(t("canvas.promptLibrary.saved"));
+ },
+ [addPromptTemplate, message, promptTemplateNode, t],
+ );
+
+ // 反推指令存在节点自己的 prompt 里，这里给它一个入口：改完立刻按新指令重跑
+ const openReverseInstruction = useCallback((node: CanvasNodeData) => setReverseInstructionNode(node), []);
+
+ const saveReverseInstruction = useCallback(
+ (prompt: string) => {
+ const node = reverseInstructionNode;
+ if (!node) return;
+ setReverseInstructionNode(null);
+ setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, prompt } } : item)));
+ if (generationRequestsRef.current.has(node.id)) {
+ message.warning(t("canvas.node.reverseInstructionBusy"));
+ return;
+ }
+ pendingReverseRunRef.current.add(node.id);
+ },
+ [message, reverseInstructionNode, t],
+ );
 
  const startImageOperationFromContext = useCallback((source: CanvasNodeData, kind: CanvasOperationKind) => {
  setContextMenu(null);
@@ -2639,7 +2715,8 @@ function InfiniteCanvasPage() {
  setRunningNodeId(nodeId);
  const runController = startGenerationRequest(nodeId, nodeId, nodeId);
  const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
- const editingTextNode = mode === "text" && Boolean(sourceTextContent);
+ // 反推节点重跑就是重新反推，不能按「已有文本 + 指令」的改写模式走
+ const editingTextNode = mode === "text" && Boolean(sourceTextContent) && !sourceNode?.metadata?.reverseSourceImageId;
  const generationContext = await hydrateNodeGenerationContext(
  buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current.filter((connection) => connection.valid !== false), editingTextNode ? t("canvas.projectPage.editTextPrompt", { source: sourceTextContent, prompt }) : prompt),
  );
@@ -3015,17 +3092,22 @@ function InfiniteCanvasPage() {
  const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : CanvasNodeType.Text];
  const textConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
  const parentPosition = sourceNode?.position || { x: 0, y: 0 };
- const isEmptyTextNode = sourceNode?.type === CanvasNodeType.Text && !sourceTextContent;
+ const isReverseResultNode = sourceNode?.type === CanvasNodeType.Text && Boolean(sourceNode.metadata?.reverseSourceImageId);
+ // 反推节点无论有没有内容都在原地重跑，否则每次生成都会再冒出一个节点
+ const isEmptyTextNode = sourceNode?.type === CanvasNodeType.Text && (!sourceTextContent || isReverseResultNode);
  const connectedTextTarget = isConfigNode
  ? connectionsRef.current.filter((connection) => connection.valid !== false && connection.fromNodeId === nodeId).map((connection) => nodesRef.current.find((node) => node.id === connection.toNodeId)).find((node) => node?.type === CanvasNodeType.Text && !node.metadata?.content && !node.metadata?.texts?.some((text) => text.content))
  : undefined;
  const rootId = isEmptyTextNode ? nodeId : connectedTextTarget?.id || nanoid();
  const reusingTextNode = isEmptyTextNode || Boolean(connectedTextTarget);
+ // 反推占位的结果节点靠 reverseSourceImageId 才能接出「用这条提示词出图」，复用时要保住它和节点标题
+ const reusedNode = reusingTextNode ? nodesRef.current.find((node) => node.id === rootId) : undefined;
+ const reusedReverseSource = reusedNode?.metadata?.reverseSourceImageId;
  const textIds = Array.from({ length: textCount }, () => nanoid());
  const rootNode: CanvasNodeData = {
  id: rootId,
  type: CanvasNodeType.Text,
- title: effectivePrompt.slice(0, 32) || "Generated Text",
+ title: reusedReverseSource ? reusedNode!.title : effectivePrompt.slice(0, 32) || "Generated Text",
  position: reusingTextNode ? (isEmptyTextNode ? sourceNode.position : connectedTextTarget!.position) : isConfigNode ? { x: parentPosition.x + parentConfig.width / 2 - textConfig.width / 2, y: parentPosition.y + parentConfig.height + 96 } : { x: parentPosition.x + parentConfig.width + 96, y: parentPosition.y + parentConfig.height / 2 - textConfig.height / 2 },
  width: reusingTextNode ? (isEmptyTextNode ? sourceNode.width : connectedTextTarget!.width) : textConfig.width,
  height: reusingTextNode ? (isEmptyTextNode ? sourceNode.height : connectedTextTarget!.height) : textConfig.height,
@@ -3038,6 +3120,7 @@ function InfiniteCanvasPage() {
  textCount,
  texts: textIds.map((id) => ({ id, status: NODE_STATUS_LOADING, content: "" })),
  primaryTextId: textIds[0],
+ ...(reusedReverseSource ? { reverseSourceImageId: reusedReverseSource } : {}),
  },
  };
  pendingChildIds = [rootId];
@@ -3159,6 +3242,17 @@ function InfiniteCanvasPage() {
  useEffect(() => {
  generateNodeRef.current = handleGenerateNode;
  }, [handleGenerateNode]);
+
+ // 反推节点落下后立刻跑一次，右键即出结果，不用再点生成
+ useEffect(() => {
+ if (!pendingReverseRunRef.current.size) return;
+ pendingReverseRunRef.current.forEach((nodeId) => {
+ const node = nodes.find((item) => item.id === nodeId && item.type === CanvasNodeType.Text);
+ if (!node) return;
+ pendingReverseRunRef.current.delete(nodeId);
+ void generateNodeRef.current?.(nodeId, "text", node.metadata?.prompt || "");
+ });
+ }, [nodes]);
 
  const handleRetryNode = useCallback(
  async (node: CanvasNodeData, imageId?: string) => {
@@ -3640,6 +3734,9 @@ function InfiniteCanvasPage() {
  onUpload={(targetNode) => handleUploadRequest(targetNode.id)}
  onDownload={downloadNodeImage}
  onMaskEdit={openMaskEditForNode}
+ onSavePromptTemplate={openSavePromptTemplate}
+ onUsePromptAsGeneration={usePromptAsGeneration}
+ onEditReverseInstruction={openReverseInstruction}
  onRevertEdit={revertNodeEdit}
  onDropFiles={handleNodeFileDrop}
  onSelectReference={selectNodeReference}
@@ -3662,7 +3759,24 @@ function InfiniteCanvasPage() {
  <rect width="100%" height="100%" fill={theme.canvas.selectionFill} stroke={theme.canvas.selectionStroke} strokeOpacity={0.55} strokeWidth={1 / viewport.k} strokeDasharray={`${6 / viewport.k} ${4 / viewport.k}`} />
  </svg>
  ) : null}
- {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} allowedTypes={allowedConnectedNodeTypes(pendingConnectionCreate.connection, nodes)} onCreate={(type, metadata) => createConnectedNode(type, pendingConnectionCreate, metadata)} onClose={cancelPendingConnectionCreate} /> : null}
+ {pendingConnectionCreate ? (
+ <ConnectionCreateMenu
+ pending={pendingConnectionCreate}
+ allowedTypes={allowedConnectedNodeTypes(pendingConnectionCreate.connection, nodes)}
+ onCreate={(type, metadata) => {
+ // 反推不摆操作节点：直接出「配置 + 空结果位」两个节点
+ if (type === CanvasNodeType.Operation && metadata?.operationKind === "reversePrompt") {
+ const connected = nodes.find((node) => node.id === pendingConnectionCreate.connection.nodeId);
+ cancelPendingConnectionCreate();
+ if (connected?.type === CanvasNodeType.Image && connected.metadata?.content) createReversePromptFlow(connected, connected);
+ else message.warning(t("canvas.projectPage.reverseNeedImage"));
+ return;
+ }
+ createConnectedNode(type, pendingConnectionCreate, metadata);
+ }}
+ onClose={cancelPendingConnectionCreate}
+ />
+ ) : null}
  </InfiniteCanvas>
 
  {hasMultipleSelectedNodes && !selectionBox ? (
@@ -3689,6 +3803,16 @@ function InfiniteCanvasPage() {
  onAddText={() => createNode(CanvasNodeType.Text)}
  onAddConfig={() => createNode(CanvasNodeType.Config)}
  onAddOperation={(kind) => {
+ // 反推同样不开操作卡，只出结果
+ if (kind === "reversePrompt") {
+ const target = nodes.find((node) => node.type === CanvasNodeType.Image && node.metadata?.content && selectedNodeIds.has(node.id));
+ if (!target) {
+ message.warning(t("canvas.projectPage.reverseNeedImage"));
+ return;
+ }
+ createReversePromptFlow(target, target);
+ return;
+ }
  if (kind === "mask") {
  const target = nodes.find((node) => node.type === CanvasNodeType.Image && node.metadata?.content && selectedNodeIds.has(node.id));
  if (!target) {
@@ -3808,6 +3932,21 @@ function InfiniteCanvasPage() {
  </Modal>
 
  <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
+ <SavePromptTemplateDialog
+  open={Boolean(promptTemplateNode)}
+  coverUrl={promptTemplateNode?.metadata?.content || ""}
+  defaultTitle={promptTemplateNode?.title || ""}
+  defaultPrompt={promptTemplateNode ? resolveNodePrompt(promptTemplateNode) : ""}
+  onSave={savePromptTemplate}
+  onClose={() => setPromptTemplateNode(null)}
+ />
+ <ReverseInstructionDialog
+  open={Boolean(reverseInstructionNode)}
+  value={reverseInstructionNode?.metadata?.prompt || t("canvas.projectPage.reversePreset")}
+  defaultPrompt={t("canvas.projectPage.reversePreset")}
+  onSave={saveReverseInstruction}
+  onClose={() => setReverseInstructionNode(null)}
+ />
  </section>
  </main>
  );

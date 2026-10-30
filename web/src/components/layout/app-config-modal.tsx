@@ -1,13 +1,19 @@
-import { App, Button, Input, Modal, Tabs } from "antd";
+import { App, Button, Input, Modal, Select, Tabs } from "antd";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ChannelEditorInline } from "@/components/layout/channel-editor-drawer";
-import { ConfigPromptSources } from "@/components/layout/config-prompt-sources";
 import { ConfigLocalStorage } from "@/components/layout/config-local-storage";
 import { exportAppConfig, importAppConfig } from "@/services/config-file";
-import { createModelChannel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+import { createModelChannel, modelOptionLabel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ApiCallFormat, type ConfigTabKey, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
+
+const MODEL_FIELDS: Array<{ key: "imageModel" | "videoModel" | "textModel" | "audioModel"; capability: ModelCapability; labelKey: string }> = [
+ { key: "imageModel", capability: "image", labelKey: "config.preferences.defaultImageModel" },
+ { key: "videoModel", capability: "video", labelKey: "config.preferences.defaultVideoModel" },
+ { key: "textModel", capability: "text", labelKey: "config.preferences.defaultTextModel" },
+ { key: "audioModel", capability: "audio", labelKey: "config.preferences.defaultAudioModel" },
+];
 
 export function AppConfigPanel({ showDoneButton = false, initialTab = "channels" }: { showDoneButton?: boolean; initialTab?: ConfigTabKey }) {
  const { message } = App.useApp();
@@ -130,17 +136,35 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
  key: "preferences",
  label: t("config.tabs.preferences"),
  children: (
+ <div className="space-y-5">
+ <div>
+ <div className="text-sm font-semibold">{t("config.preferences.defaultModels")}</div>
+ <div className="mb-3 mt-1 text-xs text-muted-foreground">{t("config.preferences.autoRoutingHint")}</div>
+ <div className="grid grid-cols-2 gap-3">
+ {MODEL_FIELDS.map((field) => (
+ <div key={field.key}>
+ <div className="mb-1 text-xs font-medium text-muted-foreground">{t(field.labelKey)}</div>
+ <Select
+ className="w-full"
+ value={config[field.key] || undefined}
+ placeholder={t("settingsPanels.model.select")}
+ options={selectableModelsByCapability(config, field.capability).map((model) => ({ value: model, label: modelOptionLabel(config, model) }))}
+ onChange={(value) => updateConfig(field.key, value)}
+ showSearch
+ optionFilterProp="label"
+ />
+ </div>
+ ))}
+ </div>
+ </div>
  <div>
  <div className="mb-2 text-sm font-semibold">{t("config.preferences.systemPrompt")}</div>
  <Input.TextArea rows={4} value={config.systemPrompt} placeholder={t("config.preferences.systemPromptPlaceholder")} onChange={(event) => updateConfig("systemPrompt", event.target.value)} />
  </div>
+ </div>
  ),
  },
- {
- key: "prompt-sources",
- label: t("config.tabs.promptSources"),
- children: <ConfigPromptSources />,
- },
+
  {
  key: "local-storage",
  label: t("config.tabs.localStorage"),

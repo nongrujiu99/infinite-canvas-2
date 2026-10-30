@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 import { ALL_PROMPTS_OPTION, fetchPrompts } from "@/services/api/prompts";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 
 export const PROMPT_PAGE_SIZE = 20;
 
@@ -11,8 +12,12 @@ export function usePromptList({ keyword, tags, category, enabled = true }: { key
         const timer = setTimeout(() => setDebouncedKeyword(keyword), 300);
         return () => clearTimeout(timer);
     }, [keyword]);
+    // 本地库是异步 hydration 的，且随时可能新增模板；把它算进 queryKey，
+    // 否则首次读到空库就会一直缓存空结果
+    const library = usePromptLibraryStore((state) => state.prompts);
+    const libraryKey = `${library.length}:${library[0]?.id ?? ""}`;
     const query = useInfiniteQuery({
-        queryKey: ["prompts", debouncedKeyword, tags, category],
+        queryKey: ["prompts", debouncedKeyword, tags, category, libraryKey],
         queryFn: ({ pageParam }) => fetchPrompts({ keyword: debouncedKeyword, tag: tags, category, page: pageParam, pageSize: PROMPT_PAGE_SIZE }),
         initialPageParam: 1,
         getNextPageParam: (lastPage, pages) => (pages.reduce((total, page) => total + page.items.length, 0) < lastPage.total ? pages.length + 1 : undefined),

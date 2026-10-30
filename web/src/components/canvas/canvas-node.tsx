@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Copy, Download, Group, History, Image as ImageIcon, Music2, Plus, RefreshCw, RotateCcw, ScanSearch, Sparkles, Star, Trash2, Video } from "lucide-react";
+import { BookmarkPlus, ChevronRight, Copy, Download, Group, History, Image as ImageIcon, Music2, Plus, RefreshCw, RotateCcw, ScanSearch, Settings2, Sparkles, Star, Trash2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
@@ -54,6 +54,9 @@ type CanvasNodeProps = {
  onUpload?: (node: CanvasNodeData) => void;
  onDownload?: (node: CanvasNodeData) => void;
  onMaskEdit?: (node: CanvasNodeData) => void;
+ onSavePromptTemplate?: (node: CanvasNodeData) => void;
+ onUsePromptAsGeneration?: (node: CanvasNodeData) => void;
+ onEditReverseInstruction?: (node: CanvasNodeData) => void;
  onRevertEdit?: (node: CanvasNodeData, versionId: string) => void;
  onDropFiles?: (node: CanvasNodeData, files: FileList) => void;
  onSelectReference?: (nodeId: string) => void;
@@ -123,6 +126,9 @@ export const CanvasNode = React.memo(function CanvasNode({
  onUpload,
  onDownload,
  onMaskEdit,
+ onSavePromptTemplate,
+ onUsePromptAsGeneration,
+ onEditReverseInstruction,
  onRevertEdit,
  onDropFiles,
  onSelectReference,
@@ -365,6 +371,21 @@ export const CanvasNode = React.memo(function CanvasNode({
  {onMaskEdit && data.type === CanvasNodeType.Image && data.metadata?.content ? (
   <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.maskEdit")} onClick={() => onMaskEdit(data)}>
    <ScanSearch className="size-3.5" />
+  </button>
+ ) : null}
+ {onSavePromptTemplate && data.type === CanvasNodeType.Image && data.metadata?.content ? (
+  <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.savePromptTemplate")} onClick={() => onSavePromptTemplate(data)}>
+   <BookmarkPlus className="size-3.5" />
+  </button>
+ ) : null}
+ {onEditReverseInstruction && data.type === CanvasNodeType.Text && data.metadata?.reverseSourceImageId ? (
+  <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.editReverseInstruction")} onClick={() => onEditReverseInstruction(data)}>
+   <Settings2 className="size-3.5" />
+  </button>
+ ) : null}
+ {onUsePromptAsGeneration && data.type === CanvasNodeType.Text && data.metadata?.reverseSourceImageId && (data.metadata?.content || data.metadata?.texts?.some((item) => item.content)) ? (
+  <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.usePromptAsGeneration")} onClick={() => onUsePromptAsGeneration(data)}>
+   <Sparkles className="size-3.5" />
   </button>
  ) : null}
  {(data.metadata?.editHistory?.length || 0) > 0 ? (

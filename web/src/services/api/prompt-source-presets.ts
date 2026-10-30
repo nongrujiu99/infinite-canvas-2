@@ -9,9 +9,6 @@ export type PromptSource = {
     builtIn: boolean;
 };
 
-export const PROMPT_REGISTRY_HOMEPAGE = "https://github.com/yukkcat/image-prompts";
-const PROMPT_REGISTRY_SOURCE_BASE = "https://raw.githubusercontent.com/yukkcat/image-prompts/main/dist/sources";
-
 export function createPromptSource(source?: Partial<PromptSource>): PromptSource {
     return {
         id: source?.id?.trim() || nanoid(),
@@ -23,16 +20,12 @@ export function createPromptSource(source?: Partial<PromptSource>): PromptSource
     };
 }
 
-export const DEFAULT_PROMPT_SOURCES: PromptSource[] = [
-    registrySource("banana-prompt-quicker", "Banana Prompt Quicker", "https://glidea.github.io/banana-prompt-quicker/"),
-    registrySource("davidwu-gpt-image2-prompts", "DavidWu GPT Image 2", "https://github.com/davidwuw0811-boop/awesome-gpt-image2-prompts"),
-    registrySource("freestylefly-gpt-image-2", "Freestylefly GPT Image 2", "https://github.com/freestylefly/awesome-gpt-image-2"),
-    registrySource("awesome-gpt-image", "Awesome GPT Image", "https://github.com/ZeroLu/awesome-gpt-image"),
-    registrySource("awesome-gpt4o-image-prompts", "Awesome GPT-4o", "https://github.com/ImgEdify/Awesome-GPT4o-Image-Prompts"),
-    registrySource("youmind-gpt-image-2", "YouMind GPT Image 2", "https://github.com/YouMind-OpenLab/awesome-gpt-image-2"),
-    registrySource("youmind-nano-banana-pro", "YouMind Nano Banana Pro", "https://github.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts"),
-];
-
-function registrySource(id: string, name: string, homepage: string): PromptSource {
-    return { id, name, url: `${PROMPT_REGISTRY_SOURCE_BASE}/${id}.json`, homepage, enabled: true, builtIn: true };
-}
+/**
+ * 不再内置任何远程提示词仓库。
+ *
+ * 之前那 7 个内置集合（Banana Prompt Quicker、DavidWu GPT Image 2 …）是别人的提示词，
+ * 内容与项目自己的画布风格对不上，还把「提示词库」这层做成了必须联网拉取的目录。
+ * 现在提示词全部来自本地库（`use-prompt-library-store`）——由画布上生成好的图一键存成模板。
+ * 数组保留为空，是为了老数据能按 builtIn 标记被过滤掉。
+ */
+export const DEFAULT_PROMPT_SOURCES: PromptSource[] = [];

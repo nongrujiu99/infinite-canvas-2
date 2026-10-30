@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { App, Button } from "antd";
-import { Download, Eye, FileUp, Plus } from "lucide-react";
+import { Download, FileUp, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { readZip } from "@/lib/zip";
@@ -14,7 +14,6 @@ import type { CanvasExportFile } from "@/types/canvas-export";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
-import { buildCanvasFeaturePreviewProject } from "@/lib/canvas/canvas-feature-preview";
 
 export default function CanvasPage() {
  const { message } = App.useApp();
@@ -30,10 +29,6 @@ export default function CanvasPage() {
 
  const enterProject = (id: string) => navigate(`/canvas/${id}`);
  const createAndEnter = () => enterProject(createProject(t("canvas.defaultTitle", { count: projects.length + 1 })));
- const openFeaturePreview = () => {
- const id = importProject(buildCanvasFeaturePreviewProject(t("canvas.featurePreview.title")));
- navigate(`/canvas/${id}?preview=1`);
- };
  const importCanvas = async (file?: File) => {
  if (!file) return;
  try {
@@ -86,9 +81,6 @@ export default function CanvasPage() {
  ) : null}
  <Button disabled={!hydrated} icon={<FileUp className="size-4" />} onClick={() => inputRef.current?.click()}>
  {t("canvas.import")}
- </Button>
- <Button disabled={!hydrated} icon={<Eye className="size-4" />} onClick={openFeaturePreview}>
- {t("canvas.featurePreview.open")}
  </Button>
  <Button disabled={!hydrated} type="primary" className="!font-semibold" icon={<Plus className="size-4" />} onClick={createAndEnter}>
  {t("canvas.create")}

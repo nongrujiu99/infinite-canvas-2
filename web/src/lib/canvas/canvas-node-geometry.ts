@@ -215,7 +215,8 @@ export function validateConnection(firstNodeId: string, secondNodeId: string, no
     const toConfig = to.type === CanvasNodeType.Config;
     const fromOperation = fromConfig || from.type === CanvasNodeType.Operation;
     const toOperation = toConfig || to.type === CanvasNodeType.Operation;
-    if (fromResource && toResource) return { error: "resourceToResource" };
+    // 图片可以直接连文本节点：把图当作文本模型的视觉输入（反推提示词就是这条路）
+    if (fromResource && toResource && !(from.type === CanvasNodeType.Image && to.type === CanvasNodeType.Text)) return { error: "resourceToResource" };
     if (from.type === CanvasNodeType.Group && !toConfig) return { error: "unsupportedInput" };
     if (fromOperation && toOperation) return { error: "operationToOperation" };
     if (toResource && isEmptyUploadResource(to) && !fromConfig) return { error: "emptyResource" };

@@ -1,4 +1,4 @@
-import { ChevronDown, Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video, Wand2 } from "lucide-react";
+import { BookMarked, ChevronDown, Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video, Wand2 } from "lucide-react";
 import { Button, Dropdown, Input, InputNumber, message, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +14,7 @@ import { getCanvasImageGenerationCount, getNodeGenerationSettings } from "@/lib/
 import { adaptMediaSizeToModel, adaptVideoSecondsToModel, computeMediaSize, computeVideoSize, inferMediaRatio, inferMediaScale, inferVideoRatio, mediaRatioOptionsForModel, mediaScaleOptionsForModel, parseVideoResolution, readMediaDimensions, videoRatioOptions, videoSecondsSpecForModel } from "@/lib/media-size";
 import { audioFormatOptions, audioVoiceOptions } from "@/lib/audio-generation";
 import { CanvasConfigComposer } from "./canvas-config-composer";
+import { PromptLibraryModal } from "./prompt-library-modal";
 import type { NodeGenerationInput } from "./canvas-node-generation";
 import { imageEditModels, supportsImageEditModel } from "@/lib/canvas/image-edit-preferences";
 
@@ -39,6 +40,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
  const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
  const [promptExpanded, setPromptExpanded] = useState(false);
+ const [libraryOpen, setLibraryOpen] = useState(false);
  const [optimizing, setOptimizing] = useState(false);
  const theme = canvasThemes[useThemeStore((state) => state.theme)];
  const mode = node.metadata?.generationMode || "image";
@@ -108,6 +110,12 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  setOptimizing(false);
  }
  }, [composerContent, globalConfig, imageReferences, textNotes, isAiConfigReady, node.id, optimizeLevel, onConfigChange, openConfigDialog, t]);
+ // 从提示词库插入：直接改写输入区内容，不新建文本节点，也不需要连线
+ const pickLibraryPrompt = useCallback((text: string) => {
+  const base = (node.metadata?.composerContent ?? node.metadata?.prompt ?? "").trim();
+  onConfigChange(node.id, { composerContent: base ? `${base}\n${text}` : text });
+  setLibraryOpen(false);
+ }, [node.id, node.metadata?.composerContent, node.metadata?.prompt, onConfigChange]);
  const summary = inputSummaryText(mode, inputSummary, t);
  return (
  <div className="flex h-full w-full cursor-move flex-col overflow-hidden px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
@@ -162,6 +170,10 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
 
  <div className="mb-2 flex h-5 shrink-0 items-center justify-between gap-2 px-0.5 text-xs" style={{ color: theme.node.muted }}>
  <span className="min-w-0 truncate">{summary}</span>
+ <button type="button" className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded px-1 opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.promptLibrary.title")} onMouseDown={(event) => event.stopPropagation()} onClick={() => setLibraryOpen(true)}>
+ <BookMarked className="size-3.5" />
+ <span>{t("canvas.promptLibrary.title")}</span>
+ </button>
  </div>
 
  <div className="mb-3 min-h-24 flex-1 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
@@ -258,6 +270,7 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  </span>
  </Button>
  </div>
+ <PromptLibraryModal open={libraryOpen} onPick={pickLibraryPrompt} onClose={() => setLibraryOpen(false)} />
  <Modal title={t("canvas.promptPanel.editorTitle")} open={promptExpanded} centered width={780} footer={null} onCancel={() => setPromptExpanded(false)} destroyOnHidden>
  <CanvasConfigComposer
  expanded

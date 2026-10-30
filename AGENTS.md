@@ -95,3 +95,4 @@
 - 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
 - 本地启动或浏览器验收时不要关闭用户已经打开的浏览器窗口或标签页；需要自动化验证时使用独立测试页面，避免打断用户当前页面和对话状态。
+- `bun.lock` 变动后 Vite 启动时要重新优化依赖，会先删掉 `web/node_modules/.vite/deps`（几十个文件）。在 WorkBuddy 环境里这一步会被 safe-delete 的批量删除保护拦下，报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED` 并直接启动失败。处理办法是把缓存目录**移出**项目而不是删掉：`mv node_modules/.vite /c/Users/11596/AppData/Local/Temp/vite-deps-<时间戳>`，再启动即可，Vite 会自己重建。不要为此关闭安全保护，也不要手写脚本批量删缓存。

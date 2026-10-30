@@ -5,7 +5,13 @@ description: Implemented changes that still need manual verification
 
 # Pending Tests
 
-- Pixels outside the painted area must not change: use an image with two copies of the same product (or a product plus another object on the table), paint only one of them and write “remove this”. Only the painted one should disappear; everything else must stay pixel-identical — same colour, lighting and texture, where this used to delete the other instance as well. The reverse also holds: an object the brush did not fully cover stays, because the painted area is the hard limit.
+- Removing a product from a hand must leave the hand untouched: paint **the product only, tight to its outline, and keep the hand out of the painted area**, then write “remove the bottle in the hand”. The hand position, orientation, finger spread and the wrist-to-cuff transition must all match the original — only the product may disappear; the gesture must not change and no fingers may appear, merge or vanish. What the product used to cover should read as the same hand continuing (palm lines, skin tone and light continuous).
+
+- Local edits must show no patchwork: after generating, sharpness, grain and lighting have to be uniform across the whole image — no patch that is softer than its surroundings, no visible seam, nothing that looks pasted in. Pixel compositing used to leave exactly that and has now been removed; the model's full-frame result is used directly.
+
+- Scope is still governed by the prompt, with no pixel fallback: with two copies of the same product in frame, paint one and write “remove this”. That one should disappear and the distant one should not. This now relies on model compliance; an occasional overreach is a known trade-off, no longer blocked by sacrificing image quality.
+
+
 
 - Local edit adds no nodes: try all four entry points on an image node (right-click “Local edit”, the scan icon in the node header, dragging from the node's right port and picking “Local edit” in the create menu, and the toolbar's operations panel). Each should open the mask editor directly with zero new nodes, where it used to leave an operation card, a mask annotation node and a result node behind. The toolbar entry with nothing selected should say “Select an image first” instead of creating an empty card.
 

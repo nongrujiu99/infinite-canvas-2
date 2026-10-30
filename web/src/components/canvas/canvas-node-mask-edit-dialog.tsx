@@ -350,8 +350,9 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, initialPrompt 
  }}
  />
  {error ? <div className="text-xs font-medium text-[#ef4444]">{error}</div> : null}
- <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskScopeHint")}</div>
- <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskOverwriteHint")}</div>
+                        <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskScopeHint")}</div>
+                        <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskHandHint")}</div>
+                        <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskOverwriteHint")}</div>
  </div>
 
  <div className="mt-auto flex items-center justify-between gap-2">

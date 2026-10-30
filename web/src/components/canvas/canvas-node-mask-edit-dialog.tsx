@@ -25,9 +25,9 @@ type BrushPreview = { x: number; y: number; size: number; adjusting: boolean };
 
 const defaultBrushSize = 100;
 const maskOverlayColor = "#4f46e5";
-const maskOverlayAlpha = 0.4;
+const maskOverlayAlpha = 0.55;
 
-export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void; onMissingConfig: () => void }) {
+export function CanvasNodeMaskEditDialog({ dataUrl, config, open, initialPrompt = "", onClose, onConfirm, onMissingConfig }: { dataUrl: string; config: AiConfig; open: boolean; initialPrompt?: string; onClose: () => void; onConfirm: (payload: CanvasImageMaskEditPayload) => void; onMissingConfig: () => void }) {
  const { t } = useTranslation();
  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,7 +54,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
 
  useEffect(() => {
  if (!open) return;
- setPrompt("");
+ setPrompt(initialPrompt);
  setModel(defaultModel);
  setBrushSize(defaultBrushSize);
  setMode("paint");
@@ -67,7 +67,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  brushAdjustRef.current = null;
  drawingRef.current = { active: false, stroke: null };
  void readImageMeta(dataUrl).then(setImage);
- }, [dataUrl, defaultModel, open]);
+ }, [dataUrl, defaultModel, initialPrompt, open]);
 
  useEffect(() => {
  clearCanvas(maskCanvasRef.current);
@@ -350,6 +350,8 @@ export function CanvasNodeMaskEditDialog({ dataUrl, config, open, onClose, onCon
  }}
  />
  {error ? <div className="text-xs font-medium text-[#ef4444]">{error}</div> : null}
+ <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskScopeHint")}</div>
+ <div className="text-xs leading-5 opacity-50">{t("canvas.editors.maskOverwriteHint")}</div>
  </div>
 
  <div className="mt-auto flex items-center justify-between gap-2">

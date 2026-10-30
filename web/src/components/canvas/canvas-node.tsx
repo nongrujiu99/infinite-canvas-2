@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Copy, Download, Group, Image as ImageIcon, Music2, Plus, RefreshCw, Sparkles, Star, Trash2, Video } from "lucide-react";
+import { ChevronRight, Copy, Download, Group, History, Image as ImageIcon, Music2, Plus, RefreshCw, RotateCcw, ScanSearch, Sparkles, Star, Trash2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
@@ -13,6 +13,7 @@ import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textare
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText, type Position } from "@/types/canvas";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { useTranslation } from "react-i18next";
+import { Popover } from "antd";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 const TEXT_NODE_FONT_FAMILY = '"SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif';
@@ -52,6 +53,8 @@ type CanvasNodeProps = {
  onViewImage?: (node: CanvasNodeData, imageId?: string) => void;
  onUpload?: (node: CanvasNodeData) => void;
  onDownload?: (node: CanvasNodeData) => void;
+ onMaskEdit?: (node: CanvasNodeData) => void;
+ onRevertEdit?: (node: CanvasNodeData, versionId: string) => void;
  onDropFiles?: (node: CanvasNodeData, files: FileList) => void;
  onSelectReference?: (nodeId: string) => void;
  onContextMenu: (event: React.MouseEvent, nodeId: string) => void;
@@ -119,6 +122,8 @@ export const CanvasNode = React.memo(function CanvasNode({
  onViewImage,
  onUpload,
  onDownload,
+ onMaskEdit,
+ onRevertEdit,
  onDropFiles,
  onSelectReference,
  onContextMenu,
@@ -357,6 +362,19 @@ export const CanvasNode = React.memo(function CanvasNode({
  </button>
  )}
  <span className="min-w-0 flex-1 truncate opacity-70">{nodeInfoSummary(data, t)}</span>
+ {onMaskEdit && data.type === CanvasNodeType.Image && data.metadata?.content ? (
+  <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.maskEdit")} onClick={() => onMaskEdit(data)}>
+   <ScanSearch className="size-3.5" />
+  </button>
+ ) : null}
+ {(data.metadata?.editHistory?.length || 0) > 0 ? (
+  <Popover trigger="click" placement="topRight" content={<EditVersionList node={data} onRevert={onRevertEdit} />}>
+   <button type="button" className="flex h-6 shrink-0 items-center gap-0.5 rounded-lg px-1 opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.node.editVersions")}>
+    <History className="size-3.5" />
+    <span className="text-[11px] tabular-nums">{data.metadata?.editHistory?.length}</span>
+   </button>
+  </Popover>
+ ) : null}
  {onDownload && [CanvasNodeType.Image, CanvasNodeType.Video, CanvasNodeType.Audio].includes(data.type as CanvasNodeType) && data.metadata?.content ? (
  <button type="button" className="grid size-6 shrink-0 place-items-center rounded-lg opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("common.download")} onClick={() => onDownload(data)}>
  <Download className="size-3.5" />
@@ -930,6 +948,27 @@ function ImageSlotStatus({ image }: { image?: CanvasNodeImage }) {
  <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center" style={{ background: theme.node.fill, color: failed ? theme.node.text : theme.node.activeStroke }}>
  {failed ? <span className="text-xs leading-5">{image.errorDetails || t("canvas.node.failed")}</span> : <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />}
  {!failed ? <span className="text-xs tracking-[0.2em]">{t("canvas.node.generating")}</span> : null}
+ </div>
+ );
+}
+
+function EditVersionList({ node, onRevert }: { node: CanvasNodeData; onRevert?: (node: CanvasNodeData, versionId: string) => void }) {
+ const { t } = useTranslation();
+ const versions = node.metadata?.editHistory || [];
+ if (!versions.length) return null;
+ return (
+ <div className="flex w-64 flex-col gap-0.5">
+ <div className="px-1 pb-1 text-[11px] font-medium opacity-55">{t("canvas.node.editVersionsHint")}</div>
+ {versions.map((version) => (
+ <button key={version.id} type="button" className="flex items-center gap-2 rounded-md px-1 py-1 text-left transition hover:bg-black/5 dark:hover:bg-white/10" title={version.prompt || t("canvas.node.editVersionUntitled")} onClick={() => onRevert?.(node, version.id)}>
+ <img src={version.content} alt="" className="size-9 shrink-0 rounded object-cover" draggable={false} loading="lazy" decoding="async" />
+ <span className="min-w-0 flex-1">
+ <span className="block truncate text-xs">{version.prompt || t("canvas.node.editVersionUntitled")}</span>
+ <span className="block text-[11px] opacity-55">{new Date(version.createdAt).toLocaleString()}</span>
+ </span>
+ <RotateCcw className="size-3.5 shrink-0 opacity-45" />
+ </button>
+ ))}
  </div>
  );
 }

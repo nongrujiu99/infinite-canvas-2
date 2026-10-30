@@ -55,12 +55,26 @@ export async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
                     return { ...image, content: await resolveImageUrl(image.storageKey, image.content) };
                 }),
             );
+            // 版本历史里存的是当时的 blob URL，刷新后会失效，得按 storageKey 重新解析
+            const editHistory = metadata.editHistory?.length
+                ? await Promise.all(
+                      metadata.editHistory.map(async (version) => {
+                          if (!version.storageKey) return version;
+                          void ensureImagePreview(version.storageKey);
+                          return { ...version, content: await resolveImageUrl(version.storageKey, version.content) };
+                      }),
+                  )
+                : metadata.editHistory;
             if (metadata.storageKey) {
                 void ensureImagePreview(metadata.storageKey);
-                return { ...node, metadata: { ...metadata, content: await resolveImageUrl(metadata.storageKey, content), images } };
+                return { ...node, metadata: { ...metadata, content: await resolveImageUrl(metadata.storageKey, content), images, editHistory } };
             }
             if (!content.startsWith("data:image/")) return node;
-            return { ...node, metadata: { ...metadata, ...imageMetadata(await uploadImage(content)) } };
+            // 单张图读不出来不能把整张画布带崩（例如 SVG data URL 解码失败），降级为直接用原串渲染
+            const uploaded = await uploadImage(content).catch(() => null);
+            return uploaded
+                ? { ...node, metadata: { ...metadata, ...imageMetadata(uploaded), images, editHistory } }
+                : { ...node, metadata: { ...metadata, images, editHistory } };
         }),
     );
 }

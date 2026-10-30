@@ -78,6 +78,7 @@ import {
  type CanvasConnection,
  type CanvasGenerationMode,
  type CanvasNodeData,
+ type CanvasNodeEditVersion,
  type CanvasNodeImage,
  type CanvasNodeText,
  type CanvasNodeMetadata,
@@ -121,6 +122,9 @@ function resolveMaskOperationSource(source: CanvasNodeData, nodes: CanvasNodeDat
  .map((connection) => nodes.find((item) => item.id === connection.fromNodeId))
  .find((item): item is CanvasNodeData => item?.type === CanvasNodeType.Image && Boolean(item.metadata?.content) && item.title !== maskNodeTitle) || source;
 }
+
+/** 节点内局部编辑最多保留多少版旧图 */
+const EDIT_HISTORY_LIMIT = 12;
 
 type CanvasHistoryEntry = Pick<CanvasClipboard, "nodes" | "connections"> & {
  backgroundMode: CanvasBackgroundMode;
@@ -667,6 +671,18 @@ function InfiniteCanvasPage() {
  const createConnectedNode = useCallback(
  (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video | CanvasNodeType.Audio | CanvasNodeType.Operation, pending: PendingConnectionCreate, nodeMetadata?: CanvasNodeMetadata) => {
  const connectedNode = nodesRef.current.find((node) => node.id === pending.connection.nodeId);
+ if (type === CanvasNodeType.Operation && nodeMetadata?.operationKind === "mask") {
+ // 局部编辑不建操作节点：直接从连过来的那张图开始涂抹
+ setPendingConnectionCreate(null);
+ setConnecting(null);
+ if (connectedNode?.type === CanvasNodeType.Image && connectedNode.metadata?.content) {
+ setActiveOperationNodeId(null);
+ setMaskEditNodeId(connectedNode.id);
+ } else {
+ message.warning(t("canvas.projectPage.maskNeedImage"));
+ }
+ return;
+ }
  const suggestedMode = connectedNode
  ? pending.connection.handleType === "target"
  ? resourceMode(connectedNode)
@@ -1921,10 +1937,22 @@ function InfiniteCanvasPage() {
  [createReversePromptFlow, message, openImageOperation, t],
  );
 
+ const openMaskEditForNode = useCallback((node: CanvasNodeData) => {
+ if (node.type !== CanvasNodeType.Image || !node.metadata?.content) return;
+ setActiveOperationNodeId(null);
+ setMaskEditNodeId(node.id);
+ }, []);
+
  const startImageOperationFromContext = useCallback((source: CanvasNodeData, kind: CanvasOperationKind) => {
  setContextMenu(null);
  if (kind === "reversePrompt") {
  createReversePromptFlow(source, source);
+ return;
+ }
+ if (kind === "mask") {
+ // 局部编辑直接在当前图片节点上涂抹，不再先摆一张操作节点卡片
+ setActiveOperationNodeId(null);
+ setMaskEditNodeId(source.id);
  return;
  }
  const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Operation];
@@ -1932,7 +1960,7 @@ function InfiniteCanvasPage() {
  ...createCanvasNode(CanvasNodeType.Operation, availableNodeCenterBelow(source, spec.width, spec.height, nodesRef.current), { operationKind: kind, status: NODE_STATUS_IDLE }),
  title: t(`canvas.operations.${kind}`),
  };
- const operationSource = kind === "mask" ? resolveMaskOperationSource(source, nodesRef.current, connectionsRef.current, t("canvas.projectPage.maskNodeTitle")) : source;
+ const operationSource = source;
  setNodes((prev) => [...prev, operation]);
  setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: operationSource.id, toNodeId: operation.id, fromPortId: "output", toPortId: "input" }]);
  setSelectedNodeIds(new Set([operation.id]));
@@ -2067,7 +2095,6 @@ function InfiniteCanvasPage() {
  async (node: CanvasNodeData, payload: CanvasImageMaskEditPayload) => {
  if (!node.metadata?.content) return;
  const operation = activeOperationNodeId ? nodesRef.current.find((item) => item.id === activeOperationNodeId) : undefined;
- const parent = operation || node;
  const sourceRatio = node.metadata?.naturalWidth && node.metadata?.naturalHeight
  ? inferMediaRatio(`${node.metadata.naturalWidth}x${node.metadata.naturalHeight}`)
  : inferMediaRatio(node.metadata?.size || "auto");
@@ -2086,71 +2113,142 @@ function InfiniteCanvasPage() {
  const nativeMaskPrompt = t("canvas.projectPage.nativeMaskPrompt", { prompt: userPrompt });
  setMaskEditNodeId(null);
  const maskImage = await uploadImage(payload.maskDataUrl);
- const maskNodeId = nanoid();
- const childId = nanoid();
+ const maskId = nanoid();
  const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
- const maskSource = { id: maskNodeId, name: "mask.png", type: maskImage.mimeType || "image/png", dataUrl: maskImage.url, storageKey: maskImage.storageKey };
- const apiMask = { id: `${maskNodeId}:api`, name: "mask.png", type: "image/png", dataUrl: payload.apiMaskDataUrl };
+ const maskSource = { id: maskId, name: "mask.png", type: maskImage.mimeType || "image/png", dataUrl: maskImage.url, storageKey: maskImage.storageKey };
+ const apiMask = { id: `${maskId}:api`, name: "mask.png", type: "image/png", dataUrl: payload.apiMaskDataUrl };
  const references = [source, maskSource];
- const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, references);
- const childMetadata = payload.generate ? { prompt, status: NODE_STATUS_LOADING, ...generationMetadata } : { prompt };
- setNodes((prev) => [
- ...prev,
- {
- id: maskNodeId,
+ if (!payload.generate) {
+ // 「导出到画布」只把遮罩标注图放上画布，不动原图，也不建结果节点
+ const maskNode: CanvasNodeData = {
+ id: maskId,
  type: CanvasNodeType.Image,
  title: t("canvas.projectPage.maskNodeTitle"),
- position: { x: parent.position.x - node.width - 48, y: parent.position.y },
+ position: { x: node.position.x - node.width - 48, y: node.position.y },
  width: node.width,
  height: node.height,
  metadata: { ...imageMetadata(maskImage), maskSourceNodeId: node.metadata?.maskSourceNodeId || node.id },
- },
- {
- id: childId,
- type: CanvasNodeType.Image,
- title: userPrompt.slice(0, 32) || t("canvas.projectPage.maskResult"),
- position: { x: parent.position.x + parent.width / 2 - node.width / 2, y: parent.position.y + parent.height + 96 },
- width: node.width,
- height: node.height,
- metadata: childMetadata,
- },
- ].map((item) => item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: payload.generate ? NODE_STATUS_LOADING : NODE_STATUS_SUCCESS } } : item));
- setConnections((prev) => [
- ...prev,
- { id: nanoid(), fromNodeId: maskNodeId, toNodeId: operation?.id || childId, fromPortId: "output", toPortId: "input" },
- { id: nanoid(), fromNodeId: operation?.id || node.id, toNodeId: childId, fromPortId: "output", toPortId: "input" },
- ]);
- setSelectedNodeIds(new Set([childId]));
+ };
+ setNodes((prev) => [...prev, maskNode]);
+ setSelectedNodeIds(new Set([maskId]));
  setSelectedConnectionId(null);
- setDialogNodeId(childId);
- if (!payload.generate) {
  setActiveOperationNodeId(null);
  return;
  }
- setRunningNodeId(childId);
- const controller = startGenerationRequest(childId, node.id, childId);
+ // 原地覆盖：先把当前这一版收进历史，成功后才真正替换内容，失败则原图不受影响
+ const previousVersion: CanvasNodeEditVersion = {
+ id: nanoid(),
+ content: node.metadata.content,
+ storageKey: node.metadata.storageKey,
+ mimeType: node.metadata.mimeType,
+ naturalWidth: node.metadata.naturalWidth,
+ naturalHeight: node.metadata.naturalHeight,
+ bytes: node.metadata.bytes,
+ prompt: node.metadata?.lastEditPrompt || node.metadata?.prompt,
+ createdAt: Date.now(),
+ };
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item));
+ if (operation) setNodes((prev) => prev.map((item) => item.id === operation.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item));
+ setRunningNodeId(node.id);
+ const controller = startGenerationRequest(node.id, node.id, node.id);
  let receivedResult = false;
  try {
  const image = await requestEdit(generationConfig, prompt, references, { signal: controller.signal, mask: apiMask, maskPrompt: nativeMaskPrompt }).then((items) => items[0]);
  receivedResult = true;
- setNodes((prev) => prev.map((item) => item.id === childId ? { ...item, metadata: { ...item.metadata, content: image.dataUrl, pendingRemoteResult: true } } : item));
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, content: image.dataUrl, storageKey: undefined, pendingRemoteResult: true } } : item));
  const uploaded = await uploadImage(image.dataUrl, { signal: controller.signal });
  const size = generatedImageNodeSize(uploaded.width, uploaded.height);
- setNodes((prev) => prev.map((item) => item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), pendingRemoteResult: undefined, prompt, ...generationMetadata } } : item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : item));
+ const primaryImageId = node.metadata?.primaryImageId || node.metadata?.images?.[0]?.id;
+ setNodes((prev) => prev.map((item) => item.id === node.id ? {
+ ...item,
+ width: size.width,
+ height: size.height,
+ metadata: {
+ ...item.metadata,
+ ...imageMetadata(uploaded),
+ prompt: userPrompt,
+ lastEditPrompt: userPrompt,
+ editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT),
+ images: item.metadata?.images?.map((current) => current.id === primaryImageId ? { ...current, content: uploaded.url, storageKey: uploaded.storageKey, naturalWidth: uploaded.width, naturalHeight: uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType, status: NODE_STATUS_SUCCESS, errorDetails: undefined } : current),
+ pendingRemoteResult: undefined,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
+ } } : item));
+ if (operation) {
+ // 老流程遗留的操作节点：完成后合并进图片节点，不再留一张中间卡片
+ setNodes((prev) => prev.filter((item) => item.id !== operation.id));
+ setConnections((prev) => prev.filter((connection) => connection.fromNodeId !== operation.id && connection.toNodeId !== operation.id));
+ message.success(t("canvas.projectPage.maskMergedIntoImage"));
+ }
  } catch (error) {
- if (isGenerationCanceled(error)) return;
+ if (isGenerationCanceled(error)) {
+ // 中断时若结果已经替换上去了，也要把上一版留在历史里，别让这一版悄悄消失
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, ...(receivedResult ? { editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT) } : {}) } } : item));
+ if (operation) setNodes((prev) => prev.map((item) => item.id === operation.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_IDLE } } : item));
+ return;
+ }
  const errorDetails = receivedResult ? t("canvas.projectPage.resultLoadFailed") : error instanceof Error ? error.message : t("canvas.projectPage.maskFailed");
  message.error(errorDetails);
- setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
+ // 失败不毁图：没出结果就只把状态恢复成可编辑；结果已到手但本地入库失败，则先补版本再保留新图
+ setNodes((prev) => prev.map((item) => item.id === node.id ? {
+ ...item,
+ metadata: {
+ ...item.metadata,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
+ ...(receivedResult ? { editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT), pendingRemoteResult: true } : {}),
+ },
+ } : item));
  if (operation) setNodes((prev) => prev.map((item) => item.id === operation.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item));
  } finally {
- finishGenerationRequest(childId, controller);
+ finishGenerationRequest(node.id, controller);
  setRunningNodeId(null);
  setActiveOperationNodeId(null);
  }
  },
- [activeOperationNodeId, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest, t],
+ [activeOperationNodeId, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, setConnections, startGenerationRequest, t],
  );
+
+ const revertNodeEdit = useCallback((node: CanvasNodeData, versionId?: string) => {
+ setNodes((prev) => prev.map((item) => {
+ if (item.id !== node.id) return item;
+ const history = item.metadata?.editHistory || [];
+ const index = versionId ? history.findIndex((version) => version.id === versionId) : 0;
+ if (index < 0) return item;
+ const target = history[index];
+ if (!target?.content) return item;
+ const current: CanvasNodeEditVersion = {
+ id: nanoid(),
+ content: item.metadata?.content || "",
+ storageKey: item.metadata?.storageKey,
+ mimeType: item.metadata?.mimeType,
+ naturalWidth: item.metadata?.naturalWidth,
+ naturalHeight: item.metadata?.naturalHeight,
+ bytes: item.metadata?.bytes,
+ prompt: item.metadata?.lastEditPrompt,
+ createdAt: Date.now(),
+ };
+ const primaryImageId = item.metadata?.primaryImageId || item.metadata?.images?.[0]?.id;
+ return {
+ ...item,
+ metadata: {
+ ...item.metadata,
+ content: target.content,
+ storageKey: target.storageKey,
+ mimeType: target.mimeType,
+ naturalWidth: target.naturalWidth,
+ naturalHeight: target.naturalHeight,
+ bytes: target.bytes,
+ lastEditPrompt: target.prompt,
+ pendingRemoteResult: undefined,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
+ images: item.metadata?.images?.map((currentImage) => currentImage.id === primaryImageId ? { ...currentImage, content: target.content, storageKey: target.storageKey, naturalWidth: target.naturalWidth ?? currentImage.naturalWidth, naturalHeight: target.naturalHeight ?? currentImage.naturalHeight, bytes: target.bytes ?? currentImage.bytes, status: NODE_STATUS_SUCCESS, errorDetails: undefined } : currentImage),
+ editHistory: [current, ...history.filter((_, position) => position !== index)].slice(0, EDIT_HISTORY_LIMIT),
+ },
+ };
+ }));
+ }, []);
 
  const upscaleImageNode = useCallback(async (node: CanvasNodeData, params: CanvasImageUpscaleParams) => {
  if (!node.metadata?.content) return;
@@ -3539,6 +3637,8 @@ function InfiniteCanvasPage() {
  onViewImage={handleNodeViewImage}
  onUpload={(targetNode) => handleUploadRequest(targetNode.id)}
  onDownload={downloadNodeImage}
+ onMaskEdit={openMaskEditForNode}
+ onRevertEdit={revertNodeEdit}
  onDropFiles={handleNodeFileDrop}
  onSelectReference={selectNodeReference}
  onContextMenu={handleNodeContextMenu}
@@ -3586,7 +3686,19 @@ function InfiniteCanvasPage() {
  onAddAudio={() => createNode(CanvasNodeType.Audio)}
  onAddText={() => createNode(CanvasNodeType.Text)}
  onAddConfig={() => createNode(CanvasNodeType.Config)}
- onAddOperation={(kind) => createNode(CanvasNodeType.Operation, undefined, { operationKind: kind, status: NODE_STATUS_IDLE })}
+ onAddOperation={(kind) => {
+ if (kind === "mask") {
+ const target = nodes.find((node) => node.type === CanvasNodeType.Image && node.metadata?.content && selectedNodeIds.has(node.id));
+ if (!target) {
+ message.warning(t("canvas.projectPage.maskNeedImage"));
+ return;
+ }
+ setActiveOperationNodeId(null);
+ setMaskEditNodeId(target.id);
+ return;
+ }
+ createNode(CanvasNodeType.Operation, undefined, { operationKind: kind, status: NODE_STATUS_IDLE });
+ }}
  onAddGroup={() => createNode(CanvasNodeType.Group)}
  onUndo={undoCanvas}
  onRedo={redoCanvas}
@@ -3651,7 +3763,7 @@ function InfiniteCanvasPage() {
  {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => { setCropNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(crop) => void cropImageNode(cropNode!, crop).catch(handleOperationFailure)} /> : null}
 
  {maskEditNode?.metadata?.content ? (
- <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} config={effectiveConfig} open={Boolean(maskEditNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setMaskEditNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(payload) => void maskEditImageNode(maskEditNode!, payload).catch(handleOperationFailure)} />
+ <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} initialPrompt={maskEditNode.metadata?.lastEditPrompt || ""} config={effectiveConfig} open={Boolean(maskEditNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setMaskEditNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(payload) => void maskEditImageNode(maskEditNode!, payload).catch(handleOperationFailure)} />
  ) : null}
 
  {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => { setSplitNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void splitImageNode(splitNode!, params).catch(handleOperationFailure)} /> : null}

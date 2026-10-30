@@ -65,6 +65,20 @@ export type CanvasNodeText = {
     content: string;
 };
 
+/** 局部编辑原地覆盖前的旧版本。最新的一版排在最前。 */
+export type CanvasNodeEditVersion = {
+    id: string;
+    content: string;
+    storageKey?: string;
+    mimeType?: string;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    bytes?: number;
+    /** 产生这一版时使用的编辑描述，回退后再次编辑时可以直接复用。 */
+    prompt?: string;
+    createdAt: number;
+};
+
 export type CanvasNodeMetadata = {
     content?: string;
     composerContent?: string;
@@ -105,6 +119,10 @@ export type CanvasNodeMetadata = {
     inputOrder?: string[];
     naturalWidth?: number;
     naturalHeight?: number;
+    /** 局部编辑原地覆盖留下的旧版本，最新在前。用于节点内回退，不新建节点。 */
+    editHistory?: CanvasNodeEditVersion[];
+    /** 上一次局部编辑的描述，再次涂抹时预填。 */
+    lastEditPrompt?: string;
     freeResize?: boolean;
     images?: CanvasNodeImage[];
     primaryImageId?: string;

@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask } from "@/services/api/video";
-import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { defaultConfig, resolveModelScript, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { ensureImagePreview, imageToDataUrl, uploadImage } from "@/services/image-storage";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
@@ -19,7 +19,7 @@ import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { cropDataUrl, resizeDataUrl, splitDataUrl, upscaleDataUrl } from "@/lib/canvas/canvas-image-data";
+import { cropDataUrl, resizeDataUrl, splitDataUrl, upscaleDataUrl, type ImageUpscaleParams } from "@/lib/canvas/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
 import { supportsImageEditModel, supportsSuperResolveScale } from "@/lib/canvas/image-edit-preferences";
 import { captureVideoFrame, type VideoFramePosition } from "@/lib/canvas/canvas-video-frame";
@@ -33,8 +33,7 @@ import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "@/components
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "@/components/canvas/canvas-node-crop-dialog";
 import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "@/components/canvas/canvas-node-mask-edit-dialog";
 import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "@/components/canvas/canvas-node-split-dialog";
-import { CanvasNodeSuperResolveDialog, type CanvasSuperResolvePayload } from "@/components/canvas/canvas-node-super-resolve-dialog";
-import { CanvasNodeUpscaleDialog, type CanvasImageUpscaleParams } from "@/components/canvas/canvas-node-upscale-dialog";
+import { CanvasNodeResizeDialog, type CanvasResizeMode, type CanvasSuperResolvePayload } from "@/components/canvas/canvas-node-resize-dialog";
 import { buildNodeGenerationContext, buildNodeGenerationInputs, buildNodeResponseMessages, hydrateNodeGenerationContext, type NodeGenerationInput } from "@/components/canvas/canvas-node-generation";
 import { CanvasSelectionToolbar } from "@/components/canvas/canvas-selection-toolbar";
 import { InfiniteCanvas } from "@/components/canvas/infinite-canvas";
@@ -42,7 +41,7 @@ import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/asset-picker-modal";
-import { SavePromptTemplateDialog } from "@/components/canvas/save-prompt-template-dialog";
+import { PromptTemplateDialog } from "@/components/prompts/prompt-template-dialog";
 import { ReverseInstructionDialog } from "@/components/canvas/reverse-instruction-dialog";
 import { CanvasSidePanel } from "@/components/canvas/canvas-side-panel";
 import { CanvasZoomControls } from "@/components/canvas/canvas-zoom-controls";
@@ -312,8 +311,8 @@ function InfiniteCanvasPage() {
  const [cropNodeId, setCropNodeId] = useState<string | null>(null);
  const [maskEditNodeId, setMaskEditNodeId] = useState<string | null>(null);
  const [splitNodeId, setSplitNodeId] = useState<string | null>(null);
- const [upscaleNodeId, setUpscaleNodeId] = useState<string | null>(null);
- const [superResolveNodeId, setSuperResolveNodeId] = useState<string | null>(null);
+ const [resizeNodeId, setResizeNodeId] = useState<string | null>(null);
+ const [resizeMode, setResizeMode] = useState<CanvasResizeMode>("fast");
  const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
  const [activeOperationNodeId, setActiveOperationNodeId] = useState<string | null>(null);
  const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
@@ -668,7 +667,7 @@ function InfiniteCanvasPage() {
  setCropNodeId(null);
  setSplitNodeId(null);
  setMaskEditNodeId(null);
- setUpscaleNodeId(null);
+ setResizeNodeId(null);
  setAngleNodeId(null);
  setActiveOperationNodeId(null);
  message.error(errorDetails);
@@ -817,8 +816,7 @@ function InfiniteCanvasPage() {
  const cropNode = cropNodeId ? nodeById.get(cropNodeId) || null : null;
  const maskEditNode = maskEditNodeId ? nodeById.get(maskEditNodeId) || null : null;
  const splitNode = splitNodeId ? nodeById.get(splitNodeId) || null : null;
- const upscaleNode = upscaleNodeId ? nodeById.get(upscaleNodeId) || null : null;
- const superResolveNode = superResolveNodeId ? nodeById.get(superResolveNodeId) || null : null;
+ const resizeNode = resizeNodeId ? nodeById.get(resizeNodeId) || null : null;
  const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
  const contextMenuNode = contextMenu?.type === "node" ? nodeById.get(contextMenu.nodeId) || null : null;
  const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
@@ -1034,7 +1032,7 @@ function InfiniteCanvasPage() {
  setCropNodeId(null);
  setMaskEditNodeId(null);
  setSplitNodeId(null);
- setUpscaleNodeId(null);
+ setResizeNodeId(null);
  setAngleNodeId(null);
  setActiveOperationNodeId(null);
  setPreviewNodeId(null);
@@ -1739,7 +1737,7 @@ function InfiniteCanvasPage() {
  setCropNodeId(null);
  setMaskEditNodeId(null);
  setSplitNodeId(null);
- setUpscaleNodeId(null);
+ setResizeNodeId(null);
  setAngleNodeId(null);
  setActiveOperationNodeId(null);
  setPendingConnectionCreate(null);
@@ -1953,9 +1951,12 @@ function InfiniteCanvasPage() {
  if (kind === "crop") setCropNodeId(operationSource.id);
  if (kind === "split") setSplitNodeId(operationSource.id);
  if (kind === "mask") setMaskEditNodeId(operationSource.id);
- if (kind === "upscale") setUpscaleNodeId(operationSource.id);
+ if (kind === "upscale" || kind === "superResolve") {
+ // 已保存的项目里可能还留着 superResolve 操作节点，统一落到同一个对话框的 AI 模式。
+ setResizeMode(kind === "superResolve" ? "ai" : "fast");
+ setResizeNodeId(operationSource.id);
+ }
  if (kind === "angle") setAngleNodeId(operationSource.id);
- if (kind === "superResolve") setSuperResolveNodeId(operationSource.id);
  }, [t]);
 
  const runImageOperation = useCallback(
@@ -1984,7 +1985,7 @@ function InfiniteCanvasPage() {
  const openSavePromptTemplate = useCallback((node: CanvasNodeData) => setPromptTemplateNode(node), []);
 
  const savePromptTemplate = useCallback(
- ({ title, prompt }: { title: string; prompt: string }) => {
+ ({ title, prompt, category, tags }: { title: string; prompt: string; category: string; tags: string[] }) => {
  const node = promptTemplateNode;
  if (!node) return;
  addPromptTemplate({
@@ -1992,7 +1993,8 @@ function InfiniteCanvasPage() {
  prompt,
  coverUrl: node.metadata?.content || "",
  coverStorageKey: node.metadata?.storageKey,
- tags: [],
+ category,
+ tags,
  sourceNodeId: node.id,
  });
  setPromptTemplateNode(null);
@@ -2029,6 +2031,13 @@ function InfiniteCanvasPage() {
  // 局部编辑直接在当前图片节点上涂抹，不再先摆一张操作节点卡片
  setActiveOperationNodeId(null);
  setMaskEditNodeId(source.id);
+ return;
+ }
+ if (kind === "upscale" || kind === "superResolve") {
+ // 放大同样走原地：不摆操作卡片、不产结果节点，旧版本进编辑历史可回退
+ setActiveOperationNodeId(null);
+ setResizeMode(kind === "superResolve" ? "ai" : "fast");
+ setResizeNodeId(source.id);
  return;
  }
  const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Operation];
@@ -2328,38 +2337,58 @@ function InfiniteCanvasPage() {
  }));
  }, []);
 
- const upscaleImageNode = useCallback(async (node: CanvasNodeData, params: CanvasImageUpscaleParams) => {
+ const upscaleImageNode = useCallback(async (node: CanvasNodeData, params: ImageUpscaleParams) => {
  if (!node.metadata?.content) return;
  const operation = activeOperationNodeId ? nodesRef.current.find((item) => item.id === activeOperationNodeId) : undefined;
- const parent = operation || node;
- setUpscaleNodeId(null);
+ setResizeNodeId(null);
+ // 原地放大：不新建结果节点、不摆操作卡片，旧版本收进 editHistory 以便节点内回退
+ const previousVersion: CanvasNodeEditVersion = {
+ id: nanoid(),
+ content: node.metadata.content,
+ storageKey: node.metadata.storageKey,
+ mimeType: node.metadata.mimeType,
+ naturalWidth: node.metadata.naturalWidth,
+ naturalHeight: node.metadata.naturalHeight,
+ bytes: node.metadata.bytes,
+ prompt: node.metadata?.prompt,
+ createdAt: Date.now(),
+ };
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item));
+ try {
  const upscaled = await upscaleDataUrl(node.metadata.content, params);
- const image = await uploadImage(upscaled);
- const size = fitNodeSize(image.width, image.height);
- const childId = nanoid();
- const child: CanvasNodeData = {
- id: childId,
- type: CanvasNodeType.Image,
- title: "Upscaled Image",
- position: { x: parent.position.x + parent.width / 2 - size.width / 2, y: parent.position.y + parent.height + 96 },
+ const uploaded = await uploadImage(upscaled);
+ const size = generatedImageNodeSize(uploaded.width, uploaded.height);
+ const primaryImageId = node.metadata?.primaryImageId || node.metadata?.images?.[0]?.id;
+ setNodes((prev) => prev.map((item) => item.id === node.id ? {
+ ...item,
  width: size.width,
  height: size.height,
  metadata: {
- ...imageMetadata(image),
- prompt: node.metadata?.prompt,
+ ...item.metadata,
+ ...imageMetadata(uploaded),
+ editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT),
+ images: item.metadata?.images?.map((current) => current.id === primaryImageId ? { ...current, content: uploaded.url, storageKey: uploaded.storageKey, naturalWidth: uploaded.width, naturalHeight: uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType, status: NODE_STATUS_SUCCESS, errorDetails: undefined } : current),
+ pendingRemoteResult: undefined,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
  },
- };
- setNodes((prev) => [...prev.map((item) => (item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS } } : item)), child]);
- setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: operation?.id || node.id, toNodeId: childId, fromPortId: "output", toPortId: "input" }]);
- setSelectedNodeIds(new Set([childId]));
- setDialogNodeId(childId);
+ } : item));
+ if (operation) {
+ // 老流程遗留的操作节点：完成后合并进图片节点，不再留一张中间卡片
+ setNodes((prev) => prev.filter((item) => item.id !== operation.id));
+ setConnections((prev) => prev.filter((connection) => connection.fromNodeId !== operation.id && connection.toNodeId !== operation.id));
+ }
+ } catch (error) {
+ message.error(error instanceof Error ? error.message : t("canvas.projectPage.generationFailed"));
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : item));
+ } finally {
  setActiveOperationNodeId(null);
- }, [activeOperationNodeId]);
+ }
+ }, [activeOperationNodeId, message, setConnections, t]);
 
  const superResolveImageNode = useCallback(async (node: CanvasNodeData, payload: CanvasSuperResolvePayload) => {
  if (!node.metadata?.content) return;
  const operation = activeOperationNodeId ? nodesRef.current.find((item) => item.id === activeOperationNodeId) : undefined;
- const parent = operation || node;
  const ratio = inferMediaRatio(`${node.metadata.naturalWidth || node.width}x${node.metadata.naturalHeight || node.height}`);
  const generationConfig = { ...buildGenerationConfig(effectiveConfig, undefined, "image"), model: payload.model, quality: payload.scale, size: computeMediaSize(payload.scale, ratio), count: "1" };
  if (!supportsImageEditModel(effectiveConfig, payload.model, "superResolve")) {
@@ -2374,65 +2403,86 @@ function InfiniteCanvasPage() {
  openConfigDialog(true);
  return;
  }
- const reusableChild = operation ? connectionsRef.current
- .filter((connection) => connection.valid !== false && connection.fromNodeId === operation.id)
- .map((connection) => nodesRef.current.find((item) => item.id === connection.toNodeId))
- .find((item) => item?.type === CanvasNodeType.Image && item.metadata?.status === NODE_STATUS_ERROR && !item.metadata?.content) : undefined;
- const childId = reusableChild?.id || nanoid();
- const prompt = t("canvas.editors.superResolvePrompt");
+ // 带自定义脚本的模型通常是真正的超分服务（Real-ESRGAN 之类），按像素重建，
+ // 不认「保持主体不变」这类重绘指令，给空提示词交回脚本自己决定。
+ const prompt = resolveModelScript(generationConfig, generationConfig.model) ? "" : t("canvas.editors.superResolvePrompt");
  const reference = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
- const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [reference]);
- const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
- setSuperResolveNodeId(null);
- setRunningNodeId(childId);
- const child: CanvasNodeData = {
- id: childId,
- type: CanvasNodeType.Image,
- title: t("canvas.editors.superResolveResult"),
- position: reusableChild?.position || { x: parent.position.x + parent.width / 2 - imageConfig.width / 2, y: parent.position.y + parent.height + 96 },
- width: imageConfig.width,
- height: imageConfig.height,
- metadata: { prompt, status: NODE_STATUS_LOADING, ...generationMetadata },
+ // 原地覆盖：不新建结果节点、不摆操作卡片，旧版本收进 editHistory 以便节点内回退
+ const previousVersion: CanvasNodeEditVersion = {
+ id: nanoid(),
+ content: node.metadata.content,
+ storageKey: node.metadata.storageKey,
+ mimeType: node.metadata.mimeType,
+ naturalWidth: node.metadata.naturalWidth,
+ naturalHeight: node.metadata.naturalHeight,
+ bytes: node.metadata.bytes,
+ prompt: node.metadata?.prompt,
+ createdAt: Date.now(),
  };
- setNodes((prev) => {
- const current = prev.map((item) => item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item);
- return reusableChild ? current.map((item) => item.id === childId ? child : item) : [...current, child];
- });
- if (!reusableChild) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: operation?.id || node.id, toNodeId: childId, fromPortId: "output", toPortId: "input" }]);
- setSelectedNodeIds(new Set([childId]));
- setSelectedConnectionId(null);
- setDialogNodeId(childId);
- const controller = startGenerationRequest(childId, node.id, childId);
+ setResizeNodeId(null);
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item));
+ setRunningNodeId(node.id);
+ const controller = startGenerationRequest(node.id, node.id, node.id);
  let receivedResult = false;
  try {
  const image = await requestEdit(generationConfig, prompt, [reference], { signal: controller.signal }).then((items) => items[0]);
  receivedResult = true;
- setNodes((prev) => prev.map((item) => item.id === childId ? { ...item, metadata: { ...item.metadata, content: image.dataUrl, pendingRemoteResult: true } } : item));
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, content: image.dataUrl, storageKey: undefined, pendingRemoteResult: true } } : item));
  const requestedSize = parsePixelSize(generationConfig.size);
  const sourceDataUrl = await imageToDataUrl({ dataUrl: image.dataUrl }, { signal: controller.signal });
- const outputDataUrl = requestedSize ? await resizeDataUrl(sourceDataUrl, requestedSize.width, requestedSize.height) : sourceDataUrl;
- setNodes((prev) => prev.map((item) => item.id === childId ? { ...item, metadata: { ...item.metadata, content: outputDataUrl } } : item));
+ // 只在模型给得比目标小时才用插值补齐。模型给得更大就原样保留——无条件缩到目标尺寸，
+ // 等于把刚重建出来的高频又用插值抹掉一遍。
+ const sourceMeta = await readImageMeta(sourceDataUrl);
+ const needsFill = Boolean(requestedSize && sourceMeta.width * sourceMeta.height < requestedSize.width * requestedSize.height);
+ const outputDataUrl = needsFill && requestedSize ? await resizeDataUrl(sourceDataUrl, requestedSize.width, requestedSize.height) : sourceDataUrl;
  const uploaded = await uploadImage(outputDataUrl, { signal: controller.signal });
  const resolutionMismatch = imageResolutionMismatch(generationConfig.size, uploaded.width, uploaded.height);
  if (resolutionMismatch) message.warning(t("canvas.projectPage.resolutionMismatch", { sizes: resolutionMismatch }));
  const size = generatedImageNodeSize(uploaded.width, uploaded.height);
- setNodes((prev) => prev.map((item) => item.id === childId
- ? { ...item, ...size, metadata: { ...item.metadata, ...imageMetadata(uploaded), pendingRemoteResult: undefined, prompt, ...generationMetadata } }
- : item.id === operation?.id
- ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } }
- : item));
+ const primaryImageId = node.metadata?.primaryImageId || node.metadata?.images?.[0]?.id;
+ setNodes((prev) => prev.map((item) => item.id === node.id ? {
+ ...item,
+ width: size.width,
+ height: size.height,
+ metadata: {
+ ...item.metadata,
+ ...imageMetadata(uploaded),
+ ...(prompt ? { prompt } : {}),
+ editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT),
+ images: item.metadata?.images?.map((current) => current.id === primaryImageId ? { ...current, content: uploaded.url, storageKey: uploaded.storageKey, naturalWidth: uploaded.width, naturalHeight: uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType, status: NODE_STATUS_SUCCESS, errorDetails: undefined } : current),
+ pendingRemoteResult: undefined,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
+ },
+ } : item));
+ if (operation) {
+ setNodes((prev) => prev.filter((item) => item.id !== operation.id));
+ setConnections((prev) => prev.filter((connection) => connection.fromNodeId !== operation.id && connection.toNodeId !== operation.id));
+ }
  } catch (error) {
- if (!isGenerationCanceled(error)) {
+ if (isGenerationCanceled(error)) {
+ // 中断时若结果已经替换上去了，也要把上一版留在历史里，别让这一版悄悄消失
+ setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_SUCCESS, ...(receivedResult ? { editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT) } : {}) } } : item));
+ return;
+ }
  const errorDetails = receivedResult ? t("canvas.projectPage.resultLoadFailed") : error instanceof Error ? error.message : t("canvas.projectPage.generationFailed");
  message.error(errorDetails);
- setNodes((prev) => prev.map((item) => item.id === childId || item.id === operation?.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item));
- }
+ // 失败不毁图：没出结果就只把状态恢复成可编辑；结果已到手但本地入库失败，则先补版本再保留新图
+ setNodes((prev) => prev.map((item) => item.id === node.id ? {
+ ...item,
+ metadata: {
+ ...item.metadata,
+ status: NODE_STATUS_SUCCESS,
+ errorDetails: undefined,
+ ...(receivedResult ? { editHistory: [previousVersion, ...(item.metadata?.editHistory || [])].slice(0, EDIT_HISTORY_LIMIT), pendingRemoteResult: true } : {}),
+ },
+ } : item));
  } finally {
- finishGenerationRequest(childId, controller);
+ finishGenerationRequest(node.id, controller);
  setRunningNodeId(null);
  setActiveOperationNodeId(null);
  }
- }, [activeOperationNodeId, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest, t]);
+ }, [activeOperationNodeId, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, setConnections, startGenerationRequest, t]);
 
  const generateAngleNode = useCallback(
  async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
@@ -3894,11 +3944,18 @@ function InfiniteCanvasPage() {
 
  {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => { setSplitNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void splitImageNode(splitNode!, params).catch(handleOperationFailure)} /> : null}
 
- {upscaleNode?.metadata?.content ? (
- <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open={Boolean(upscaleNode)} onClose={() => { setUpscaleNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void upscaleImageNode(upscaleNode!, params).catch(handleOperationFailure)} />
+ {resizeNode?.metadata?.content ? (
+ <CanvasNodeResizeDialog
+ dataUrl={resizeNode.metadata.content}
+ config={effectiveConfig}
+ open={Boolean(resizeNode)}
+ initialMode={resizeMode}
+ onMissingConfig={() => openConfigDialog(true)}
+ onClose={() => { setResizeNodeId(null); setActiveOperationNodeId(null); }}
+ onConfirmFast={(params) => void upscaleImageNode(resizeNode, params)}
+ onConfirmAi={(payload) => void superResolveImageNode(resizeNode, payload)}
+ />
  ) : null}
-
- {superResolveNode?.metadata?.content ? <CanvasNodeSuperResolveDialog dataUrl={superResolveNode.metadata.content} config={effectiveConfig} open={Boolean(superResolveNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setSuperResolveNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(payload) => void superResolveImageNode(superResolveNode, payload)} /> : null}
 
  {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} config={effectiveConfig} open={Boolean(angleNode)} onMissingConfig={() => openConfigDialog(true)} onClose={() => { setAngleNodeId(null); setActiveOperationNodeId(null); }} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
 
@@ -3932,11 +3989,10 @@ function InfiniteCanvasPage() {
  </Modal>
 
  <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
- <SavePromptTemplateDialog
+ <PromptTemplateDialog
   open={Boolean(promptTemplateNode)}
   coverUrl={promptTemplateNode?.metadata?.content || ""}
-  defaultTitle={promptTemplateNode?.title || ""}
-  defaultPrompt={promptTemplateNode ? resolveNodePrompt(promptTemplateNode) : ""}
+  value={{ title: promptTemplateNode?.title || "", prompt: promptTemplateNode ? resolveNodePrompt(promptTemplateNode) : "", category: "", tags: [] }}
   onSave={savePromptTemplate}
   onClose={() => setPromptTemplateNode(null)}
  />

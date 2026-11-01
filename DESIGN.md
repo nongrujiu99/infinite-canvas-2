@@ -129,6 +129,8 @@ The palette is Photoshop 2020's UI gray scale, in its light-gray and dark-gray b
 
 **The Tone-Not-Shadow Rule.** Separation comes from one tone step plus a 1px border. Shadows are reserved for genuinely floating surfaces (menus, tooltips, dialogs).
 
+**The Canvas-Surface Rule.** The 20px dot grid is the canvas's own material, so it may only appear where something is a canvas: the workspace viewport, and the landing page's hero. It is drawn as a 1px dot in the hairline tone — one step above the surface, never readable as a texture — and it does not move, animate, or follow the pointer. It never appears on panels, menus, cards, or any document section, and it is never paired with a second texture. Pages that are not canvases stay flat: a dotted background on a settings screen is a costume, not a surface. The page-level grid is always **one step fainter than the grid inside the demo canvas** — measured as composited luminance, about 8 levels apart on both themes (light ≈ 219 vs 211, dark ≈ 44 vs 52). A background grid that out-contrasts the content it sits behind inverts the hierarchy: the hero would read as the canvas and the canvas as a pasted-on picture.
+
 ## Typography
 
 **Display Font:** Segoe UI (Windows Photoshop 2020's UI face) with Adobe Clean, PingFang SC and Microsoft YaHei fallbacks  
@@ -146,6 +148,46 @@ The palette is Photoshop 2020's UI gray scale, in its light-gray and dark-gray b
 **The Three-Size Rule.** 全站只有 22 / 14 / 12 三档字号。层级由字重（600 / 400）和颜色（foreground / muted-foreground）承担，不由「再小一号」承担。9、10、11、13、15、16px 一律不允许出现——相邻档差 1px 的阶梯等于没有阶梯。
 
 **The Quiet Label Rule.** Labels support decisions but never compete with values or actions.
+
+### Landing Page Scale
+
+落地页（`/`，样式全部作用域在 `.ic-home`）在 22 / 14 / 12 之外多一档章节标题，并允许首屏标题再上一档：
+
+- **首屏标题** 44px（`clamp(2.25rem, 3.2vw, 2.75rem)`，600，1.16，-0.02em）：整页只有一次。
+- **章节标题** 28px（`clamp(1.5rem, 2vw, 1.75rem)`，600，1.22）：每节一个，含隐私带那句声明。
+- 正文 14 / 注解 12 不变。
+
+**The Landing-Scale Rule.** 这两档只服务落地页。应用界面（画布、素材库、设置）里出现 28 或 44 就是错——那里 22 已经是页面标题，层级由字重与灰度承担。原因：应用里读者知道自己在哪一页，落地页的读者在往下扫，22 与 14 只差 1.57 倍，章节标题撑不起一节。
+
+**The Mono-Numeral Rule.** 落地页里所有编号（首屏索引带的 01–03、章节标记的 01–03）用同一套等宽字（`--home-mono`）：同样的两个数字在三个组件里换三种长相，读者未必说得出哪里不对，但会觉得这页没做完。中文标签（全貌 / 开始）落回正文字族，不做等宽化。
+
+### Landing Page Grid
+
+落地页一屏里有五种「左标题 / 右内容」的组合，但只用一副骨架：
+
+- **两列 5 : 7**（`--home-split`），列间距一档（`clamp(32px, 3.4vw, 52px)`）。
+- 左列放标题（章节可带 01–03 序号），右列放说明或主体。
+- 说明文字从第二列起点起笔，**右端不贴齐、也不居中**；第二列起点因此与首屏画布的左边缘重合，成为全页第二条竖轴。
+- 首屏两列拉到同高，左列的注解贴住列底，与画布说明落在同一基线上。
+
+**The One-Split Rule.** 落地页只有这一副两列骨架。首屏、章节头、结尾 CTA、页脚共用同一个 5 : 7，不允许出现 6 : 6、7 : 5 之类的临时比例——比例一多，竖轴就有三四条，读者的眼睛找不到规律。说明文字一律从第二列起笔，禁止 `justify-self: end`：标题两百像素、说明三百像素，两端对齐会在中间留出 700px 的洞，把一句话拆成两段互不相干的文字。留白放在右边缘是页边，留在两段之间是断裂。
+
+### Section Header Recipe
+
+落地页的五个分段头（全貌 / 01 / 02 / 03 / 开始）是**同一个组件**，只有文字不同：
+
+- **标记** 12px 等宽，灰色，后面拖 32px 发丝——「全貌」「开始」用词，「01」「02」「03」用数字。
+- **标题** 28px 600，紧跟标记下方 8px。
+- **说明** 14px 灰，落在第二列（46%）起点，末行与标题底对齐。
+- 标题顶边距分区线恒为 37px，五个头的标题因此全部落在同一条基线上。
+
+**The One-Header Rule.** 不允许出现「没有标记的章节头」或「只有标题没有说明的头」。标记不是装饰，它是这一节在页面里的位置（全貌 / 第一到第三节 / 开始）；缺一个，读者就数不清自己在哪。同一节里禁止第二层编号——01 节的三步不再挂 01/02/03，两层数字叠在一起，读起来像渲染错误。
+
+### Vertical Rhythm
+
+落地页的分区节奏是**上窄下宽**：分区线往上 37px 就是标记，往下 86px 才是下一节。标记贴着线挂，读者一眼知道这一节从哪开始；内容块之间因此是 123px，而不是 203px。
+
+**The Band Rule.** 分区上下不许等距。等距会让高度不同的几节（70 / 151 / 202 / 300 / 798）被同一道间距压成互不相干的孤岛——矮的那几节看着像被自己的空白挤扁了。上 37 / 下 86 把「归属」给了下一节，页面因此是连续的，不是五块拼起来的。
 
 ## Layout
 

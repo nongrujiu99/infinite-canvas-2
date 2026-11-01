@@ -1,10 +1,11 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { createBrowserRouter, Outlet } from "react-router-dom";
 
 import { AnalyticsTracker } from "@/components/layout/analytics-tracker";
 import UserLayout from "@/layouts/user-layout";
 import CanvasPage from "@/pages/canvas";
 import CanvasProjectPage from "@/pages/canvas/project";
 import EcomStudioPage from "@/pages/studio";
+import HomePage from "@/pages/home";
 import NotFound from "@/pages/not-found";
 import PromptsPage from "@/pages/prompts";
 
@@ -17,7 +18,7 @@ export const router = createBrowserRouter([
  </UserLayout>
  ),
  children: [
- { path: "/", element: <Navigate to="/canvas" replace /> },
+ { path: "/", element: <HomePage /> },
  { path: "/canvas", element: <CanvasPage /> },
  { path: "/canvas/:id", element: <CanvasProjectPage /> },
  { path: "/image", element: <EcomStudioPage /> },

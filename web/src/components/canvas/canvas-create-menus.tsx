@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Crop, Grid2x2, ImageIcon, List, Maximize2, Music2, ScanSearch, Settings2, Sparkles, Video, WandSparkles, X } from "lucide-react";
+import { Crop, Grid2x2, ImageIcon, List, Maximize2, Music2, ScanSearch, Settings2, Sparkles, Video, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -12,7 +12,6 @@ const OPERATION_OPTIONS: { kind: CanvasOperationKind; icon: React.ReactNode }[] 
  { kind: "split", icon: <Grid2x2 className="size-5" /> },
  { kind: "mask", icon: <ScanSearch className="size-5" /> },
  { kind: "upscale", icon: <Maximize2 className="size-5" /> },
- { kind: "superResolve", icon: <WandSparkles className="size-5" /> },
  { kind: "angle", icon: <Sparkles className="size-5" /> },
 ];
 

@@ -16,7 +16,7 @@
 本地开发需要 [Bun](https://bun.sh/)：
 
 ```bash
-git clone https://github.com/basketikun/infinite-canvas.git
+git clone https://github.com/nongrujiu99/infinite-canvas-2.git
 cd infinite-canvas/web
 bun install
 bun run dev

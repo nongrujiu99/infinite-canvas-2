@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { BetweenHorizontalStart, Crop, FileText, GalleryHorizontalEnd, GalleryHorizontal, Grid2x2, Group, Image as ImageIcon, List, Maximize2, Music2, Plus, ScanSearch, Settings2, Sparkles, Trash2, Ungroup, Video, WandSparkles } from "lucide-react";
+import { BetweenHorizontalStart, Crop, FileText, GalleryHorizontalEnd, GalleryHorizontal, Grid2x2, Group, Image as ImageIcon, List, Maximize2, Music2, Plus, ScanSearch, Settings2, Sparkles, Trash2, Ungroup, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -13,7 +13,6 @@ const IMAGE_OPERATIONS: { kind: CanvasOperationKind; icon: ReactNode }[] = [
  { kind: "split", icon: <Grid2x2 className="size-4" /> },
  { kind: "mask", icon: <ScanSearch className="size-4" /> },
  { kind: "upscale", icon: <Maximize2 className="size-4" /> },
- { kind: "superResolve", icon: <WandSparkles className="size-4" /> },
  { kind: "angle", icon: <Sparkles className="size-4" /> },
  { kind: "reversePrompt", icon: <FileText className="size-4" /> },
 ];

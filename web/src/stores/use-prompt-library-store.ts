@@ -19,6 +19,8 @@ export type SavedPrompt = {
     /** 缩略图地址（blob / data / 远端都可能，刷新后按 coverStorageKey 重解析） */
     coverUrl: string;
     coverStorageKey?: string;
+    /** 分类（用户自己起的名字，空字符串表示未分类） */
+    category: string;
     tags: string[];
     /** 来源图片节点，方便回溯 */
     sourceNodeId?: string;
@@ -49,9 +51,11 @@ const libraryStorage: PersistStorage<PromptLibraryStore> = {
         // 缩略图存的是 blob URL，刷新后失效，必须按 storageKey 重新解析
         parsed.state.prompts = await Promise.all(
             (parsed.state.prompts || []).map(async (item) => {
-                if (!item.coverStorageKey) return item;
-                void ensureImagePreview(item.coverStorageKey);
-                return { ...item, coverUrl: await resolveImageUrl(item.coverStorageKey, item.coverUrl) };
+                // 老数据没有 category 字段，补成「未分类」，否则筛选时对不上
+                const normalized = { ...item, category: item.category || "" };
+                if (!normalized.coverStorageKey) return normalized;
+                void ensureImagePreview(normalized.coverStorageKey);
+                return { ...normalized, coverUrl: await resolveImageUrl(normalized.coverStorageKey, normalized.coverUrl) };
             }),
         );
         return parsed;

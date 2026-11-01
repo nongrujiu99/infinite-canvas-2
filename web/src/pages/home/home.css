@@ -1,0 +1,997 @@
+/* Hallmark · shape: Live Canvas · genre: precision-studio (DESIGN.md「The Precision Studio」) · theme: brand, 不发牌
+ * axes: light-gray/neutral-grotesk/cool · posture: Stage · 深浅两套 · hero: 一块能拖动的迷你画布
+ * signature: 首屏画布可拖、连线跟着走，节点样式取自 lib/canvas-theme.ts 的真实取值
+ * 字号四档 44 / 28 / 14 / 12，只在 .ic-home 内生效（DESIGN.md「Landing Page Scale」）
+ * v2.2.0 章节加 01–03 序号，三节换三种骨架，首屏画布补上工作区外壳（顶栏 + 缩略图）
+ * v2.3.0 层次三件事：章节标题 22→28 撑起一整节；首屏底部加 01–03 索引带收住重心；
+ *        截图带整块铺台面色、七种节点改摆成节点卡、参数退成设置行——三种材质而不是三张表
+ * v2.4.0 首屏不再是纯色：把画布自己的 20px 点阵铺到 hero 上（比画布里淡一档），
+ *        演示画布于是浮在无限画布上而不是贴在一块黑板上；同时给首屏高度封顶 1040，
+ *        2K/4K 上内容不再被摊成上下各空 360 的一片空地
+ * v2.5.0 全页收敛到一套两列骨骼（5 : 7 + 一档间距）：章节头、结尾 CTA、页脚都用它，
+ *        说明文字从第二列起笔而不是贴右边缘——原来标题和说明之间空 700px，读成两段
+ *        不相干的话；首屏左列同时被拉到与画布同高，注解贴住列底，两栏共用一条地平线
+ * v2.5.1 首屏点阵压到比画布内的点更淡一档（暗色 17% → 8%）。原来是背景比内容还重：
+ *        首屏点合成约 61 级、画布内的点只有 52 级，主次颠倒
+ * v2.6.0 分段头收成一个组件（等宽标记 + 发丝 → 标题 → 46% 说明），五个头共用一条基线；
+ *        分区节奏改上窄下宽 37/86，标记贴着分区线挂，内容块之间从 203 收到 123；
+ *        01 节的三步不再带编号，去掉与章节标记重复的第二层数字 */
+/* Hallmark · shape: Live Canvas · genre: precision-studio · theme: brand · posture: Stage · 深浅两套 · contrast: pass */
+
+.ic-home {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: clip;
+    scrollbar-color: var(--border) transparent;
+    background: var(--background);
+    color: var(--foreground);
+
+    --home-container: 1280px;
+    --home-gutter: 20px;
+    --home-rule: var(--border);
+    /* 首屏点阵。从前景色淡化出来，不写死颜色：背景要有材质，但读不到「点」 */
+    --home-grid: color-mix(in srgb, var(--foreground) 10%, transparent);
+
+    /* 落地页四档：44 / 28 / 14 / 12。应用界面仍是 22 / 14 / 12——
+       22 与 14 只差 1.57 倍，章节标题撑不起一节，所以落地页多给一档 28。 */
+    --home-display: clamp(2.25rem, 3.2vw, 2.75rem);
+    --home-title: clamp(1.5rem, 2vw, 1.75rem);
+    --home-page: 1.375rem;
+    --home-body: 0.875rem;
+    --home-label: 0.75rem;
+
+    /* 全页只有一套两列骨骼：5 : 7，间距一档。首屏的「文案 | 画布」就是它，
+       下面每个章节头、结尾 CTA、页脚都复用它——整页因此只有两条竖轴
+       （内容左沿 与 第二列起点），说明文字永远从第二列起笔，不再贴右边缘飘 */
+    --home-split: minmax(0, 5fr) minmax(0, 7fr);
+    --home-split-gap: clamp(32px, 3.4vw, 52px);
+
+    /* 两档节奏：上窄下宽。分区线往上 37 就是章节标记（数字 + 一小截发丝），
+       标记贴着线挂，读者一眼知道这一节从哪开始；下面 86 才是节与节之间的呼吸。
+       原来上下各 101，标记悬在半空，两节内容之间空出 203——矮的那几节（结尾 70、
+       隐私 151）被自己的间距压成了孤岛 */
+    --home-band-top: clamp(28px, 2.6vw, 40px);
+    --home-band-bottom: clamp(56px, 6vw, 88px);
+    --home-gap-head: clamp(28px, 3vw, 44px);
+
+    /* 序号、页码、步骤号只用这一种等宽字：同一组数字在索引带、章节头、三步里
+       换了三种长相，是这一页最扎眼的不统一。中文会自动回落到正文字族，不影响 */
+    --home-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+    /* 迷你画布：取值与 lib/canvas-theme.ts 的 light 完全一致，深浅切换只换这一组 */
+    --demo-bg: #e9e9e9;
+    --demo-dot: rgba(0, 0, 0, 0.12);
+    --demo-panel: #f4f4f4;
+    --demo-stroke: #cfcfcf;
+    --demo-text: #1e1e1e;
+    --demo-muted: #5c5c5c;
+    --demo-active: #1473e6;
+    --demo-flow: #1473e6;
+}
+
+.dark .ic-home {
+    /* 与 lib/canvas-theme.ts 的 dark 一致 */
+    --demo-bg: #1d1d1d;
+    --demo-dot: rgba(255, 255, 255, 0.1);
+    --demo-panel: #323232;
+    --demo-stroke: #444444;
+    --demo-text: #d8d8d8;
+    --demo-muted: #a0a0a0;
+    --demo-active: #2680eb;
+    --demo-flow: #2680eb;
+    /* 同一个 alpha 在亮底上是格子纸，在暗底上就没了——暗底要单独给一档。
+       但这一档必须比画布内的点（rgba(255,255,255,.1) ≈ 合成后 52 级）更淡：
+       首屏是背景，画布是内容，背景比内容还重就是反的。8% 合成后约 44 级 */
+    --home-grid: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+@media (min-width: 640px) {
+    .ic-home {
+        --home-gutter: 32px;
+    }
+}
+
+.ic-home :where(h1, h2, h3, p, dl, dd, ol, ul, figure) {
+    margin: 0;
+    padding: 0;
+}
+
+.ic-home .wrap {
+    width: 100%;
+    max-width: var(--home-container);
+    margin-inline: auto;
+    padding-inline: var(--home-gutter);
+}
+
+/* ---------- typography ---------- */
+
+.ic-home h1,
+.ic-home h2 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    overflow-wrap: break-word;
+    min-width: 0;
+    text-wrap: balance;
+}
+
+.ic-home h1 {
+    font-size: var(--home-display);
+    line-height: 1.16;
+    max-width: 18ch;
+}
+
+.ic-home h2 {
+    font-size: var(--home-title);
+    line-height: 1.22;
+    max-width: 14em;
+}
+
+.ic-home h3 {
+    font-size: var(--home-body);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.ic-home .lead {
+    font-size: var(--home-body);
+    line-height: 1.7;
+    color: var(--muted-foreground);
+    max-width: 42ch;
+    text-wrap: pretty;
+}
+
+.ic-home .label {
+    font-size: var(--home-label);
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+
+/* ---------- hero ---------- */
+
+/* 首屏两段：主体在剩余高度里居中，索引带压在底边。
+   没有这条带子，900 高的屏上画布下面会空出近 200px，整块内容发飘。
+   高度封顶 1040：1080p 以下照旧满屏，2K/4K 上内容还是那么大，
+   再不封顶首屏就要被拉成上下各空 360 的一片空地 */
+.ic-home .hero {
+    position: relative;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-height: min(calc(100dvh - 48px), 1040px);
+}
+
+/* 首屏本身就是一块画布：点阵从迷你画布里放出来铺满整屏，密度和画布里一致（20px）。
+   产品卖的就是无限画布，纯色底会让演示图看着像贴上去的一张图；铺了网格，
+   演示画布才是浮在无限画布上的一个视口。点要淡到字跟前看不见、退开才有一层。
+   只铺首屏——往下滚就回到文档，一格一格的区分靠这个材质切换 */
+.ic-home .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--home-grid) 1.2px, transparent 1.2px);
+    background-size: 20px 20px;
+    background-position: center top;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* 伪元素是定位元素，会盖住普通流内容，所以两段内容各自抬一层 */
+.ic-home .hero > * {
+    position: relative;
+    z-index: 1;
+}
+
+.ic-home .hero .stage-grid {
+    align-self: center;
+    padding-block: clamp(40px, 5vw, 72px);
+}
+
+/* 首屏底部的索引：三个章节的入口。12 号的序号 + 14 号的标题，
+   静止时全是灰的，指上去才亮——它是导航，不该和正文抢 */
+.ic-home .index {
+    border-top: 1px solid var(--home-rule);
+}
+
+.ic-home .index ol {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    list-style: none;
+}
+
+.ic-home .index li + li {
+    border-left: 1px solid var(--home-rule);
+}
+
+.ic-home .index a {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 16px 20px 16px 0;
+    color: var(--muted-foreground);
+    text-decoration: none;
+    transition: color 150ms cubic-bezier(0.28, 0.11, 0.24, 1);
+}
+
+.ic-home .index li + li a {
+    padding-left: 20px;
+}
+
+.ic-home .index a:hover,
+.ic-home .index a:focus-visible {
+    color: var(--foreground);
+}
+
+.ic-home .index a:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+
+.ic-home .index-no {
+    flex-shrink: 0;
+    font-family: var(--home-mono);
+    font-size: var(--home-label);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+}
+
+.ic-home .index a span:last-child {
+    font-size: var(--home-body);
+    line-height: 1.4;
+}
+
+.ic-home .stage-grid {
+    display: grid;
+    grid-template-columns: var(--home-split);
+    gap: var(--home-split-gap);
+    /* 两列拉到同高：左列的注解因此能贴到画布底边，两栏共用一条地平线。
+       居中会让 238 高的文案悬在 518 高的画布旁边，上下各漏一段空 */
+    align-items: stretch;
+}
+
+/* 左列分两段：标题组在剩余高度里居中，注解贴住列底（= 画布底 + 图注底） */
+.ic-home .stage-copy {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-width: 0;
+}
+
+.ic-home .stage-copy-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+}
+
+/* 标题、说明、按钮、注解四层用四种间距，靠疏密分层，不靠再加字号 */
+.ic-home .stage-copy .lead {
+    margin-top: 24px;
+    max-width: 34ch;
+}
+
+.ic-home .stage-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 32px;
+}
+
+.ic-home .stage-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-top: 24px;
+    padding: 0;
+    list-style: none;
+    font-size: var(--home-label);
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+
+.ic-home .stage-notes li + li::before {
+    content: "·";
+    margin-right: 10px;
+}
+
+/* ---------- the live canvas ---------- */
+
+.ic-home .demo {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ic-home .demo-workspace {
+    border: 1px solid var(--demo-stroke);
+    border-radius: 4px;
+    background: var(--demo-bg);
+    overflow: hidden;
+}
+
+/* 一条真实画布会有的顶栏：画布名、节点数、缩放 */
+.ic-home .demo-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 32px;
+    padding-inline: 10px;
+    border-bottom: 1px solid var(--demo-stroke);
+    background: var(--demo-panel);
+    font-size: var(--home-label);
+    color: var(--demo-muted);
+}
+
+.ic-home .demo-bar-name {
+    color: var(--demo-text);
+    font-weight: 600;
+}
+
+.ic-home .demo-bar-meta {
+    font-variant-numeric: tabular-nums;
+}
+
+.ic-home .demo-stage {
+    position: relative;
+    aspect-ratio: 700 / 470;
+    background-image: radial-gradient(var(--demo-dot) 1px, transparent 1px);
+    background-size: 20px 20px;
+    overflow: hidden;
+}
+
+.ic-home .demo-links {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.ic-home .demo-link {
+    fill: none;
+    stroke: var(--demo-muted);
+    stroke-width: 1.5;
+    opacity: 0.6;
+}
+
+.ic-home .demo-link.is-flowing {
+    stroke: var(--demo-flow);
+    stroke-width: 2;
+    stroke-dasharray: 7 9;
+    opacity: 1;
+    animation: demo-flow 620ms linear infinite;
+}
+
+@keyframes demo-flow {
+    to {
+        stroke-dashoffset: -32;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ic-home .demo-link.is-flowing {
+        animation: none;
+        stroke-dasharray: none;
+    }
+}
+
+.ic-home .demo-node {
+    position: absolute;
+    left: var(--nx);
+    top: var(--ny);
+    width: var(--nw);
+    height: var(--nh);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--demo-stroke);
+    border-radius: 4px;
+    background: var(--demo-panel);
+    color: var(--demo-text);
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+}
+
+.ic-home .demo-node:active {
+    cursor: grabbing;
+}
+
+.ic-home .demo-node:hover {
+    border-color: color-mix(in srgb, var(--demo-active) 45%, var(--demo-stroke));
+}
+
+.ic-home .demo-node:focus-visible {
+    outline: 1px solid var(--demo-active);
+    outline-offset: 1px;
+}
+
+.ic-home .demo-node-head {
+    font-size: var(--home-label);
+    line-height: 1.3;
+    color: var(--demo-muted);
+    flex-shrink: 0;
+}
+
+.ic-home .demo-text {
+    font-size: var(--home-label);
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+.ic-home .demo-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--home-label);
+    line-height: 1.5;
+}
+
+.ic-home .demo-rows > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ic-home .demo-rows > div > span:first-child {
+    color: var(--demo-muted);
+}
+
+.ic-home .demo-generate {
+    margin-top: auto;
+    height: 28px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--home-label);
+    font-weight: 500;
+    border: 1px solid var(--demo-active);
+    border-radius: 3px;
+    background: var(--demo-active);
+    color: #ffffff;
+    cursor: pointer;
+    transition:
+        background-color 150ms cubic-bezier(0.28, 0.11, 0.24, 1),
+        color 150ms cubic-bezier(0.28, 0.11, 0.24, 1);
+}
+
+.ic-home .demo-generate:hover {
+    background: color-mix(in srgb, var(--demo-active) 88%, #ffffff);
+}
+
+.ic-home .demo-generate:active {
+    background: color-mix(in srgb, var(--demo-active) 84%, #000000);
+}
+
+.ic-home .demo-generate:disabled {
+    color: var(--demo-muted);
+    border-color: var(--demo-stroke);
+    background: transparent;
+    cursor: progress;
+}
+
+.ic-home .demo-generate:focus-visible {
+    outline: 1px solid var(--demo-active);
+    outline-offset: 2px;
+}
+
+.ic-home .demo-image {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    border-radius: 2px;
+    object-fit: cover;
+    display: block;
+}
+
+.ic-home .demo-minimap {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 64px;
+    aspect-ratio: 700 / 470;
+    border: 1px solid var(--demo-stroke);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--demo-panel) 82%, transparent);
+    pointer-events: none;
+}
+
+.ic-home .demo-minimap span {
+    position: absolute;
+    left: var(--nx);
+    top: var(--ny);
+    width: var(--nw);
+    height: var(--nh);
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--demo-muted) 45%, transparent);
+}
+
+.ic-home .demo-caption {
+    font-size: var(--home-label);
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+
+/* ---------- the real screen ---------- */
+
+/* 全页只有文字与示意画布两种材质，这里补一层真截图。
+   这一节整块铺成台面色：页面从底色降一层，截图压在台面上像一块凹进去的屏，
+   不再给图加第二个边框——边框是卡片的语言，台面才是这一节的层次 */
+.ic-home .shot {
+    padding-block: var(--home-band-top) var(--home-band-bottom);
+    border-bottom: 1px solid var(--home-rule);
+    background: var(--card);
+}
+
+/* 章节头统一用同一副骨架：左列标题（可带序号），右列说明从第二列起笔。
+   以前说明是 justify-self: end 贴右边缘，1216 的容器里会留下 700px 的洞，
+   标题和说明读成两段不相干的话；现在两者之间只隔一个网格间距 */
+.ic-home .shot-head,
+.ic-home .section-head,
+.ic-home .close,
+.ic-home .foot-grid {
+    display: grid;
+    grid-template-columns: var(--home-split);
+    gap: 12px var(--home-split-gap);
+    align-items: end;
+}
+
+.ic-home .shot-head,
+.ic-home .section-head {
+    margin-bottom: var(--home-gap-head);
+}
+
+.ic-home .shot-head .lead,
+.ic-home .section-head .lead {
+    justify-self: start;
+    max-width: 44ch;
+}
+
+.ic-home .shot-frame {
+    display: block;
+}
+
+.ic-home .shot-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--home-rule);
+    border-radius: 4px;
+    background: var(--background);
+}
+
+.ic-home .shot-frame figcaption {
+    padding: 12px 2px 0;
+    font-size: var(--home-label);
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+
+/* ---------- sections ---------- */
+
+.ic-home .section {
+    padding-block: var(--home-band-top) var(--home-band-bottom);
+    border-bottom: 1px solid var(--home-rule);
+}
+
+.ic-home .section-title {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* 章节标记只占 label 一档，靠它把「标记 / 标题 / 正文」分成三级；
+   后面拖一小截发丝，和 01 那三列之间的连线是同一套笔画。
+   五种头部（全貌 / 01 / 02 / 03 / 开始）用的是同一个配方，标题因此都在同一条基线上 */
+.ic-home .section-no {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--home-mono);
+    font-size: var(--home-label);
+    line-height: 1.4;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+}
+
+.ic-home .section-no::after {
+    content: "";
+    width: 32px;
+    height: 1px;
+    background: var(--home-rule);
+}
+
+/* steps */
+
+.ic-home .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    list-style: none;
+}
+
+.ic-home .steps li {
+    position: relative;
+    padding-top: 16px;
+    border-top: 1px solid var(--home-rule);
+}
+
+/* 三列之间的发丝线把三步连成一条链，和画布上的连线是同一套语言。
+   这一组不再编号：章节标记已经是 01，三步再挂 01/02/03 就成了两层数字 */
+.ic-home .steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 100%;
+    width: 40px;
+    height: 1px;
+    background: var(--home-rule);
+}
+
+.ic-home .steps h3 {
+    font-size: var(--home-body);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.ic-home .steps p {
+    margin-top: 8px;
+    font-size: var(--home-body);
+    line-height: 1.7;
+    color: var(--muted-foreground);
+}
+
+/* node shelf */
+
+/* 七种节点不排成表，直接摆成七张节点卡——卡片取的就是画布上节点的样子：
+   32px 标题栏加图标，下面是说明，底色比页面高一档。
+   最长的那条（图片处理）占两列，七张正好铺满 4 × 2，不留空位 */
+.ic-home .node-shelf {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    list-style: none;
+}
+
+.ic-home .node-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--home-rule);
+    border-radius: 4px;
+    background: var(--card);
+    overflow: hidden;
+}
+
+.ic-home .node-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 32px;
+    padding-inline: 12px;
+    border-bottom: 1px solid var(--home-rule);
+    font-size: var(--home-body);
+    font-weight: 600;
+    line-height: 1;
+}
+
+.ic-home .node-card-head svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--muted-foreground);
+    stroke-width: 1.6;
+}
+
+.ic-home .node-card p {
+    padding: 12px;
+    font-size: var(--home-label);
+    line-height: 1.65;
+    color: var(--muted-foreground);
+}
+
+/* 七张卡是奇数：4 列时末张占两列、3 列时末张通栏，两种排法都正好铺满，不留空格 */
+@media (min-width: 1200px) {
+    .ic-home .node-card:last-child {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 1199px) and (min-width: 640px) {
+    .ic-home .node-shelf {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .ic-home .node-card:last-child {
+        grid-column: span 3;
+    }
+}
+
+/* params */
+
+/* 参数这一节反过来收敛：名字退成 12 号灰字，值（chip）才是内容。
+   读起来像生成配置节点里的一排设置行，而不是又一张标题加粗的表 */
+.ic-home .params {
+    list-style: none;
+    border-top: 1px solid var(--home-rule);
+}
+
+.ic-home .params li {
+    display: grid;
+    grid-template-columns: minmax(0, 96px) minmax(0, 1fr);
+    column-gap: 24px;
+    align-items: center;
+    padding-block: 12px;
+    border-bottom: 1px solid var(--home-rule);
+}
+
+.ic-home .params li:last-child {
+    border-bottom: 0;
+}
+
+.ic-home .param-name {
+    font-size: var(--home-label);
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+
+.ic-home .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ic-home .chip {
+    padding: 2px 8px;
+    border: 1px solid var(--home-rule);
+    border-radius: 3px;
+    background: var(--card);
+    font-size: var(--home-label);
+    line-height: 1.55;
+    color: var(--foreground);
+}
+
+/* ---------- the tone change ---------- */
+
+.ic-home .local {
+    background: var(--card);
+    border-bottom: 1px solid var(--home-rule);
+    padding-block: var(--home-band-top) var(--home-band-bottom);
+}
+
+.ic-home .statement {
+    font-size: var(--home-title);
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.02em;
+    max-width: 17em;
+    white-space: pre-line;
+    overflow-wrap: break-word;
+}
+
+.ic-home .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 40px;
+    list-style: none;
+}
+
+.ic-home .facts li {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: var(--home-label);
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+
+/* ---------- close ---------- */
+
+/* 骨架同上：标记 + 标题 + 说明在左列，动作贴右边缘。
+   说明现在跟着标题待在 section-title 里，所以只补一点缝，让它和标题的 8px 叠成 12 */
+.ic-home .close .lead {
+    margin-top: 4px;
+}
+
+.ic-home .close-action {
+    justify-self: end;
+}
+
+/* ---------- footer ---------- */
+
+.ic-home .site-foot {
+    padding-block: 40px 32px;
+}
+
+/* 骨架同上，脚步是两列顶对齐 */
+.ic-home .foot-grid {
+    align-items: start;
+}
+
+.ic-home .foot-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ic-home .foot-brand img {
+    height: 20px;
+    width: auto;
+    align-self: flex-start;
+}
+
+.ic-home .foot-brand p {
+    font-size: var(--home-label);
+    line-height: 1.6;
+    color: var(--muted-foreground);
+    max-width: 40ch;
+}
+
+.ic-home .foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    font-size: var(--home-label);
+}
+
+.ic-home .foot-links a {
+    color: var(--muted-foreground);
+    text-decoration: none;
+    transition: color 150ms cubic-bezier(0.28, 0.11, 0.24, 1);
+}
+
+.ic-home .foot-links a:hover {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.ic-home .foot-note {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--home-rule);
+    font-size: var(--home-label);
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+
+.ic-home .foot-note a {
+    color: var(--muted-foreground);
+    text-decoration: none;
+}
+
+.ic-home .foot-note a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 900px) {
+    .ic-home .hero {
+        min-height: 0;
+    }
+
+    .ic-home .hero .stage-grid {
+        padding-block: 32px 40px;
+    }
+
+    /* 索引在窄屏下改成三行堆叠，横排会挤成两行字 */
+    .ic-home .index ol {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ic-home .index li + li {
+        border-left: 0;
+        border-top: 1px solid var(--home-rule);
+    }
+
+    .ic-home .index a {
+        padding: 12px 0;
+    }
+
+    .ic-home .stage-grid,
+    .ic-home .section-head,
+    .ic-home .shot-head,
+    .ic-home .close,
+    .ic-home .foot-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ic-home .section-head,
+    .ic-home .shot-head,
+    .ic-home .close {
+        align-items: start;
+    }
+
+    .ic-home .section-head .lead,
+    .ic-home .shot-head .lead,
+    .ic-home .close-action {
+        justify-self: start;
+    }
+
+    /* 截图在窄屏上裁掉两侧，留住生成配置与图片这一段 */
+    .ic-home .shot-frame img {
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        object-position: 68% center;
+    }
+
+    .ic-home .steps,
+    .ic-home .facts {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 20px;
+    }
+
+    .ic-home .steps li::after {
+        display: none;
+    }
+
+    .ic-home .facts {
+        margin-top: 28px;
+    }
+
+    .ic-home .params li {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 6px;
+    }
+
+    /* 画布收成一列，按阅读顺序排 */
+    .ic-home .demo-bar {
+        height: 28px;
+    }
+
+    .ic-home .demo-stage {
+        aspect-ratio: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background-image: none;
+    }
+
+    .ic-home .demo-links,
+    .ic-home .demo-minimap {
+        display: none;
+    }
+
+    .ic-home .demo-node {
+        position: static;
+        width: 100%;
+        height: auto;
+        cursor: default;
+    }
+
+    .ic-home .demo-node-image {
+        height: 160px;
+    }
+
+    .ic-home .demo-caption {
+        display: none;
+    }
+
+    .ic-home .statement {
+        max-width: none;
+    }
+}
+
+/* 手机竖屏只剩两格太窄，节点卡收成一列 */
+@media (max-width: 639px) {
+    .ic-home .node-shelf {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ic-home .node-card:last-child {
+        grid-column: auto;
+    }
+}

@@ -1,102 +1,218 @@
-import { ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
-import { App, Button, Image, Tag } from "antd";
-import { useNavigate } from "react-router-dom";
+import { Button } from "antd";
+import { Group, Image as ImageIcon, Music2, Scissors, Settings2, Type, Video } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { fetchPrompts, type Prompt } from "@/services/api/prompts";
-import { navigationTools } from "@/constant/navigation-tools";
-import i18n from "@/i18n";
-import { cn } from "@/lib/utils";
+import { useThemeStore } from "@/stores/use-theme-store";
 
-export default function IndexPage() {
- const { message } = App.useApp();
- const { t } = useTranslation();
- const navigate = useNavigate();
- const [primaryTool] = navigationTools;
- const [promptShowcase, setPromptShowcase] = useState<Prompt[]>([]);
- const [previewIndex, setPreviewIndex] = useState(0);
- const [previewOpen, setPreviewOpen] = useState(false);
+import { MiniCanvas } from "./mini-canvas";
+import "./home.css";
 
- useEffect(() => {
- void fetchPrompts({ pageSize: 12 })
- .then((data) => setPromptShowcase(data.items))
- .catch((error) => message.error(error instanceof Error ? error.message : i18n.t("home.promptError")));
- }, [message]);
+type Row = { name: string; text: string };
+type Step = { title: string; text: string };
+type Param = { name: string; items: string[] };
 
- return (
- <main className="h-full overflow-y-auto bg-background text-foreground">
- <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl flex-col justify-center px-6">
- <div className="flex flex-col items-center pb-20 pt-10 text-center">
- <h1 className="max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">{t("meta.title")}</h1>
- <p className="mt-6 max-w-2xl text-balance text-base leading-7 text-muted-foreground sm:text-lg">{t("home.description")}</p>
- <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
- <Button type="primary" size="large" onClick={() => navigate(`/${primaryTool.slug}`)} icon={<ArrowRight className="size-4" />} iconPlacement="end">
- {t("home.start")}
- </Button>
- <Button size="large" onClick={() => navigate("/canvas")}>
- {t("home.openCanvas")}
- </Button>
- </div>
- </div>
+const REPO_URL = "https://github.com/nongrujiu99/infinite-canvas-2";
+const PHOTO_URL = "https://commons.wikimedia.org/wiki/File:Fragment_of_160_Front_Street_West,_Toronto.jpg";
 
- <section className="relative mx-auto mb-20 max-w-6xl border-t border-border pt-12">
- <div className="mb-8 grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-start">
- <div />
- <div className="max-w-2xl text-center">
- <h2 className="text-2xl font-semibold">{t("home.showcaseTitle")}</h2>
- <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("home.showcaseDescription")}</p>
- </div>
- <Button type="link" onClick={() => navigate("/prompts")} className="justify-self-center md:justify-self-end" icon={<ArrowRight className="size-4" />} iconPlacement="end">
- {t("home.viewPrompts")}
- </Button>
- </div>
- <div className="grid auto-rows-[210px] gap-4 md:grid-cols-4">
- {promptShowcase.map((item, index) => (
- <button
- key={item.id}
- type="button"
- onClick={() => {
- setPreviewIndex(index);
- setPreviewOpen(true);
- }}
- className={cn(
- "group relative cursor-pointer overflow-hidden border border-border bg-muted text-left",
- index === 0 && "md:col-span-2 md:row-span-2",
- index === 3 && "md:col-span-2",
- )}
- >
- <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"  loading="lazy" decoding="async"/>
- <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent p-4 text-white">
- <div className="mb-2 flex flex-wrap gap-1.5">
- {item.tags.slice(0, 2).map((tag) => (
- <Tag key={tag} variant="filled" className="m-0 bg-white/15 text-xs text-white backdrop-blur">
- {tag}
- </Tag>
- ))}
- </div>
- <h3 className="text-sm font-medium">{item.title}</h3>
- <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/75">{item.prompt}</p>
- </div>
- </button>
- ))}
- </div>
- </section>
- </section>
- <Image.PreviewGroup
- preview={{
- open: previewOpen,
- current: previewIndex,
- onOpenChange: setPreviewOpen,
- onChange: setPreviewIndex,
- }}
- >
- <div className="hidden">
- {promptShowcase.map((item) => (
- <Image key={item.id} src={item.coverUrl} alt={item.title} />
- ))}
- </div>
- </Image.PreviewGroup>
- </main>
- );
+/* 与画布里的七种节点一一对应，图标沿用节点自身的语汇 */
+const NODE_ICONS = [Type, ImageIcon, Video, Music2, Settings2, Group, Scissors];
+
+export default function HomePage() {
+    const { t } = useTranslation();
+    const navigate = useNavigate();
+    /* 截图跟着主题走：浅色页面上摆一张深色画布，等于在页面里开个洞。
+       两张图同一次取景、同一条链路，只是换了主题，按当前主题取其中一张 */
+    const theme = useThemeStore((state) => state.theme);
+    /* 走 BASE_URL：站点部署在子路径（GitHub Pages 的 /repo/）时绝对路径会 404 */
+    const shotSrc = `${import.meta.env.BASE_URL}home/${theme === "dark" ? "canvas.webp" : "canvas-light.webp"}`;
+    const rows = (key: string) => t(key, { returnObjects: true }) as unknown as Row[];
+    const steps = t("home.chain.steps", { returnObjects: true }) as unknown as Step[];
+    const nodes = rows("home.nodes.rows");
+    const params = t("home.params.rows", { returnObjects: true }) as unknown as Param[];
+    const facts = t("home.local.facts", { returnObjects: true }) as unknown as string[];
+    /* 首屏底部的索引：只是把下面三节搬到入口，不重复正文 */
+    const indexItems = [
+        { no: "01", href: "#chain", title: t("home.chain.title") },
+        { no: "02", href: "#nodes", title: t("home.nodes.title") },
+        { no: "03", href: "#params", title: t("home.params.title") },
+    ];
+
+    return (
+        <main className="ic-home">
+            <section className="hero">
+                <div className="wrap stage-grid">
+                    <div className="stage-copy">
+                        <div className="stage-copy-main">
+                            <h1>{t("home.hero.title")}</h1>
+                            <p className="lead">{t("home.hero.lead")}</p>
+                            <div className="stage-actions">
+                                <Button type="primary" size="large" onClick={() => navigate("/canvas")}>
+                                    {t("home.hero.primary")}
+                                </Button>
+                                <Button size="large" href="#chain">
+                                    {t("home.hero.secondary")}
+                                </Button>
+                            </div>
+                        </div>
+                        <ul className="stage-notes">
+                            {(t("home.hero.notes", { returnObjects: true }) as unknown as string[]).map((note) => (
+                                <li key={note}>{note}</li>
+                            ))}
+                        </ul>
+                    </div>
+                    <MiniCanvas />
+                </div>
+                <nav className="index" aria-label={t("home.index.label")}>
+                    <div className="wrap">
+                        <ol>
+                            {indexItems.map((item) => (
+                                <li key={item.href}>
+                                    <a href={item.href}>
+                                        <span className="index-no">{item.no}</span>
+                                        <span>{item.title}</span>
+                                    </a>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                </nav>
+            </section>
+
+            <section className="shot">
+                <div className="wrap">
+                    <div className="shot-head">
+                        <div className="section-title">
+                            <span className="section-no">{t("home.shot.kicker")}</span>
+                            <h2>{t("home.shot.title")}</h2>
+                        </div>
+                        <p className="lead">{t("home.shot.lead")}</p>
+                    </div>
+                    <figure className="shot-frame">
+                        <img src={shotSrc} width={2000} height={1111} alt={t("home.shot.alt")} loading="lazy" decoding="async" />
+                        <figcaption>{t("home.shot.caption")}</figcaption>
+                    </figure>
+                </div>
+            </section>
+
+            <section className="section" id="chain">
+                <div className="wrap">
+                    <div className="section-head">
+                        <div className="section-title">
+                            <span className="section-no">01</span>
+                            <h2>{t("home.chain.title")}</h2>
+                        </div>
+                        <p className="lead">{t("home.chain.lead")}</p>
+                    </div>
+                    <ol className="steps">
+                        {steps.map((step) => (
+                            <li key={step.title}>
+                                <h3>{step.title}</h3>
+                                <p>{step.text}</p>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </section>
+
+            <section className="section" id="nodes">
+                <div className="wrap">
+                    <div className="section-head">
+                        <div className="section-title">
+                            <span className="section-no">02</span>
+                            <h2>{t("home.nodes.title")}</h2>
+                        </div>
+                        <p className="lead">{t("home.nodes.lead")}</p>
+                    </div>
+                    <ul className="node-shelf">
+                        {nodes.map((node, index) => {
+                            const Icon = NODE_ICONS[index] ?? Settings2;
+                            return (
+                                <li className="node-card" key={node.name}>
+                                    <div className="node-card-head">
+                                        <Icon aria-hidden="true" />
+                                        <span>{node.name}</span>
+                                    </div>
+                                    <p>{node.text}</p>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </section>
+
+            <section className="section" id="params">
+                <div className="wrap">
+                    <div className="section-head">
+                        <div className="section-title">
+                            <span className="section-no">03</span>
+                            <h2>{t("home.params.title")}</h2>
+                        </div>
+                        <p className="lead">{t("home.params.lead")}</p>
+                    </div>
+                    <ul className="params">
+                        {params.map((row) => (
+                            <li key={row.name}>
+                                <span className="param-name">{row.name}</span>
+                                <span className="chips">
+                                    {row.items.map((item) => (
+                                        <span className="chip" key={item}>
+                                            {item}
+                                        </span>
+                                    ))}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </section>
+
+            <section className="local">
+                <div className="wrap">
+                    <p className="statement">{t("home.local.statement")}</p>
+                    <ul className="facts">
+                        {facts.map((fact) => (
+                            <li key={fact}>{fact}</li>
+                        ))}
+                    </ul>
+                </div>
+            </section>
+
+            <section className="section">
+                <div className="wrap close">
+                    <div className="section-title">
+                        <span className="section-no">{t("home.close.kicker")}</span>
+                        <h2>{t("home.close.title")}</h2>
+                        <p className="lead">{t("home.close.lead")}</p>
+                    </div>
+                    <Button type="primary" size="large" className="close-action" onClick={() => navigate("/canvas")}>
+                        {t("home.close.action")}
+                    </Button>
+                </div>
+            </section>
+
+            <footer className="site-foot">
+                <div className="wrap foot-grid">
+                    <div className="foot-brand">
+                        <img src="/logo-wordmark.svg" alt={t("meta.title")} />
+                        <p>{t("home.foot.tagline")}</p>
+                    </div>
+                    <nav className="foot-links">
+                        <Link to="/canvas">{t("navigation.canvas")}</Link>
+                        <Link to="/image">{t("navigation.image")}</Link>
+                        <Link to="/prompts">{t("navigation.prompts")}</Link>
+                        <a href={REPO_URL} target="_blank" rel="noreferrer">
+                            GitHub
+                        </a>
+                    </nav>
+                    <div className="foot-note">
+                        <a href={PHOTO_URL} target="_blank" rel="noreferrer">
+                            {t("home.foot.credit")}
+                        </a>
+                        <span>{t("home.foot.rights")}</span>
+                    </div>
+                </div>
+            </footer>
+        </main>
+    );
 }

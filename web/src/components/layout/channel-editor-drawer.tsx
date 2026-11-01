@@ -61,6 +61,20 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  <div className="mt-1 text-xs text-muted-foreground">{t("config.channelEditor.simpleDescription")}</div>
 
  <label className="mt-5 block">
+ <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.name")}</span>
+ {/* 名称与连通性无关，失焦即存，不必为改个名字重跑一次模型同步 */}
+ <Input
+ value={draft.name}
+ maxLength={40}
+ placeholder={t("config.channelEditor.namePlaceholder")}
+ onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+ onBlur={() => {
+ const name = draft.name.trim();
+ if (name && name !== channel.name) onSave({ ...channel, name });
+ }}
+ />
+ </label>
+ <label className="mt-3 block">
  <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.baseUrl")}</span>
  <Input value={draft.baseUrl} onChange={(event) => { setDraft((current) => ({ ...current, baseUrl: event.target.value })); setTestSummary(null); }} placeholder="https://api.example.com" />
  </label>

@@ -2,7 +2,7 @@ import localforage from "localforage";
 
 import { runPromptSource, type RawPrompt } from "./prompt-source-runtime";
 import { usePromptSourceStore } from "@/stores/use-prompt-source-store";
-import { promptCoverUrl, usePromptLibraryStore } from "@/stores/use-prompt-library-store";
+import { promptCoverUrl, usePromptLibraryStore, type SavedPrompt } from "@/stores/use-prompt-library-store";
 import i18n from "@/i18n";
 import type { PromptSource } from "./prompt-source-presets";
 
@@ -22,8 +22,14 @@ export function localPromptCategory() {
     return i18n.t("prompts.myLibrary");
 }
 
-function localPrompts(): Prompt[] {
-    return usePromptLibraryStore.getState().prompts.map((item) => ({
+/** 条目自己的分类名，没填就用「未分类」——这样分类列表里能看见自己没归类的那些 */
+export function localPromptCategoryOf(item: SavedPrompt) {
+    return item.category?.trim() || i18n.t("prompts.uncategorized");
+}
+
+/** 把本地库条目转成页面用的 Prompt，画布左面板与提示词中心共用同一份映射 */
+export function savedPromptToPrompt(item: SavedPrompt): Prompt {
+    return {
         id: item.id,
         title: item.title,
         prompt: item.prompt,
@@ -35,9 +41,13 @@ function localPrompts(): Prompt[] {
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         sourceId: LOCAL_PROMPT_SOURCE_ID,
-        category: localPromptCategory(),
+        category: localPromptCategoryOf(item),
         githubUrl: "",
-    }));
+    };
+}
+
+function localPrompts(): Prompt[] {
+    return usePromptLibraryStore.getState().prompts.map(savedPromptToPrompt);
 }
 
 export type PromptListResponse = {
@@ -170,10 +180,9 @@ export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROM
     const normalizedPageSize = Math.max(1, Math.min(100, pageSize));
     const withoutTagFilter = filterPrompts(items, { keyword: normalizedKeyword, category, tags: [] });
     const filtered = filterPrompts(items, { keyword: normalizedKeyword, category, tags: tag });
-    const categories = [
-        ...(items.some((item) => item.sourceId === LOCAL_PROMPT_SOURCE_ID) ? [localPromptCategory()] : []),
-        ...enabledSources().map((source) => source.name),
-    ];
+    // 本地条目的分类是用户自己起的，直接按条目聚合，不再是一个写死的「我的提示词库」
+    const localCategories = Array.from(new Set(items.filter((item) => item.sourceId === LOCAL_PROMPT_SOURCE_ID).map((item) => item.category)));
+    const categories = [...localCategories, ...enabledSources().map((source) => source.name)];
 
     return {
         items: filtered.slice((normalizedPage - 1) * normalizedPageSize, normalizedPage * normalizedPageSize),

@@ -1,16 +1,18 @@
-import { FolderPlus, Search } from "lucide-react";
+import { FolderPlus, Pencil, Search, Trash2 } from "lucide-react";
 import { type ReactNode, type UIEvent, useEffect, useMemo, useState } from "react";
-import { App, Button, Empty, Input, Spin, Tag } from "antd";
+import { App, Button, Empty, Input, Popconfirm, Spin, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
 import { PageHeader } from "@/components/layout/page-header";
+import { PromptTemplateDialog } from "@/components/prompts/prompt-template-dialog";
 import { usePromptList } from "@/components/prompts/use-prompt-list";
 import { PromptDetailDialog } from "./components/prompt-detail-dialog";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { ALL_PROMPTS_OPTION, type Prompt } from "@/services/api/prompts";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
+import { ALL_PROMPTS_OPTION, LOCAL_PROMPT_SOURCE_ID, type Prompt } from "@/services/api/prompts";
 
 /** 标签墙默认展示的数量，其余的收进「展开」 */
 const TAG_LIMIT = 24;
@@ -23,7 +25,12 @@ export default function PromptsPage() {
  const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
  const [tagsExpanded, setTagsExpanded] = useState(false);
+ // 只有本地模板能改能删：远程来源已经下线，但保留判断，免得以后接回来时误伤
+ const [editing, setEditing] = useState<Prompt | null>(null);
  const addAsset = useAssetStore((state) => state.addAsset);
+ const savedPrompts = usePromptLibraryStore((state) => state.prompts);
+ const updatePrompt = usePromptLibraryStore((state) => state.updatePrompt);
+ const removePrompt = usePromptLibraryStore((state) => state.removePrompt);
  const copyText = useCopyText();
  const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory });
 
@@ -46,6 +53,21 @@ export default function PromptsPage() {
  const savePromptAsset = (item: Prompt) => {
  addAsset({ kind: "text", title: item.title, coverUrl: item.coverUrl, tags: item.tags, source: item.category, data: { content: item.prompt }, metadata: { source: "prompt-library", promptId: item.id, githubUrl: item.githubUrl } });
  message.success(t("common.addedToAssets"));
+ };
+
+ // 编辑弹窗要拿到原始分类（「未分类」是展示用的兜底名，不能存回去）
+ const savedEditing = useMemo(() => savedPrompts.find((item) => item.id === editing?.id) || null, [editing?.id, savedPrompts]);
+
+ const saveEditedPrompt = ({ title, prompt, category, tags }: { title: string; prompt: string; category: string; tags: string[] }) => {
+ if (!editing) return;
+ updatePrompt(editing.id, { title, prompt, category, tags });
+ setEditing(null);
+ message.success(t("canvas.promptLibrary.updated"));
+ };
+
+ const deletePrompt = (item: Prompt) => {
+ removePrompt(item.id);
+ message.success(t("prompts.deleted"));
  };
 
  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -83,7 +105,19 @@ export default function PromptsPage() {
  <section className="min-w-0">
  <Input size="large" prefix={<Search className="size-4 text-muted-foreground" />} value={titleKeyword} placeholder={t("prompts.search")} onChange={(event) => setTitleKeyword(event.target.value)} />
  {query.isLoading ? <div className="flex h-60 items-center justify-center"><Spin /></div> : null}
- {!query.isLoading ? <div className="mt-5"><PromptGrid items={promptItems} onOpen={setSelectedPrompt} renderActions={(item) => <Button type="text" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => savePromptAsset(item)}>{t("common.addToAssets")}</Button>} onCopy={(item) => copyText(item.prompt, t("common.promptCopied"))} emptyText={t("prompts.empty")} /></div> : null}
+ {!query.isLoading ? <div className="mt-5"><PromptGrid items={promptItems} onOpen={setSelectedPrompt} renderActions={(item) => (
+ <div className="flex items-center gap-1">
+ <Button type="text" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => savePromptAsset(item)}>{t("common.addToAssets")}</Button>
+ {item.sourceId === LOCAL_PROMPT_SOURCE_ID ? (
+ <>
+ <Button type="text" size="small" icon={<Pencil className="size-3.5" />} onClick={() => setEditing(item)}>{t("common.edit")}</Button>
+ <Popconfirm title={t("prompts.deleteHint")} okText={t("common.delete")} cancelText={t("common.cancel")} onConfirm={() => deletePrompt(item)}>
+ <Button type="text" size="small" danger icon={<Trash2 className="size-3.5" />} />
+ </Popconfirm>
+ </>
+ ) : null}
+ </div>
+ )} onCopy={(item) => copyText(item.prompt, t("common.promptCopied"))} emptyText={t("prompts.empty")} /></div> : null}
  <div className="mt-6 text-center text-xs text-muted-foreground">{query.isFetchingNextPage ? t("prompts.loading") : query.hasNextPage ? t("prompts.loadMore") : promptItems.length > 0 ? t("prompts.end") : null}</div>
  </section>
  </div>
@@ -91,6 +125,15 @@ export default function PromptsPage() {
  </main>
 
  <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))} onSaveAsset={savePromptAsset} />
+ <PromptTemplateDialog
+ open={Boolean(editing)}
+ editing
+ coverUrl={editing?.coverUrl || ""}
+ value={{ title: editing?.title || "", prompt: editing?.prompt || "", category: savedEditing?.category || "", tags: savedEditing?.tags || [] }}
+ onSave={saveEditedPrompt}
+ onDelete={() => { if (editing) deletePrompt(editing); setEditing(null); }}
+ onClose={() => setEditing(null)}
+ />
  </div>
  );
 }

@@ -12,10 +12,10 @@ export function usePromptList({ keyword, tags, category, enabled = true }: { key
         const timer = setTimeout(() => setDebouncedKeyword(keyword), 300);
         return () => clearTimeout(timer);
     }, [keyword]);
-    // 本地库是异步 hydration 的，且随时可能新增模板；把它算进 queryKey，
-    // 否则首次读到空库就会一直缓存空结果
+    // 本地库是异步 hydration 的，且随时可能新增、改名、换分类；把它算进 queryKey，
+    // 否则首次读到空库就会一直缓存空结果，改完模板列表也不会刷新
     const library = usePromptLibraryStore((state) => state.prompts);
-    const libraryKey = `${library.length}:${library[0]?.id ?? ""}`;
+    const libraryKey = `${library.length}:${library.map((item) => item.updatedAt).join("|")}`;
     const query = useInfiniteQuery({
         queryKey: ["prompts", debouncedKeyword, tags, category, libraryKey],
         queryFn: ({ pageParam }) => fetchPrompts({ keyword: debouncedKeyword, tag: tags, category, page: pageParam, pageSize: PROMPT_PAGE_SIZE }),

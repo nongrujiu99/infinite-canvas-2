@@ -9,12 +9,11 @@ import { exportCanvasNodes } from "@/lib/canvas/canvas-export";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { cn } from "@/lib/utils";
 import { PromptDetailDialog } from "@/pages/prompts/components/prompt-detail-dialog";
-import type { Prompt } from "@/services/api/prompts";
+import { savedPromptToPrompt, type Prompt } from "@/services/api/prompts";
 import { uploadMediaFile } from "@/services/file-storage";
 import { previewUrlFor, subscribeImagePreviews, getImagePreviewRevision, uploadImage } from "@/services/image-storage";
 import { useAssetStore, type Asset, type AssetKind } from "@/stores/use-asset-store";
-import { promptCoverUrl, usePromptLibraryStore } from "@/stores/use-prompt-library-store";
-import { LOCAL_PROMPT_SOURCE_ID, localPromptCategory } from "@/services/api/prompts";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 import { CANVAS_SIDE_PANEL_MAX_WIDTH, CANVAS_SIDE_PANEL_MIN_WIDTH, CANVAS_SIDE_PANEL_MOTION_MS, useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -476,21 +475,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ onInsert, theme }: { o
  const [detail, setDetail] = useState<Prompt | null>(null);
 
  // 远程仓库已移除，这里的来源只剩本地提示词库——就是从出图存下来的模板
- const items = useMemo<Prompt[]>(() => savedPrompts.map((item) => ({
-  id: item.id,
-  title: item.title,
-  prompt: item.prompt,
-  description: "",
-  coverUrl: promptCoverUrl(item),
-  referenceImageUrls: [],
-  tags: item.tags,
-  preview: "",
-  createdAt: item.createdAt,
-  updatedAt: item.updatedAt,
-  sourceId: LOCAL_PROMPT_SOURCE_ID,
-  category: localPromptCategory(),
-  githubUrl: "",
- })), [savedPrompts]);
+ const items = useMemo<Prompt[]>(() => savedPrompts.map(savedPromptToPrompt), [savedPrompts]);
 
  const filtered = useMemo(() => {
   const q = keyword.trim().toLowerCase();

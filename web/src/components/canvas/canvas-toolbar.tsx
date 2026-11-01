@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Segmented } from "antd";
-import { CircleDot, Crop, Eraser, Grid2x2, Group, Hand, Image as ImageIcon, Maximize2, Moon, MousePointer2, Music2, Palette, Redo2, ScanSearch, Settings2, SlidersHorizontal, Sparkles, Square, Sun, Trash2, Type, Undo2, Upload, Video, WandSparkles } from "lucide-react";
+import { CircleDot, Crop, Eraser, Grid2x2, Group, Hand, Image as ImageIcon, Maximize2, Moon, MousePointer2, Music2, Palette, Redo2, ScanSearch, Settings2, SlidersHorizontal, Sparkles, Square, Sun, Trash2, Type, Undo2, Upload, Video } from "lucide-react";
 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -14,7 +14,6 @@ const OPERATION_OPTIONS: { kind: CanvasOperationKind; icon: ReactNode }[] = [
  { kind: "split", icon: <Grid2x2 className="size-4" /> },
  { kind: "mask", icon: <ScanSearch className="size-4" /> },
  { kind: "upscale", icon: <Maximize2 className="size-4" /> },
- { kind: "superResolve", icon: <WandSparkles className="size-4" /> },
  { kind: "angle", icon: <Sparkles className="size-4" /> },
 ];
 

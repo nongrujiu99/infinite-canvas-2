@@ -669,6 +669,17 @@ html [role="switch"]:focus-visible {
     outline-offset: 2px;
 }
 
+/*
+ * antd 的按钮走的是 `:where(.hash).ant-btn:not(:disabled):focus-visible`，
+ * 三个类的权重压过了上面的 `html button`（0,2,1），实测拿到的仍是
+ * `--ant-color-primary-border` —— 深色下 3px rgb(22,47,75)，对比度约 1.5:1。
+ * 这里用两个 .ant-btn 加一个 html 把它盖回去。
+ */
+html .ant-btn.ant-btn:not(:disabled):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
 /* ---------------------------------------------------------------------------
  * 筛选标签（提示词库左侧的分类与标签）
  *

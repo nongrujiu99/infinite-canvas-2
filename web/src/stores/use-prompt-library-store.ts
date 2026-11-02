@@ -43,26 +43,69 @@ export function promptCoverUrl(item: SavedPrompt) {
     return previewUrlFor(item.coverStorageKey) || item.coverUrl;
 }
 
+/**
+ * 直接从存储里读出被引用的封面 key，不依赖内存状态。
+ *
+ * 图片回收是异步触发的：刷新页面后马上删一个画布，提示词库可能还没 hydration 完，
+ * 这时 `getState().prompts` 是空的，保留集就是空的——封面会被当孤儿删掉。
+ * 所以回收前再从持久化数据里取一份兜底。
+ */
+export async function persistentPromptStorageKeys() {
+    const keys = new Set<string>();
+    let value: string | null = null;
+    try {
+        value = (await localForageStorage.getItem(PROMPT_LIBRARY_KEY)) || null;
+    } catch {
+        // 读不出来就只靠内存那份，别因为兜底失败反而放大了删除范围
+        return keys;
+    }
+    if (!value) return keys;
+    try {
+        const parsed = JSON.parse(value) as StorageValue<PromptLibraryStore>;
+        (parsed.state?.prompts || []).forEach((item) => {
+            if (item.coverStorageKey) keys.add(item.coverStorageKey);
+        });
+    } catch {
+        // 存储内容坏了同样退回内存那份
+    }
+    return keys;
+}
+
 const libraryStorage: PersistStorage<PromptLibraryStore> = {
     getItem: async (name) => {
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
-        const parsed = JSON.parse(value) as StorageValue<PromptLibraryStore>;
+        let parsed: StorageValue<PromptLibraryStore>;
+        try {
+            parsed = JSON.parse(value) as StorageValue<PromptLibraryStore>;
+        } catch {
+            // 解析失败就当作没有：抛出去会被 persist 当成空库，接着一次 set 就把原数据覆盖掉
+            return null;
+        }
         // 缩略图存的是 blob URL，刷新后失效，必须按 storageKey 重新解析
-        parsed.state.prompts = await Promise.all(
-            (parsed.state.prompts || []).map(async (item) => {
-                // 老数据没有 category 字段，补成「未分类」，否则筛选时对不上
-                const normalized = { ...item, category: item.category || "" };
-                if (!normalized.coverStorageKey) return normalized;
-                void ensureImagePreview(normalized.coverStorageKey);
-                return { ...normalized, coverUrl: await resolveImageUrl(normalized.coverStorageKey, normalized.coverUrl) };
-            }),
-        );
+        parsed.state.prompts = await Promise.all((parsed.state.prompts || []).map(resolveSavedPromptCover));
         return parsed;
     },
     setItem: (name, value) => localForageStorage.setItem(name, JSON.stringify(value)),
     removeItem: (name) => localForageStorage.removeItem(name),
 };
+
+async function resolveSavedPromptCover(item: SavedPrompt): Promise<SavedPrompt> {
+    // 老数据没有 category 字段，补成「未分类」，否则筛选时对不上
+    const normalized = { ...item, category: item.category || "" };
+    if (!normalized.coverStorageKey) return normalized;
+    try {
+        // 卡片只出小图，优先拿缩略图，别为了一个封面把原图整个读进内存
+        const preview = await ensureImagePreview(normalized.coverStorageKey);
+        if (preview) return { ...normalized, coverUrl: preview };
+        // 原图若已被回收，coverUrl 里那个 blob URL 早就失效了，留着只会渲染成破图。
+        // 置空让界面回落到标题占位——至少看得出来「这条有内容，只是没缩略图」
+        return { ...normalized, coverUrl: (await resolveImageUrl(normalized.coverStorageKey, "")) || "" };
+    } catch {
+        // 读图失败不能连累整条记录，更不能让整库解析失败被判成空库
+        return { ...normalized, coverUrl: "" };
+    }
+}
 
 export const usePromptLibraryStore = create<PromptLibraryStore>()(
     persist(

@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { Empty, Input, Modal, Tooltip } from "antd";
 import { Search, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { getImagePreviewRevision, subscribeImagePreviews } from "@/services/image-storage";
 import { promptCoverUrl, usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 
 /**
@@ -16,6 +17,8 @@ export function PromptLibraryModal({ open, onPick, onClose }: { open: boolean; o
     const { t } = useTranslation();
     const prompts = usePromptLibraryStore((state) => state.prompts);
     const removePrompt = usePromptLibraryStore((state) => state.removePrompt);
+    // 缩略图是异步补出来的，订阅一次 revision，图到了一格一格刷新，否则要等下次开弹窗才看得到
+    useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
     const [keyword, setKeyword] = useState("");
 
     const items = useMemo(() => {

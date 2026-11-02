@@ -51,8 +51,9 @@ export async function deleteStoredMedia(keys: Iterable<string>) {
     );
 }
 
-export async function cleanupUnusedMedia(usedData: unknown) {
+export async function cleanupUnusedMedia(usedData: unknown, extraKeys: Iterable<string> = []) {
     const usedKeys = collectMediaStorageKeys(usedData);
+    for (const key of extraKeys) if (key) usedKeys.add(key);
     const unused: string[] = [];
     await store.iterate((_value, key) => {
         if (!usedKeys.has(key)) unused.push(key);
@@ -62,8 +63,15 @@ export async function cleanupUnusedMedia(usedData: unknown) {
 
 export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {
     if (!value || typeof value !== "object") return keys;
-    if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.includes(":")) keys.add(value.storageKey);
-    Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectMediaStorageKeys(child, keys)) : collectMediaStorageKeys(item, keys)));
+    // 与图片那边保持一致：认所有 *StorageKey 字段，别只认名字刚好叫 storageKey 的
+    for (const [field, item] of Object.entries(value as Record<string, unknown>)) {
+        if (typeof item === "string" && /storageKey$/i.test(field)) {
+            if (item.includes(":")) keys.add(item);
+            continue;
+        }
+        if (Array.isArray(item)) item.forEach((child) => collectMediaStorageKeys(child, keys));
+        else if (item && typeof item === "object") collectMediaStorageKeys(item, keys);
+    }
     return keys;
 }
 

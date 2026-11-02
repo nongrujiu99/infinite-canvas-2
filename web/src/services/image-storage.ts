@@ -248,8 +248,10 @@ export async function deleteStoredImages(keys: Iterable<string>) {
     );
 }
 
-export async function cleanupUnusedImages(usedData: unknown) {
+export async function cleanupUnusedImages(usedData: unknown, extraKeys: Iterable<string> = []) {
     const usedKeys = collectImageStorageKeys(usedData);
+    // 外部已知的引用（比如还没 hydration 完的提示词库）单独传进来，不依赖 usedData 的结构
+    for (const key of extraKeys) if (key) usedKeys.add(key);
     await Promise.all([
         imageLogStore.iterate((value) => {
             collectImageStorageKeys(value, usedKeys);
@@ -269,10 +271,34 @@ export async function cleanupUnusedImages(usedData: unknown) {
     await Promise.all([deleteStoredImages(unused), ...orphanPreviews.map(deleteImagePreview)]);
 }
 
+/**
+ * 把一份图片 blob 复制成新的 storageKey。
+ *
+ * 用于「这张图被别的长期资产引用」的场景（提示词库封面、素材封面）：
+ * 画布节点后续的编辑、放大、版本回退都会往节点原来的 storageKey 覆盖写，
+ * 共用同一个 key 的话，封面会跟着变——用户看到的就是「缩略图过段时间变成了别的图」。
+ */
+export async function cloneStoredImage(storageKey: string) {
+    const blob = await store.getItem<Blob>(storageKey);
+    if (!blob) return undefined;
+    const nextKey = `image:${nanoid()}`;
+    await store.setItem(nextKey, blob);
+    await storeImagePreview(nextKey, blob);
+    return nextKey;
+}
+
 export function collectImageStorageKeys(value: unknown, keys = new Set<string>()) {
     if (!value || typeof value !== "object") return keys;
-    if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.startsWith("image:")) keys.add(value.storageKey);
-    Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectImageStorageKeys(child, keys)) : collectImageStorageKeys(item, keys)));
+    for (const [field, item] of Object.entries(value as Record<string, unknown>)) {
+        // 除了 storageKey，封面这类派生字段（coverStorageKey）也指向 image_files 里的 blob，
+        // 漏掉它们，回收器就会把仍然在用的图片当孤儿删掉
+        if (typeof item === "string" && /storageKey$/i.test(field)) {
+            if (item.startsWith("image:")) keys.add(item);
+            continue;
+        }
+        if (Array.isArray(item)) item.forEach((child) => collectImageStorageKeys(child, keys));
+        else if (item && typeof item === "object") collectImageStorageKeys(item, keys);
+    }
     return keys;
 }
 

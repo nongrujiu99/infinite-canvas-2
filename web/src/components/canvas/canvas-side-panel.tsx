@@ -471,11 +471,13 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ onInsert, theme }: { o
  const { message } = App.useApp();
  const { t } = useTranslation();
  const savedPrompts = usePromptLibraryStore((state) => state.prompts);
+ // 缩略图是异步补的，重算一次映射才能把新地址带到卡片上
+ const previewRevision = useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
  const [keyword, setKeyword] = useState("");
  const [detail, setDetail] = useState<Prompt | null>(null);
 
  // 远程仓库已移除，这里的来源只剩本地提示词库——就是从出图存下来的模板
- const items = useMemo<Prompt[]>(() => savedPrompts.map(savedPromptToPrompt), [savedPrompts]);
+ const items = useMemo<Prompt[]>(() => savedPrompts.map(savedPromptToPrompt), [previewRevision, savedPrompts]);
 
  const filtered = useMemo(() => {
   const q = keyword.trim().toLowerCase();

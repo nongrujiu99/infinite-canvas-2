@@ -9,7 +9,7 @@ import { requestEdit, requestGeneration, requestImageQuestion } from "@/services
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask } from "@/services/api/video";
 import { defaultConfig, resolveModelScript, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
-import { ensureImagePreview, imageToDataUrl, uploadImage } from "@/services/image-storage";
+import { cloneStoredImage, ensureImagePreview, imageToDataUrl, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
@@ -1985,14 +1985,18 @@ function InfiniteCanvasPage() {
  const openSavePromptTemplate = useCallback((node: CanvasNodeData) => setPromptTemplateNode(node), []);
 
  const savePromptTemplate = useCallback(
- ({ title, prompt, category, tags }: { title: string; prompt: string; category: string; tags: string[] }) => {
+ async ({ title, prompt, category, tags }: { title: string; prompt: string; category: string; tags: string[] }) => {
  const node = promptTemplateNode;
  if (!node) return;
+ const sourceKey = node.metadata?.storageKey;
+ // 封面单独复制一份：节点后续的编辑、放大、版本回退都会覆盖写自己的 storageKey，
+ // 共用一把 key 的话，提示词库里的缩略图会跟着变成另一张图
+ const coverStorageKey = sourceKey ? (await cloneStoredImage(sourceKey).catch(() => undefined)) || sourceKey : undefined;
  addPromptTemplate({
  title,
  prompt,
- coverUrl: node.metadata?.content || "",
- coverStorageKey: node.metadata?.storageKey,
+ coverUrl: coverStorageKey ? await resolveImageUrl(coverStorageKey, "") : node.metadata?.content || "",
+ coverStorageKey,
  category,
  tags,
  sourceNodeId: node.id,

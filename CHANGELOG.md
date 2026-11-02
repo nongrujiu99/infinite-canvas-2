@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.30.1 - 2026-11-03
+
 + [修复] 提示词库的缩略图会「过一段时间」自己消失。原因是封面图只靠 `coverStorageKey` 指着一张存在 IndexedDB `image_files` 里的原图活着，而这张图**不在任何回收保留集里**——删一次素材、删一次画布，`cleanupUnusedImages` 就把所有不属于 `assets / projects / 生图工作台结果` 的图片当孤儿删掉，封面随即变成死链。`coverUrl` 本身是 `URL.createObjectURL` 出来的 blob URL，刷新即失效，所以原图一被回收就再也回不来，表现就是「上次看还在，这次打开是空的」。现在把提示词库的 `coverStorageKey` 纳入保留集，并让 `collectImageStorageKeys` 认所有 `*StorageKey` 字段（之前只认 `storageKey`，`coverStorageKey` 即使塞进去也收集不到）。
 
 + [修复] 「存为提示词模板」原来直接把节点自己的 `storageKey` 拿来当封面。节点后续的局部编辑、放大、版本回退都会往同一个 key 覆盖写，封面会跟着变成另一张图；现在保存时把封面复制成独立 key（`cloneStoredImage`），与节点彻底解耦。

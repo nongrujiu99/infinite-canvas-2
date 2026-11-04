@@ -50,8 +50,13 @@ export type EcomStyle = {
     /** 该风格的画面禁区。 */
     avoid: string[];
     /**
-     * 风格缩略图（≤160px 的 data URL），只给界面看，不进 prompt。
-     * 存在自建风格里而不是走图片存储：它不是生成素材，也不该被图片清理逻辑回收。
+     * 风格缩略图，只给界面看，不进 prompt。
+     *
+     * 两种来源：内置配方指向 `public/style-covers/*.webp`（真实的成品照，
+     * 比手绘图形更能说明这套配方出图长什么样）；自建配方存 ≤160px 的 data URL。
+     * 没有 cover 时界面回落到 `StyleThumb` 按场景参数现画一张示意图。
+     *
+     * 不走图片存储：它不是用户素材，也不该被图片清理逻辑回收。
      */
     cover?: string;
     /** 内置风格只读，用户改动会写入覆盖层。 */
@@ -82,6 +87,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["front-eye", "three-quarter", "top-down"],
         fitCategories: [...ALL_3C, "other"],
         avoid: ["props", "colored background", "hard shadow", "visible backdrop edge"],
+        cover: "/style-covers/clean-white.webp",
         builtIn: true,
         enabled: true,
     },
@@ -102,6 +108,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "front-eye", "high-45"],
         fitCategories: [...ALL_3C, "other"],
         avoid: ["banding artifacts", "hard shadow", "busy props", "colored spill on the product"],
+        cover: "/style-covers/soft-gradient.webp",
         builtIn: true,
         enabled: true,
     },
@@ -122,6 +129,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "high-45", "desk-scene"],
         fitCategories: ["remote", "presenter", "mini-keyboard", "desk-accessory", "audio", "power", "smart-home"],
         avoid: ["saturated green cast on the product", "wilted leaves", "cluttered props", ...COMMON_3C_AVOID],
+        cover: "/style-covers/fresh-mint.webp",
         builtIn: true,
         enabled: true,
     },
@@ -142,6 +150,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "floating", "high-45"],
         fitCategories: ["remote", "presenter", "mini-keyboard", "audio", "power"],
         avoid: ["orange cast on the product surface", "oversaturated color", "hard black shadow", ...COMMON_3C_AVOID],
+        cover: "/style-covers/citrus-pop.webp",
         builtIn: true,
         enabled: true,
     },
@@ -162,6 +171,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["front-eye", "three-quarter", "floating"],
         fitCategories: ["remote", "presenter", "mini-keyboard", "power", "smart-home", "audio"],
         avoid: ["blue tint on the product body", "heavy shadow", "fake clouds", ...COMMON_3C_AVOID],
+        cover: "/style-covers/sky-clear.webp",
         builtIn: true,
         enabled: true,
     },
@@ -183,6 +193,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "floating", "close-up"],
         fitCategories: ["mini-keyboard", "presenter", "audio", "power", "smart-home"],
         avoid: ["double reflection of the product", "milky acrylic", "reflection covering the product face", ...COMMON_3C_AVOID],
+        cover: "/style-covers/acrylic-float.webp",
         builtIn: true,
         enabled: true,
     },
@@ -202,6 +213,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["desk-scene", "high-45", "lifestyle"],
         fitCategories: ["mini-keyboard", "desk-accessory", "presenter", "remote", "audio"],
         avoid: ["messy desk clutter", "blurry product", "fake screen content in background", "crooked horizon", ...COMMON_3C_AVOID],
+        cover: "/style-covers/desk-minimal.webp",
         builtIn: true,
         enabled: true,
     },
@@ -222,6 +234,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "front-eye", "desk-scene"],
         fitCategories: ["mini-keyboard", "desk-accessory", "audio", "smart-home", "presenter"],
         avoid: ["warm orange cast", "dramatic shadow", "cluttered background", ...COMMON_3C_AVOID],
+        cover: "/style-covers/nordic-soft.webp",
         builtIn: true,
         enabled: true,
     },
@@ -241,6 +254,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["front-eye", "three-quarter", "high-45"],
         fitCategories: [...ALL_3C, "other"],
         avoid: ["double shadow", "harsh black shadow", "gradient banding", ...COMMON_3C_AVOID],
+        cover: "/style-covers/studio-shadow.webp",
         builtIn: true,
         enabled: true,
     },
@@ -262,6 +276,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "top-down", "close-up"],
         fitCategories: ["mini-keyboard", "audio", "presenter", "desk-accessory"],
         avoid: ["oversaturated color", "pink cast on the product", "busy composition", ...COMMON_3C_AVOID],
+        cover: "/style-covers/morandi-still.webp",
         builtIn: true,
         enabled: true,
     },
@@ -281,6 +296,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["three-quarter", "close-up", "floating"],
         fitCategories: ["mini-keyboard", "remote", "presenter", "audio", "power"],
         avoid: ["lost product silhouette in the dark", "blue color spill on the product", "noisy background", "fake RGB glow"],
+        cover: "/style-covers/tech-dark.webp",
         builtIn: true,
         enabled: true,
     },
@@ -300,6 +316,7 @@ export const ECOM_STYLES: EcomStyle[] = [
         angles: ["desk-scene", "lifestyle", "in-hand"],
         fitCategories: ["desk-accessory", "mini-keyboard", "presenter", "remote", "audio"],
         avoid: ["blown out highlights", "heavy yellow cast", "fake looking plants", ...COMMON_3C_AVOID],
+        cover: "/style-covers/sunlight-window.webp",
         builtIn: true,
         enabled: true,
     },

@@ -1441,7 +1441,7 @@ export default {
             riser: "Display riser",
             riserOnHint: "Keep the riser that comes with the style (acrylic block, plinth, display stand).",
             riserOffHint: "When off, the product sits directly on the scene surface and no acrylic block or display stand is generated.",
-            riserRequiredByStyle: "This style relies on its riser for depth; with it off the image will look noticeably flatter.",
+            riserRequiredByStyle: "Relies on the riser for depth — off, it looks flat.",
             sendReference: "Send reference image too",
             sendReferenceShort: "Refs go with the request — stronger constraint",
             sendReferenceUnsupportedShort: "Model accepts one image only",

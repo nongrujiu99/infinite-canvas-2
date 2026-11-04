@@ -60,7 +60,7 @@ export function StudioSection({
                 {collapsible ? (
                     <button
                         type="button"
-                        onClick={() => toggle(key)}
+                        onClick={() => toggle(key, folded)}
                         aria-expanded={!folded}
                         aria-label={folded ? t("studio.section.expand") : t("studio.section.collapse")}
                         className="group -my-1 flex min-w-0 items-baseline gap-2 py-1 text-left"

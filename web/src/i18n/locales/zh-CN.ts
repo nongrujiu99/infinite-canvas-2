@@ -1426,7 +1426,7 @@ export default {
             riser: "展示台",
             riserOnHint: "沿用风格自带的承托台（亚克力垫块 / 石膏台 / 展示台）。",
             riserOffHint: "关闭后产品直接落在场景表面上，不再生成亚克力垫块或展示台。",
-            riserRequiredByStyle: "当前风格靠展示台撑出层次，关闭后画面会明显变平。",
+            riserRequiredByStyle: "靠展示台撑出层次，关掉后画面会变平。",
             sendReference: "同时提交参考图",
             sendReferenceShort: "参考图随请求一起发，约束更强",
             sendReferenceUnsupportedShort: "当前模型不支持多图",

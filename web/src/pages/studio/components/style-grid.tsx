@@ -1,5 +1,5 @@
 import { Switch, Tooltip } from "antd";
-import { Check } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -121,7 +121,6 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
 
                     <div className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
                         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{current.tags.join(" · ")}</span>
-                        {!showRiser && current.requiresRiser ? <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">{t("studio.settings.riserRequiredByStyle")}</span> : null}
                         <Tooltip title={showRiser ? t("studio.settings.riserOnHint") : t("studio.settings.riserOffHint")}>
                             <label className="flex shrink-0 cursor-pointer items-center gap-1.5">
                                 <span className="text-xs text-muted-foreground">{t("studio.settings.riser")}</span>
@@ -129,6 +128,18 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
                             </label>
                         </Tooltip>
                     </div>
+
+                    {/*
+                     * 提示独占一行。之前它和标签、开关挤在同一行，而这个区块只有 254px 宽：
+                     * 一整句警告是 shrink-0，压得左侧标签的 flex-1 缩到 0，整行还溢出面板。
+                     * 换行后标签与开关都回到自己的位置，警告也才读得完整。
+                     */}
+                    {!showRiser && current.requiresRiser ? (
+                        <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            <span>{t("studio.settings.riserRequiredByStyle")}</span>
+                        </p>
+                    ) : null}
 
                     {covered.length ? <p className="mt-1.5 text-xs leading-5 text-amber-700/90 dark:text-amber-400/90">{t("studio.style.overriddenByReference", { fields: covered.map((field) => t(`studio.style.field.${field}`)).join("、") })}</p> : null}
 

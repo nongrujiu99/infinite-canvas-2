@@ -3,7 +3,13 @@ import { persist } from "zustand/middleware";
 
 type SectionCollapseStore = {
     collapsed: Record<string, boolean>;
-    toggle: (key: string) => void;
+    /**
+     * 传的是「这一块当前生效的折叠状态」，不是默认值。
+     * 默认值是组件级参数（视觉配方默认收起），store 不知道，所以不能自己取反：
+     * 早先按 `!state.collapsed[key]` 取反，默认收起的区块第一下点永远点不开——
+     * undefined 取反还是 true，等于原地踏步，得点两下才展开。
+     */
+    toggle: (key: string, current: boolean) => void;
 };
 
 /**
@@ -17,7 +23,7 @@ export const useSectionCollapseStore = create<SectionCollapseStore>()(
     persist(
         (set) => ({
             collapsed: {},
-            toggle: (key) => set((state) => ({ collapsed: { ...state.collapsed, [key]: !state.collapsed[key] } })),
+            toggle: (key, current) => set((state) => ({ collapsed: { ...state.collapsed, [key]: !current } })),
         }),
         { name: "infinite-canvas:section-collapse" },
     ),

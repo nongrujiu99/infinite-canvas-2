@@ -1,10 +1,10 @@
 import { Switch, Tooltip } from "antd";
 import { Check } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EcomCategoryId } from "@/constant/ecom/categories";
-import type { EcomStyleField } from "@/constant/ecom/styles";
+import type { EcomPalette, EcomStyleField } from "@/constant/ecom/styles";
 import { sortStylesByCategory } from "@/lib/ecom/style-match";
 import { cn } from "@/lib/utils";
 import { useActiveEcomStyles } from "@/stores/studio/use-ecom-style-store";
@@ -14,6 +14,73 @@ import { SectionManageButton, StudioSection } from "./section";
 
 /** 参考图能覆盖的字段，与 prompt 区块一一对应。 */
 const COVERABLE: EcomStyleField[] = ["scene", "lighting", "composition", "palettes"];
+
+/**
+ * 用一套配色画出来的迷你场景：背景、台面、产品轮廓、投影、道具与轮廓光。
+ *
+ * 只是一小段三色条的话，用户看不出「这套配方出图长什么样」，十二套在眼里就是
+ * 十二根深浅不同的横条。这里按配方的真实分工上色 —— `main` 是背景，`sub` 是
+ * 台面与投影，`accent` 是道具和高光 —— 缩略图就直接是成片的构图：产品立在
+ * 台面上、有落影、有一盏左上的柔光。有承托物的配方会把台面画高一层，
+ * 关掉「展示台」开关时跟着消失，所见即所得。
+ */
+function StyleThumb({ palette, riser }: { palette: EcomPalette; riser: boolean }) {
+    const uid = useId().replace(/:/g, "");
+    // 有承托物时台面抬高一层，产品跟着上移
+    const floor = riser ? 58 : 66;
+    const top = floor - 30;
+    return (
+        <svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice" className="size-full" aria-hidden="true">
+            <defs>
+                {/* 左上柔光的衰减 */}
+                <linearGradient id={`light${uid}`} x1="0" y1="0" x2="0.7" y2="1">
+                    <stop offset="0%" stopColor="#fff" stopOpacity="0.32" />
+                    <stop offset="58%" stopColor="#fff" stopOpacity="0" />
+                </linearGradient>
+                {/* 背景向台面过渡，避免一条硬边 */}
+                <linearGradient id={`horizon${uid}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={palette.sub} stopOpacity="0" />
+                    <stop offset="100%" stopColor={palette.sub} stopOpacity="1" />
+                </linearGradient>
+                {/* 四角压暗，让画面像有景深 */}
+                <linearGradient id={`vignette${uid}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="55%" stopColor="#000" stopOpacity="0" />
+                    <stop offset="100%" stopColor="#000" stopOpacity="0.16" />
+                </linearGradient>
+                <filter id={`soft${uid}`} x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation="2.2" />
+                </filter>
+            </defs>
+
+            <rect width="120" height="90" fill={palette.main} />
+            <rect width="120" height="90" fill={`url(#light${uid})`} />
+            <rect y={floor - 30} width="120" height="30" fill={`url(#horizon${uid})`} />
+            <rect y={floor} width="120" height={90 - floor} fill={palette.sub} />
+            <rect width="120" height="90" fill={`url(#vignette${uid})`} />
+
+            {/* 承托物：一块略高于台面的垫块，顶面比侧面亮 */}
+            {riser ? (
+                <>
+                    <rect x="30" y={floor} width="60" height="9" fill={palette.sub} />
+                    <rect x="30" y={floor} width="60" height="1.4" fill="#fff" opacity="0.5" />
+                    <rect x="30" y={floor + 8} width="60" height="1" fill="#000" opacity="0.1" />
+                </>
+            ) : null}
+
+            {/* 道具：左后方的圆柱，用点缀色，充当画面里的次要素材 */}
+            <ellipse cx="30" cy={floor - 0.5} rx="8" ry="2.2" fill="#000" opacity="0.1" filter={`url(#soft${uid})`} />
+            <rect x="25" y={floor - 16} width="10" height="16" rx="3" fill={palette.accent} opacity="0.75" />
+            <ellipse cx="30" cy={floor - 16} rx="5" ry="1.8" fill="#fff" opacity="0.25" />
+
+            {/* 产品本体：白色圆角块，靠落影与轮廓光从背景里立起来 */}
+            <ellipse cx="64" cy={floor + 0.5} rx="15" ry="3.2" fill="#000" opacity="0.22" filter={`url(#soft${uid})`} />
+            <rect x="62.5" y={top + 1} width="26" height="30" rx="5" fill="#000" opacity="0.09" filter={`url(#soft${uid})`} />
+            <rect x="61" y={top} width="24" height="30" rx="4.5" fill="#fff" opacity="0.96" />
+            <rect x="61" y={floor - 5} width="24" height="5" rx="2" fill={palette.sub} opacity="0.55" />
+            <rect x="82.4" y={top + 3} width="1.4" height="24" rx="0.7" fill={palette.accent} opacity="0.7" />
+        </svg>
+    );
+}
 
 /**
  * 自定义视觉配方。
@@ -62,12 +129,11 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
             <p className="mb-1.5 text-xs leading-5 text-muted-foreground">{t("studio.style.customHint")}</p>
 
             {/*
-             * 配方改成单列行：左边一小段三色条，右边名字。
-             * 原来是两列色卡，10 张加起来近 500px 高、还是一片饱和色块墙，
-             * 可选功能的视觉重量超过了主路径（平台 × 场景）。行式列表安静得多，
-             * 名字也能完整显示——真正要对比的是「哪套配方」，不是色条面积。
+             * 配方是「看一眼就知道出图长什么样」的东西，所以给的是缩略图而不是色条。
+             * 两列卡片的密度：名字 4–5 个字，两列各 140px 左右放得下；再大的话
+             * 可选功能的视觉重量就超过主路径（平台 × 场景）了。
              */}
-            <div className="space-y-1">
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-2">
                 {sorted.map((style) => {
                     const active = style.id === styleId;
                     const palette = style.palettes[paletteIndex] ?? style.palettes[0];
@@ -76,22 +142,21 @@ export function StyleGrid({ categoryId, coveredFields, onOpenManager }: { catego
                             <button
                                 type="button"
                                 onClick={() => selectStyle(style.id)}
+                                aria-pressed={active}
                                 className={cn(
-                                    "flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition",
-                                    active ? "border-primary bg-primary/8" : "border-border/80 hover:border-foreground/25",
+                                    "group overflow-hidden rounded-lg border text-left transition",
+                                    active ? "border-primary ring-1 ring-primary/50" : "border-border hover:border-foreground/30",
                                 )}
                             >
-                                {style.cover ? (
-                                    <img src={style.cover} alt="" className="size-4 shrink-0 rounded-full object-cover" loading="lazy" />
-                                ) : (
-                                    <span className="flex h-4 w-12 shrink-0 overflow-hidden rounded-full border border-border/60">
-                                        <span className="h-full flex-[3]" style={{ background: palette.main }} />
-                                        <span className="h-full flex-1" style={{ background: palette.sub }} />
-                                        <span className="h-full w-[18%]" style={{ background: palette.accent }} />
-                                    </span>
-                                )}
-                                <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "font-medium text-primary" : "text-foreground")}>{style.name}</span>
-                                {active ? <Check className="size-3 shrink-0 text-primary" /> : null}
+                                <span className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
+                                    {style.cover ? <img src={style.cover} alt="" className="size-full object-cover" loading="lazy" decoding="async" /> : <StyleThumb palette={palette} riser={showRiser && Boolean(style.riser)} />}
+                                    {active ? (
+                                        <span className="absolute right-1 top-1 grid size-4 place-items-center rounded-full bg-primary shadow-sm">
+                                            <Check className="size-2.5" strokeWidth={3} />
+                                        </span>
+                                    ) : null}
+                                </span>
+                                <span className={cn("block truncate px-1.5 py-1 text-xs", active ? "font-medium text-foreground" : "text-foreground/85 group-hover:text-foreground")}>{style.name}</span>
                             </button>
                         </Tooltip>
                     );

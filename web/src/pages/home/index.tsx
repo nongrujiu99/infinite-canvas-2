@@ -201,6 +201,7 @@ export default function HomePage() {
                         <Link to="/canvas">{t("navigation.canvas")}</Link>
                         <Link to="/image">{t("navigation.image")}</Link>
                         <Link to="/prompts">{t("navigation.prompts")}</Link>
+                        <Link to="/changelog">{t("changelog.entry")}</Link>
                         <a href={REPO_URL} target="_blank" rel="noreferrer">
                             GitHub
                         </a>

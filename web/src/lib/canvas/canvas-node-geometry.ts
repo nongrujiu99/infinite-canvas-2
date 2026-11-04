@@ -161,7 +161,10 @@ function configMode(node: CanvasNodeData): CanvasGenerationMode {
 
 function acceptsConfigInput(mode: CanvasGenerationMode, node: CanvasNodeData) {
     const type = resourceType(node);
-    if (mode === "text") return type === CanvasNodeType.Text;
+    // 文本模型同样能读图：看图写文案、OCR、改写成图提示词都走这条路。
+    // 这条规则和「图片可以直接连文本节点」保持一致——否则从生图切到文本，
+    // 原本挂着的图片会被判成不兼容、连线变红、生成被禁用，可换回生图又恢复正常。
+    if (mode === "text") return type === CanvasNodeType.Text || type === CanvasNodeType.Image;
     if (mode === "image") return type === CanvasNodeType.Text || type === CanvasNodeType.Image;
     if (mode === "audio") return type === CanvasNodeType.Text || type === CanvasNodeType.Audio;
     return type === CanvasNodeType.Text || type === CanvasNodeType.Image || type === CanvasNodeType.Video || type === CanvasNodeType.Audio;

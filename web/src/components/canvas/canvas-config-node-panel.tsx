@@ -1,4 +1,4 @@
-import { BookMarked, ChevronDown, Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Video, Wand2 } from "lucide-react";
+import { BookMarked, ChevronDown, Image as ImageIcon, LoaderCircle, MessageSquare, Music2, Play, Square, Unplug, Video, Wand2 } from "lucide-react";
 import { Button, Dropdown, Input, InputNumber, message, Modal, Popover, Segmented, Select, Slider, Switch } from "antd";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -116,7 +116,11 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
   onConfigChange(node.id, { composerContent: base ? `${base}\n${text}` : text });
   setLibraryOpen(false);
  }, [node.id, node.metadata?.composerContent, node.metadata?.prompt, onConfigChange]);
- const summary = inputSummaryText(mode, inputSummary, t);
+ const summary = inputSummaryText(mode, inputSummary, t, invalidSourceIds.length);
+ // 提示里直接给一个「断开」：缩略图上那个 × 只有 12px，还要先想到去悬停，用户找不到
+ const disconnectInvalid = useCallback(() => {
+  invalidSourceIds.forEach((sourceId) => onDisconnectReference(sourceId, node.id));
+ }, [invalidSourceIds, node.id, onDisconnectReference]);
  return (
  <div className="flex h-full w-full cursor-move flex-col overflow-hidden px-4 pb-4 pt-8 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
  <div className="mb-2 shrink-0 cursor-default" onMouseDown={(event) => event.stopPropagation()}>
@@ -207,7 +211,13 @@ export function CanvasConfigNodePanel({ node, nodes, inputs, connectedNodes, inv
  </div>
  ) : null}
 
- {invalidSourceIds.length ? <div className="mb-2 shrink-0 text-xs leading-4 text-red-500">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</div> : null}
+ {invalidSourceIds.length ? (
+ <div className="mb-2 flex shrink-0 cursor-default items-start gap-1.5 text-xs leading-4 text-red-500" onMouseDown={(event) => event.stopPropagation()}>
+ <Unplug className="mt-0.5 size-3 shrink-0" />
+ <span className="min-w-0 flex-1">{t("canvas.configNode.invalidConnections", { count: invalidSourceIds.length })}</span>
+ <button type="button" className="shrink-0 cursor-pointer underline decoration-dotted underline-offset-2 transition-opacity hover:opacity-70" onClick={disconnectInvalid}>{t("canvas.configNode.disconnectInvalid")}</button>
+ </div>
+ ) : null}
  {requiresImageEditModel && !compatibleImageModels.length ? <div className="mb-2 shrink-0 text-xs leading-4 text-red-500">{t("canvas.editors.noCompatibleEditModel")}</div> : null}
 
  <div className="canvas-generation-settings shrink-0 cursor-default rounded-xl px-2.5 py-2" style={{ background: theme.node.fill }}>
@@ -390,12 +400,14 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
  };
 }
 
-function inputSummaryText(mode: CanvasGenerationMode, summary: CanvasConfigNodePanelProps["inputSummary"], t: TFunction) {
+function inputSummaryText(mode: CanvasGenerationMode, summary: CanvasConfigNodePanelProps["inputSummary"], t: TFunction, invalidCount = 0) {
  const values = [
- summary.textCount ? t("canvas.configNode.textSummary", { count: summary.textCount }) : "",
- mode !== "audio" && summary.imageCount ? t("canvas.configNode.imageSummary", { count: summary.imageCount }) : "",
- mode === "video" && summary.videoCount ? t("canvas.configNode.videoSummary", { count: summary.videoCount }) : "",
- (mode === "video" || mode === "audio") && summary.audioCount ? t("canvas.configNode.audioSummary", { count: summary.audioCount }) : "",
+  summary.textCount ? t("canvas.configNode.textSummary", { count: summary.textCount }) : "",
+  mode !== "audio" && summary.imageCount ? t("canvas.configNode.imageSummary", { count: summary.imageCount }) : "",
+  mode === "video" && summary.videoCount ? t("canvas.configNode.videoSummary", { count: summary.videoCount }) : "",
+  (mode === "video" || mode === "audio") && summary.audioCount ? t("canvas.configNode.audioSummary", { count: summary.audioCount }) : "",
  ].filter(Boolean);
- return values.length ? values.join(" · ") : t("canvas.configNode.waitingInput");
+ if (values.length) return values.join(" · ");
+ // 挂着线却说「等待连接素材」是自相矛盾的：这里说清楚「有输入，但用不了」
+ return invalidCount ? t("canvas.configNode.invalidOnly", { count: invalidCount }) : t("canvas.configNode.waitingInput");
 }

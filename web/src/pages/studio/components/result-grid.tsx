@@ -1,13 +1,16 @@
 import { App, Button, Image, Modal, Tooltip } from "antd";
-import { Braces, Download, FolderPlus, Images, Maximize2, Sparkles, Trash2 } from "lucide-react";
+import { BookmarkPlus, Braces, Download, FolderPlus, Images, Maximize2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PromptTemplateDialog, type PromptTemplateDraft } from "@/components/prompts/prompt-template-dialog";
 import { parseAspectRatio } from "@/lib/media-size";
 import { cn } from "@/lib/utils";
 import { useEcomStudioStore, type StudioResult } from "@/stores/studio/use-ecom-studio-store";
 import { useAssetStore } from "@/stores/use-asset-store";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 
+// 五颗按钮要塞进最窄 152px 的列里，间距压到 2px：5×24 + 4×2 + 边框仍有余量
 const ACTION = "flex size-6 items-center justify-center rounded-lg bg-background/85 text-foreground/80 backdrop-blur-sm transition hover:bg-background hover:text-foreground";
 
 /** 瀑布流的列宽下限与间距，两处都要用，提到外面免得对不上。 */
@@ -161,7 +164,9 @@ export function ResultGrid() {
     const clearResults = useEcomStudioStore((state) => state.clearResults);
     const removeResult = useEcomStudioStore((state) => state.removeResult);
     const addAsset = useAssetStore((state) => state.addAsset);
+    const addPromptTemplate = usePromptLibraryStore((state) => state.addPrompt);
     const [promptOf, setPromptOf] = useState<StudioResult | null>(null);
+    const [templateOf, setTemplateOf] = useState<StudioResult | null>(null);
     const elapsed = useElapsedSeconds(generating);
     const { ref: gridRef, count: columnCount } = useColumnCount();
 
@@ -196,6 +201,26 @@ export function ResultGrid() {
         link.href = item.dataUrl;
         link.download = `ecom-${item.styleId}-${item.ratio.replace(":", "x")}-${item.id}.png`;
         link.click();
+    };
+
+    /*
+     * 存模板时封面直接复用这张结果的 storageKey，不另存一份：
+     * 结果图本身就是那次出图的成品，studio 里也不会有人覆写这把 key（不像画布节点
+     * 会被编辑、放大覆盖）。回收器把提示词库的 coverStorageKey 算作在用，删结果也不会丢图。
+     */
+    const saveAsTemplate = ({ title, prompt, category, tags }: PromptTemplateDraft) => {
+        const item = templateOf;
+        if (!item) return;
+        addPromptTemplate({
+            title: title || `${item.styleName} · ${item.ratio}`,
+            prompt,
+            coverUrl: item.dataUrl,
+            coverStorageKey: item.storageKey,
+            category,
+            tags,
+        });
+        setTemplateOf(null);
+        message.success(t("studio.result.savedToPrompt"));
     };
 
     // 一次请求出 count 张，所以生成中就摆 count 个位，而不是只放一个打转的圈
@@ -272,10 +297,15 @@ export function ResultGrid() {
                                             preview={{ cover: <Maximize2 className="size-4" /> }}
                                         />
                                         {/* 操作只在实际用到时出现，静止状态只留图，图墙才干净 */}
-                                        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 p-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                                        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-0.5 p-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                                             <Tooltip title={t("studio.result.viewPrompt")}>
                                                 <button type="button" aria-label={t("studio.result.viewPrompt")} className={ACTION} onClick={() => setPromptOf(cell.item)}>
                                                     <Braces className="size-3.5" />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip title={t("studio.result.saveToPrompt")}>
+                                                <button type="button" aria-label={t("studio.result.saveToPrompt")} className={ACTION} onClick={() => setTemplateOf(cell.item)}>
+                                                    <BookmarkPlus className="size-3.5" />
                                                 </button>
                                             </Tooltip>
                                             <Tooltip title={t("studio.result.saveToAssets")}>
@@ -312,7 +342,25 @@ export function ResultGrid() {
                 <p className="px-0.5 text-xs leading-5 text-muted-foreground">{elapsed >= 45 ? t("studio.result.workingSlow") : t("studio.result.workingHint")}</p>
             ) : null}
 
-            <Modal open={Boolean(promptOf)} title={t("studio.result.promptTitle")} footer={null} onCancel={() => setPromptOf(null)} width={720}>
+            <Modal
+                open={Boolean(promptOf)}
+                title={t("studio.result.promptTitle")}
+                onCancel={() => setPromptOf(null)}
+                width={720}
+                // 看到这段 prompt 觉得值得留着复用时，就地存成模板，不必退出去再点一次卡片
+                footer={
+                    <Button
+                        icon={<BookmarkPlus className="size-3.5" />}
+                        onClick={() => {
+                            const item = promptOf;
+                            setPromptOf(null);
+                            if (item) setTemplateOf(item);
+                        }}
+                    >
+                        {t("studio.result.saveToPrompt")}
+                    </Button>
+                }
+            >
                 {/* 手写补充单独标出来：看 prompt 时能分清哪几行是自己写的，复现时不用通篇找 */}
                 {promptOf?.extraPrompt ? (
                     <p className="mb-2 rounded-lg bg-primary/8 px-2.5 py-1.5 text-xs leading-5 text-foreground/85">
@@ -322,6 +370,20 @@ export function ResultGrid() {
                 ) : null}
                 <pre className="max-h-[60vh] overflow-auto rounded-lg bg-muted/50 p-3 text-xs leading-5 whitespace-pre-wrap text-foreground/85">{promptOf?.prompt}</pre>
             </Modal>
+
+            {/* 和画布图片节点共用同一个弹窗：缩略图、分类、标签这些行为不必再写一遍 */}
+            <PromptTemplateDialog
+                open={Boolean(templateOf)}
+                coverUrl={templateOf?.dataUrl || ""}
+                value={{
+                    title: templateOf ? `${templateOf.styleName} · ${templateOf.ratio}` : "",
+                    prompt: templateOf?.prompt || "",
+                    category: "",
+                    tags: templateOf ? ["电商生图", templateOf.styleName] : [],
+                }}
+                onSave={saveAsTemplate}
+                onClose={() => setTemplateOf(null)}
+            />
         </div>
     );
 }

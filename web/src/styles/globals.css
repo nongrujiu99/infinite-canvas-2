@@ -632,11 +632,56 @@
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * 生成中的占位卡
+ *
+ * 生成一次通常 20–60 秒，期间结果区原本一直是空状态文案，点完按钮看起来像没反应。
+ * 骨架卡必须动起来才算「在做事」，静止的灰块只会被读成坏掉。
+ * ------------------------------------------------------------------------- */
+
+.result-pending-sweep {
+    animation: result-pending-sweep 1.9s ease-in-out infinite;
+}
+
+@keyframes result-pending-sweep {
+    from {
+        transform: translateX(-120%);
+    }
+
+    to {
+        transform: translateX(320%);
+    }
+}
+
+/* 骨架换成成片的那一下要有个交代：直接硬切会像页面闪了一下 */
+.result-card-in {
+    animation: result-card-in 240ms ease-out both;
+}
+
+@keyframes result-card-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .canvas-connection-flow {
         animation: none;
         stroke-dasharray: 6 10;
         opacity: 0.75;
+    }
+
+    .result-pending-sweep {
+        animation: none;
+        opacity: 0.4;
+    }
+
+    .result-card-in {
+        animation: none;
     }
 }
 

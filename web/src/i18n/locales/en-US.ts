@@ -1471,6 +1471,11 @@ export default {
         result: {
             empty: "No results yet",
             emptyHint: "Upload a product photo and pick a style, then hit Generate — results land here.",
+            working: "Generating",
+            workingMeta: "{{count}} image(s) · {{seconds}}s",
+            workingCell: "Rendering",
+            workingHint: "The model is rendering — usually 20–60 seconds",
+            workingSlow: "Slower than usual, still rendering",
             count: "{{count}} image(s)",
             clear: "Clear",
             viewPrompt: "View prompt",

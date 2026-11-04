@@ -1454,6 +1454,11 @@ export default {
         result: {
             empty: "还没有生成结果",
             emptyHint: "上传产品图、选好风格后，点左下角「生成电商图」，结果会排在这里。",
+            working: "正在生成",
+            workingMeta: "{{count}} 张 · {{seconds}} 秒",
+            workingCell: "出图中",
+            workingHint: "模型正在出图，通常 20–60 秒",
+            workingSlow: "比平时慢，仍在出图",
             count: "共 {{count}} 张",
             clear: "清空",
             viewPrompt: "查看提示词",

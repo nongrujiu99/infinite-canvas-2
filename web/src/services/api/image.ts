@@ -24,8 +24,15 @@ type ResponseToolCall = {
     thoughtSignature?: string;
 };
 
-type ResponseInputMessage =
+type AssistantToolCallMessage = {
+    role: "assistant";
+    content: string | null;
+    tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+};
+
+export type ResponseInputMessage =
     | AiTextMessage
+    | AssistantToolCallMessage
     | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string }
     | { role: "tool"; tool_call_id: string; content: string };
 
@@ -709,11 +716,18 @@ function toGeminiContents(messages: ResponseInputMessage[]): GeminiContent[] {
             const name = callNameById.get(message.tool_call_id) || "tool_result";
             return [{ role: "user", parts: [{ functionResponse: { id: message.tool_call_id, name, response: { result: jsonValue(message.content) } } }] }];
         }
+        if (message.role === "assistant" && "tool_calls" in message && Array.isArray(message.tool_calls)) {
+            return message.tool_calls.flatMap((call): GeminiContent[] => {
+                callNameById.set(call.id, call.function.name);
+                const contentParts = message.content ? toGeminiParts(message.content) : [];
+                return [{ role: "model", parts: [...contentParts, { functionCall: { id: call.id, name: call.function.name, args: jsonObject(call.function.arguments) } }] }];
+            });
+        }
         return [{ role: message.role === "assistant" ? "model" : "user", parts: toGeminiParts(message.content) }];
     });
 }
 
-function toGeminiParts(content: ResponseMessageContent): GeminiPart[] {
+function toGeminiParts(content: ResponseMessageContent | null): GeminiPart[] {
     if (!Array.isArray(content)) return [{ text: String(content || "") }];
     return content.map((item) => (item.type === "text" ? { text: item.text } : toGeminiImagePart(item.image_url.url)));
 }
@@ -1076,6 +1090,45 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
         if (strictFunction) throw new StructuredOutputError(`严格结构化输出请求失败：${readAxiosError(error, apiText("requestFailed"))}`);
         throw toApiError(error, apiText("requestFailed"));
     }
+}
+
+export type ChatToolDefinition = {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+};
+
+export type ChatToolCallResult = {
+    content: string;
+    toolCalls: ResponseToolCall[];
+};
+
+/**
+ * 通用工具调用对话：暴露多工具 + tool_choice auto，并支持工具结果回填后的多轮往返。
+ * 与 requestImageQuestion 共用底层流式能力，但额外透出 tools 与 tool 消息，供 Agent 编排循环使用。
+ */
+export async function requestChatWithTools(config: AiConfig, messages: ResponseInputMessage[], tools: ChatToolDefinition[], onDelta: (text: string) => void, options?: RequestOptions): Promise<ChatToolCallResult> {
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
+    const toolList: ResponseFunctionTool[] = tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }));
+    const toolChoice: ToolChoice = "auto";
+    if (requestConfig.apiFormat === "gemini") {
+        const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(toolList, toolChoice)), onDelta, options);
+        return { content: result.content, toolCalls: result.toolCalls };
+    }
+    const chatMessages = withSystemMessage(requestConfig, messages).map((msg) => {
+        if ("type" in msg) return msg;
+        if (msg.role === "tool") return msg;
+        if (msg.role === "assistant" && "tool_calls" in msg && Array.isArray(msg.tool_calls)) return msg;
+        return { role: msg.role, content: msg.content };
+    });
+    const result = await requestChatCompletionsStreaming(requestConfig, {
+        model: requestConfig.model,
+        messages: chatMessages,
+        tools: toolList.map((tool) => ({ type: "function", function: tool.function })),
+        tool_choice: toolChoice,
+        ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
+    }, onDelta, options);
+    return { content: result.content, toolCalls: result.toolCalls };
 }
 
 function requireStrictFunctionArguments(result: ToolResponseResult, expectedName: string) {

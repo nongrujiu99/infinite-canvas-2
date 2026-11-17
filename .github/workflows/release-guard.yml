@@ -1,0 +1,29 @@
+name: Release guard
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: VERSION 必须与 tag 一致
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::VERSION($version) 与 tag($GITHUB_REF_NAME) 不一致，先更新 VERSION 再打 tag"
+            exit 1
+          fi
+          echo "VERSION 与 tag 一致：$version"
+
+      - name: tag 必须位于 origin/main 上
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::tag $GITHUB_REF_NAME 所在提交不在 origin/main 上，说明版本提交没有回流主干"
+            exit 1
+          fi
+          echo "tag 已包含于 origin/main"

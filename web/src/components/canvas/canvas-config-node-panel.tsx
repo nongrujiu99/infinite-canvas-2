@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
 import { ModelPicker } from "@/components/model-picker";
-import { defaultConfig, resolveModelChannel, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { defaultConfig, resolveModelChannel, resolveModelForCapability, useConfigStore, useEffectiveConfig, type AiConfig, type ReasoningEffort } from "@/stores/use-config-store";
 import { optimizeCanvasPrompt } from "@/services/api/canvas-prompt";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -369,7 +369,7 @@ function CompactGenerationSettings({ mode, config, settings, onChange }: { mode:
  <CompactField className="flex-[2]" label={t("settingsPanels.audio.instructions")}><Input size="small" value={config.audioInstructions || ""} placeholder={t("settingsPanels.audio.instructionsPlaceholder")} onChange={(event) => onChange({ audioInstructions: event.target.value })} /></CompactField>
  </div>;
  return <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-2">
- <CompactField label={t("settingsPanels.text.reasoning")}><Segmented size="small" block className="canvas-config-mode canvas-reasoning-mode" value={config.reasoningEffort || "auto"} options={["auto", "low", "medium", "high", "xhigh"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(reasoningEffort) => onChange({ reasoningEffort: String(reasoningEffort) })} aria-label={t("settingsPanels.text.reasoning")} /></CompactField>
+ <CompactField label={t("settingsPanels.text.reasoning")}><Segmented size="small" block className="canvas-config-mode canvas-reasoning-mode" value={config.reasoningEffort || "auto"} options={["auto", "low", "medium", "high", "xhigh"].map((value) => ({ value, label: t(`settingsPanels.common.${value}`) }))} onChange={(reasoningEffort) => onChange({ reasoningEffort: reasoningEffort as ReasoningEffort })} aria-label={t("settingsPanels.text.reasoning")} /></CompactField>
  <CompactField label={t("settingsPanels.text.count")}><InputNumber size="small" className={fieldClass} min={1} max={15} value={settings.textCount || 1} onChange={(value) => onChange({ textCount: Number(value) || 1 })} /></CompactField>
  </div>;
 }

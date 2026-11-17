@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ConfigProvider, Switch } from "antd";
 import { useTranslation } from "react-i18next";
 

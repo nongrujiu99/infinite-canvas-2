@@ -4,7 +4,7 @@ import { Button, Dropdown, Modal, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { UserStatusActions } from "@/components/layout/user-status-actions";
-import { canvasThemes } from "@/lib/canvas-theme";
+import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { useCanvasSidePanelStore } from "@/stores/use-canvas-side-panel-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
@@ -163,7 +163,7 @@ function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
  );
 }
 
-function Shortcut({ keys, value, theme }: { keys: string[]; value: string; theme: typeof canvasThemes.light }) {
+function Shortcut({ keys, value, theme }: { keys: string[]; value: string; theme: CanvasTheme }) {
  return (
  <div className="grid grid-cols-[minmax(0,1fr)_120px] items-center gap-6 rounded-lg px-1 py-1.5">
  <span className="flex min-w-0 flex-wrap items-center gap-1.5">

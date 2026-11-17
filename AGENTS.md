@@ -88,6 +88,15 @@
 - 建议关闭 PR 前，必须先向用户分别说明需求价值、实现质量、可保留的思路和建议处理方式，并取得用户明确确认；批量关闭时也要让用户能看清每个 PR 的需求是否仍需保留。
 - 可以先在独立分支审查、修复、测试和准备提交；任何合并进 `main` 的操作都必须先说明修复内容、测试结果、风险与冲突，并取得用户明确同意。需要 force-push PR 作者分支时也必须提前说明影响并取得同意。
 
+## Git 工作流与仓库卫生
+
+- 每次会话结束前必须收尾，不允许把未提交改动留在工作区就丢弃工作树：有意义的改动直接 `git commit`；未完成或暂不提交的用 `git stash push -u -m "<说明>"` 保存，说明里写清是什么改动。
+- 发布提交必须落在 `origin/main` 上：发版后执行 `git tag --merged origin/main` 确认新版本 tag 在列表中；不在列表就说明版本停在了会话分支上，必须先把该分支合回 `main` 再推送，不要只把 tag 和提交留在 `workbuddy/*` 分支。
+- 不允许长期保留 `workbuddy/*` 会话分支与其工作树：会话结束用 `git worktree list` 检查，多余工作树用 `git worktree remove <路径>` 移除，对应分支用 `git branch -d` 删除；删除前必须先看 `git status --porcelain`，非空则先按上一条 commit 或 stash，禁止在有改动的情况下删工作树。
+- 合并进 `main` 统一使用 `git merge --ff-only`，让分叉立即报错而不是悄悄生成 merge commit；推送以 `main` 为唯一出口。
+- 本地 `main` 不允许长期落后远端：开工前先 `git fetch origin`，确认 `git rev-list --left-right --count origin/main...main` 输出 `0	0`（同步）或只落后不领先，落后就先快进再开发。
+- 开工前一条命令自检仓库卫生：`git status -sb && git worktree list && git branch -vv && git stash list`。出现多条 `workbuddy/*` 分支、多个工作树、未命名或来源不明的 stash 时，先清理再动手。
+
 ## 项目注意事项
 
 - 新增或调整超时、重试次数、大小限制、并发上限等会改变实际行为的边界值前，必须先向用户说明适用环节、默认值和失败后的处理方式，并取得确认；不要把经验值当成纯内部实现静默加入。

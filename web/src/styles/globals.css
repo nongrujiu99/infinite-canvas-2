@@ -668,6 +668,79 @@
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * 对话工作台「思考中 / 生成中」的跳动圆点
+ *
+ * 静止的 Spin 太小，用户看不出正在做事；三个依次跳动的小点比转圈更有
+ * 「在思考」的节奏感。主元素画第一个点，::before / ::after 画第二、三个。
+ * ------------------------------------------------------------------------- */
+.thinking-dots {
+    position: relative;
+    display: inline-flex;
+    width: 18px;
+    height: 6px;
+    align-items: center;
+    justify-content: space-between;
+    background-image: radial-gradient(circle, var(--primary) 0 2.5px, transparent 2.5px);
+    background-size: 6px 6px;
+    background-repeat: no-repeat;
+    background-position: 0 50%;
+    animation: thinking-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.thinking-dots::before,
+.thinking-dots::after {
+    content: "";
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: var(--primary);
+    animation: thinking-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.thinking-dots::before {
+    animation-delay: 0.15s;
+}
+
+.thinking-dots::after {
+    animation-delay: 0.3s;
+}
+
+/* 「思考中」用灰色圆点，与「生成图片中」的蓝色圆点区分开：
+ * 思考是中性等待，生图才是耗时最久、最值得用户盯着的关键动作。 */
+.thinking-dots-muted {
+    background-image: radial-gradient(circle, var(--muted-foreground) 0 2.5px, transparent 2.5px);
+}
+
+.thinking-dots-muted::before,
+.thinking-dots-muted::after {
+    background: var(--muted-foreground);
+}
+
+@keyframes thinking-dot-bounce {
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.35;
+    }
+
+    30% {
+        transform: translateY(-3px);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .thinking-dots,
+    .thinking-dots::before,
+    .thinking-dots::after {
+        animation: none;
+        opacity: 0.6;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .canvas-connection-flow {
         animation: none;

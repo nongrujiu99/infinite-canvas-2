@@ -9,6 +9,8 @@ export type AgentMessage = {
     attachments?: ReferenceImage[];
     resultIds?: string[];
     createdAt: string;
+    /** 生成耗时（毫秒），仅 assistant 消息记录。 */
+    durationMs?: number;
 };
 
 export type AgentConversation = {
@@ -30,6 +32,8 @@ export type AgentResult = {
     mimeType: string;
     prompt: string;
     createdAt: string;
+    /** 产生这张结果的会话 ID，用于右侧面板按会话过滤。 */
+    conversationId?: string;
 };
 
 export type AgentTaskStatus = "running" | "done" | "failed";
@@ -40,6 +44,8 @@ export type AgentTask = {
     status: AgentTaskStatus;
     conversationId: string;
     resultIds: string[];
+    /** 触发这条任务的用户消息 ID，用于点击任务时定位到对应消息。 */
+    messageId?: string;
     createdAt: string;
     finishedAt?: string;
 };
@@ -51,8 +57,8 @@ export type AgentPreferences = {
 
 /** 多步编排最大步数（上限，运行时强制收敛到此值）。 */
 export const AGENT_MAX_STEPS = 20;
-/** 多步编排默认步数。 */
-export const AGENT_DEFAULT_STEPS = 8;
+/** 多步编排默认步数。一次「3~4 个场景各来一张」要占掉 4~8 步（工具步 + 收尾文本步），8 步会在最后一张前被截断。 */
+export const AGENT_DEFAULT_STEPS = 12;
 /** 单会话最大消息条数，超限自动清理最旧的。 */
 export const AGENT_CONVERSATION_MESSAGE_LIMIT = 200;
 /** 任务列表最大条数，超限自动清理最旧的。 */

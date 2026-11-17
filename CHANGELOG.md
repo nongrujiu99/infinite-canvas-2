@@ -2,6 +2,28 @@
 
 ## Unreleased
 
++ [修复] 一次任务只做一张图、做一半就停：用户说「共3张」，模型做完第一张回一句「接下来我将继续为您制作第二张和第三张，请稍候!」然后整轮就结束了，只能再手动催一句「剩下的呢?」，再出一张、再停一次。两个原因叠在一起——生图/编辑工具原本没有 `count` 参数，无论用户要几张，实际都按偏好里的「张数」（默认 1）出图，模型只能承诺「一张一张来」；而这一轮既然没有工具调用，编排循环直接 break，承诺就永远停在文字上。现在工具新增 `count` 参数（同一画面的多个备选一次并发做够数），系统提示词也明确要求「不同场景就在同一轮里并发多次调用、绝不只留一句请稍候」；同时编排循环会识别「只说不做」的收尾话术（承诺制作 + 待办序号 / 稍候），自动补一条催促让它继续跑，最多三次，避免用户反复手动催。顺带把同一步里的多个工具调用改成并发执行——三个场景各来一张时不再串行等三倍时间，结果仍按原顺序回填；默认编排步数从 8 提到 12，给「3~4 个场景」留够余量，避免最后一张前被截断。
+
++ [修复] 对话工作台里任务整片标红「失败」，提示只有一句 `Gemini 接口没有返回图片`——三条链路的毛病叠在一起。① 生图请求原来固定只发 `responseModalities: ["IMAGE"]`，部分 Gemini 生图模型/端点只认 `["TEXT","IMAGE"]`，纯 IMAGE 时请求虽然 200、`candidates` 里却没有 `inlineData`，本地只能报「没有图」；现在第一轮仍用 IMAGE（省 token），拿不到图自动退回 TEXT+IMAGE 再请求一次，模型被拒时还能把原因写成文字带回来。② 报错只留了一句「没有返回图片」，分不清是提示词触发审核、参考图不合规还是模型没开通；现在会把 `promptFeedback.blockReason`、候选的 `finishReason` 和模型实际说的那句话（截断 160 字）拼进错误里。③ 一次工具失败会直接中断整轮编排：任务标红、模型连解释的机会都没有；现在失败原因当成工具结果回填给模型，它可以改写描述重试或用文字说明，只有「一张图没出、模型也没留下任何文字」时才把原始错误抛到界面。同时「多张图」改成并发容错（`allSettled`），一张被限流不再把已经生成的几张一起丢掉。
++ [修复] 对话工作台把「做好了么」「换个场景」这类追问原样当成生图提示词发给生图接口，接口自然画不出东西（这正是那一串失败任务的来源）。系统提示词补了两条硬约束：调用工具时 prompt 必须是完整画面描述，不能直接照抄用户原话；同一轮不要用几乎相同的 prompt 反复调工具，失败时最多改写重试一次。另外，当「对话模型」被选成生图模型（如 `gemini-3.1-flash-image`）时会提示一次：规划与工具调用不稳，建议换成文本模型。
++ [修复] 刷新页面后 Agent 对话报 `Failed to fetch`（浏览器原生 fetch 的 TypeError，原样弹到了界面上）。历史附件图与历史结果图存的都是 `URL.createObjectURL` 出来的 `blob:` 地址，刷新后这一批地址全部作废，而 `imageToDataUrl` 只认 `dataUrl` 字段、不会退回 `storageKey` 取图，于是「把参考图读成 base64」这一步直接抛错，整轮对话还没发出去就失败了。现在取图失败时会按 `storageKey` 从 IndexedDB 重新取一份原图、重建地址再试一次（历史附件与历史结果图都带 `storageKey`，所以刷新后继续聊、继续改图都能自愈）；真的取不到时也不是那句英文原生错误，而是「这张图片的本地地址已失效……请重新上传」。顺带把 `fetchImageBlob` 里其它 fetch 的 TypeError 统一换成「读取图片失败：{{detail}}」，不再把浏览器内部措辞（Failed to fetch / NetworkError）直接甩给用户。
+
++ [修复] 工具名带命名空间时认错分支。报错里出现的调用名是 `default_api:edit_image` 这种带前缀的形式，而编排循环是按 `name === "generate_image"` 精确匹配的——`generate_image` 一旦被加上前缀就会落进 else 分支，被当成「编辑」去跑，而且不会报错，只是结果不对。现在分支判断前先剥掉 `xxx:` / `xxx/` 前缀（回填给模型的 name 仍用原始名，避免 functionCall 与 functionResponse 名字对不上）；匹配不到任何工具时也不再瞎猜，直接把「没有这个工具、可用工具只有 generate_image 与 edit_image」回填给模型，让它自己纠正。
+
++ [修复] 对话工作台（Agent）调用生图/编辑工具后，第二轮请求直接报 `Function call is missing a thought_signature in functionCall parts … function call 'default_api:edit_image', position 16`，整轮失败。Gemini 3 系列要求把模型返回的 `thoughtSignature` 原样带回每一条 `functionCall`，而 Agent 回填 assistant 消息时只留了 `id / name / arguments`，签名在这一步掉了，于是凡是要回填工具结果的那一轮都会被 400 拒掉。现在签名从流式解析一路带到回填：解析时按 part 采集签名（分块到达、重复推送的调用按 id 合并，单独成块先到的签名会暂存后补），assistant 消息的 `tool_calls` 带上 `thoughtSignature`，转 Gemini `contents` 时挂回对应的 `functionCall` part；同一条消息里的并行调用合成一个 model turn、多个工具结果合成一个 user turn，不再出现「连续两个 model 轮次」。若某条调用确实拿不到签名（旧对话、非 Gemini 通道的历史、签名在单独分块里丢了），就把这条调用与它对应的工具结果一起降级成普通文本再发——模型仍知道「上一步调过什么工具、拿回了什么」，对话继续而不是整条请求 400。`thoughtSignature` 是 Gemini 专有字段，OpenAI 兼容通道下发前会剥掉，避免严格校验的中转站报未知字段。
+
++ [修复] 识图/文本节点报 `mimeType parameter with value application/octet-stream, which is not supported`。参考图转成 data URL 时若 Blob 的 `type` 为空（从 IndexedDB/OPFS 取回、或 `new Blob([bytes])` 重建都会这样），`FileReader` 会写成 `data:application/octet-stream;base64,…`，Gemini/Vertex 直接拒收。现在新增 `lib/image-mime.ts`：按文件头嗅探 PNG/JPEG/WebP/GIF/BMP/AVIF/HEIC/SVG，在构造 `inlineData` 前把 `application/octet-stream`、空值、`image/jpg` 等统一纠正为真实图片类型，认不出时按 PNG 兜底；`imageToDataUrl` 也会顺带规范化历史 data URL，OpenAI 兼容渠道同样受益。
+
++ [修复] Vertex AI 渠道下文本节点（对话、优化提示词）一直报「鉴权失败」。流式请求在已拼好 `?key=` 的地址后又硬接了 `?alt=sse`，密钥被污染成 `AQ.xxx?alt=sse`，Google 直接判 401；生图走的是非流式接口所以没受影响，才出现「渠道测试通过、出图正常，只有文本挂」的现象。现在改用统一的查询参数拼接，输出 `?key=…&alt=sse`。同时 404 会在消息里带上模型名，便于判断是「地址错」还是「该型号在这个账号下不可用」。
+
++ [新增] Vertex AI 渠道内置模型清单：连通性测试通过后自动注册模型并按能力归类——生图固定为 `gemini-3.1-flash-image`（主力高速生图 · Nano Banana 2）、`gemini-3-pro-image`（高精度生图 · Nano Banana Pro）；文本型号则改为「探针实测」注册——并行探一遍 `gemini-3.5-flash-lite`、`gemini-3.6-flash`、`gemini-3.1-flash` 等候选，只有真正返回 200 的才写入渠道并排在文本候选首位（因而自动成为默认文本模型）。这是因为 Vertex 各项目/区域开放的型号不同，例如 `gemini-2.5-flash` 在 `asia-southeast1` 下会直接 404 `Publisher model ... was not found`，靠内置猜测值必然反复踩空。若一个都没探到，保存后会明确提示文本对话可能不可用。结果面板会显示实际注册数量与「生图 / 文本」分布，留空模型名也能保存。
+
++ [新增] 渠道协议新增「Vertex AI」：接入 Google Cloud Vertex AI 官方端点 `aiplatform.googleapis.com/v1`，渠道编辑器增加协议选择器；Express Mode（`AQ.` / `AIza` 开头的 API Key）走 global 端点并以 `?key=` 查询参数鉴权，标准模式用 OAuth2 令牌按 `projects/{项目}/locations/{区域}/publishers/google/models/{模型}` 路径请求，生图预设只保留实测可用的 `gemini-3.1-flash-image` 与 `gemini-3-pro-image`。
+
++ [修复] Vertex AI 鉴权请求头按「密钥形态」自动选择，不再把 API Key 当 OAuth 令牌发出去。只有 `ya29.` 开头（`gcloud auth print-access-token`）或 `eyJ` 开头的 JWT 这类**真正的 OAuth2 令牌**才用 `Authorization: Bearer`；其余一律按 API Key 处理，走 URL `?key=` 查询参数，请求里不出现 `Authorization`，也不发 `x-goog-api-key` 自定义头。同时 Express Mode 的地址统一收敛为 `https://aiplatform.googleapis.com/v1`（自动剥离 `projects/.../locations/...` 与区域主机前缀），地址里误填项目/区域也不会再把密钥当 Bearer 发出去报 `Request had invalid authentication credentials`。渠道测试失败时还会附上「本次鉴权方式 + 密钥指纹」，一条报错即可判断前缀识别是否正确。生图、视频、连通性测试三条链路同步生效。
+
++ [修复] Vertex AI 生图失败时只说「请求失败」。网络层失败（本地代理未启动、被 CORS 拦截、连接被重置）现在会把底层原因一并显示，例如「请求失败：Network Error」，不用再靠猜。
+
 ## v0.31.0 - 2026-11-05
 
 + [调整] 「展示台」的提醒换到单独一行。这句「靠展示台撑出层次，关掉后画面会变平」原来和标签、开关挤在同一行，而这一格只有 254px 宽：整句是 `shrink-0`，把左侧标签的 `flex-1` 压到 0，标签直接看不见了，整行还越过面板右边缘。现在标签与开关留在原行，提示独占下一行并加一个三角图标，文案收短到一行放得下——1024 宽时那格只有 238px，整句仍读得完整，不换行、不溢出。

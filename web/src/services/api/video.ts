@@ -75,7 +75,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const script = resolveModelScript(config, selectedModel);
     if (script) return createScriptVideoTask(requestConfig, selectedModel, script, prompt, references, options);
     assertVideoConfig(requestConfig, requestConfig.model);
-    if (requestConfig.apiFormat === "gemini") return createGeminiVideoTask(requestConfig, selectedModel, prompt, references, options);
+    if (isGeminiLikeFormat(requestConfig)) return createGeminiVideoTask(requestConfig, selectedModel, prompt, references, options);
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
 }
 
@@ -244,7 +244,7 @@ async function pollGeminiVideoTask(config: AiConfig, task: VideoGenerationTask, 
         if (!state.done) return { status: "pending" };
         const uri = state.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
         if (!uri) return { status: "failed", error: apiText("noPlayableVideo") };
-        const url = uri.includes("key=") ? uri : `${uri}${uri.includes("?") ? "&" : "?"}key=${config.apiKey}`;
+        const url = isVertexFormat(config) || uri.includes("key=") ? uri : `${uri}${uri.includes("?") ? "&" : "?"}key=${config.apiKey}`;
         return { status: "completed", result: await videoResultFromUrl(url, options) };
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("videoTaskQueryFailed")));
@@ -257,21 +257,75 @@ function assertVideoConfig(config: AiConfig, model: string) {
     if (!config.apiKey.trim()) throw new Error(apiText("apiKeyRequired"));
 }
 
-function geminiVideoBaseUrl(config: Pick<AiConfig, "baseUrl">) {
+function isVertexFormat(config: Pick<AiConfig, "apiFormat">) {
+    return config.apiFormat === "vertex";
+}
+
+/** 是否为真正的 OAuth2 访问令牌（`ya29.` 或服务账号 JWT `eyJ...`）；其余一律按 API Key 处理。 */
+function isOAuthAccessToken(apiKey: string) {
+    const key = apiKey.trim();
+    return /^ya29\./i.test(key) || /^eyJ[A-Za-z0-9_-]*\./.test(key);
+}
+
+/**
+ * Vertex AI Express Mode：只要不是 OAuth2 访问令牌就按 API Key 鉴权。
+ * API Key 绝不能放进 Authorization: Bearer，否则 Vertex 会回「invalid authentication credentials」。
+ */
+function isVertexExpressMode(config: Pick<AiConfig, "apiKey">) {
+    return !isOAuthAccessToken(config.apiKey);
+}
+
+/** Express Mode 只支持 global 端点且不接受 projects/locations 路径段，统一收敛为 https://aiplatform.googleapis.com/v1。 */
+function vertexExpressBaseUrl(baseUrl: string) {
+    const withoutProject = baseUrl.replace(/\/projects\/.*$/i, "").replace(/\/+$/, "");
+    const globalHost = withoutProject.replace(/^(https?:\/\/)[a-z0-9-]+-aiplatform\.googleapis\.com/i, "$1aiplatform.googleapis.com");
+    return /\/v1(beta\d*)?$/i.test(globalHost) ? globalHost : `${globalHost}/v1`;
+}
+
+function isGeminiLikeFormat(config: Pick<AiConfig, "apiFormat">) {
+    return config.apiFormat === "gemini" || config.apiFormat === "vertex";
+}
+
+function geminiVideoBaseUrl(config: Pick<AiConfig, "baseUrl" | "apiFormat" | "apiKey">) {
     const normalizedBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+    if (isVertexFormat(config)) {
+        // Express Mode（API Key）只走 global 端点，误填区域或项目路径都会导致 404/鉴权失败。
+        if (isVertexExpressMode(config)) {
+            return vertexExpressBaseUrl(normalizedBaseUrl);
+        }
+        return normalizedBaseUrl;
+    }
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     return lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/v1beta") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1beta`;
 }
 
-function geminiVideoUrl(config: Pick<AiConfig, "baseUrl">, model: string, action: string) {
-    return withLocalProxy(`${geminiVideoBaseUrl(config)}/models/${encodeURIComponent(modelOptionName(model).replace(/^models\//, ""))}:${action}`);
+function geminiVideoUrl(config: Pick<AiConfig, "baseUrl" | "apiFormat" | "apiKey">, model: string, action: string) {
+    const modelName = modelOptionName(model).replace(/^models\//, "").replace(/^publishers\/google\/models\//, "");
+    const modelPath = isVertexFormat(config) ? `publishers/google/models/${encodeURIComponent(modelName)}` : `models/${encodeURIComponent(modelName)}`;
+    return withLocalProxy(withVertexKey(`${geminiVideoBaseUrl(config)}/${modelPath}:${action}`, config));
 }
 
-function geminiOperationUrl(config: Pick<AiConfig, "baseUrl">, name: string) {
-    return withLocalProxy(`${geminiVideoBaseUrl(config)}/${name.replace(/^\//, "")}`);
+function geminiOperationUrl(config: Pick<AiConfig, "baseUrl" | "apiFormat" | "apiKey">, name: string) {
+    return withLocalProxy(withVertexKey(`${geminiVideoBaseUrl(config)}/${name.replace(/^\//, "")}`, config));
 }
 
-function geminiVideoHeaders(config: Pick<AiConfig, "apiKey">) {
+/** Vertex AI Express Mode 下把 API Key 拼进 URL ?key=（绝不用 Bearer，也不发自定义头以避开 CORS 预检）。 */
+function withVertexKey(url: string, config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl">) {
+    if (isVertexFormat(config) && isVertexExpressMode(config) && !url.includes("key=")) {
+        return `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(config.apiKey)}`;
+    }
+    return url;
+}
+
+function geminiVideoHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl">): Record<string, string> {
+    // Express Mode：密钥已在 URL ?key= 里，这里既不加 Bearer 也不加 x-goog-api-key。
+    if (isVertexFormat(config) && isVertexExpressMode(config)) {
+        return { "Content-Type": "application/json" };
+    }
+    // 标准 Vertex：只有真正的 OAuth2 访问令牌（不以 AQ. / AIza 开头）才用 Bearer。
+    if (isVertexFormat(config)) {
+        return { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" };
+    }
     return { "x-goog-api-key": config.apiKey, "Content-Type": "application/json" };
 }
 
@@ -381,10 +435,19 @@ function readAxiosError(error: unknown, fallback: string) {
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; message?: string; code?: number | string }>(error)) {
         if (!error.response && error.code === "ERR_NETWORK") return apiText("requestFailed");
         const responseData = error.response?.data;
-        return readApiErrorMessage(responseData) || statusMessage(error.response?.status, fallback);
+        return explainGoogleAuthError(readApiErrorMessage(responseData)) || statusMessage(error.response?.status, fallback);
     }
     if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
     return error instanceof Error ? readApiErrorMessage(error.message) || error.message : fallback;
+}
+
+/** Google 鉴权类错误的可操作解释（与 image.ts 保持一致）。 */
+function explainGoogleAuthError(message: string) {
+    if (!message) return message;
+    if (/API keys are not supported by this API/i.test(message) || /ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(message)) return apiText("vertexKeySurfaceMismatch");
+    if (/invalid authentication credentials/i.test(message) || /Expected OAuth 2 access token/i.test(message)) return apiText("vertexOAuthTokenInvalid");
+    if (/API key not valid/i.test(message)) return apiText("vertexKeyRejected");
+    return message;
 }
 
 function statusMessage(status: number | undefined, fallback: string) {

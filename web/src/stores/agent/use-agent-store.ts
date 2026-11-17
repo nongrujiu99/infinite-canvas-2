@@ -88,10 +88,18 @@ export const useAgentStore = create<AgentStore>()(
                 })),
 
             deleteConversation: (id) =>
-                set((state) => ({
-                    conversations: state.conversations.filter((conversation) => conversation.id !== id),
-                    activeConversationId: state.activeConversationId === id ? undefined : state.activeConversationId,
-                })),
+                set((state) => {
+                    const remaining = state.conversations.filter((conversation) => conversation.id !== id);
+                    const deletingActive = state.activeConversationId === id;
+                    return {
+                        conversations: remaining,
+                        // 级联清理该会话产生的结果与任务，避免 IndexedDB 里残留孤儿数据。
+                        results: state.results.filter((result) => result.conversationId !== id),
+                        tasks: state.tasks.filter((task) => task.conversationId !== id),
+                        // 删除的是当前会话时，切到剩余的第一个；删光则为 undefined，由 UI 兜底新建。
+                        activeConversationId: deletingActive ? remaining[0]?.id : state.activeConversationId,
+                    };
+                }),
 
             addResults: (results) => set((state) => ({ results: [...state.results, ...results] })),
 

@@ -235,5 +235,6 @@ function pickDefaultModel(config: AiConfig, capability: ModelCapability, current
 
 function apiFormatLabel(apiFormat: ApiCallFormat) {
  if (apiFormat === "gemini") return "Gemini";
+ if (apiFormat === "vertex") return "Vertex AI";
  return "OpenAI";
 }

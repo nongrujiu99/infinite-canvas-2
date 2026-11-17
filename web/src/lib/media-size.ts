@@ -14,9 +14,13 @@ export const mediaRatioOptions = [
 
 const geminiCompatibleRatioValues = new Set(["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "auto"]);
 
-export function usesAspectRatioImageParams(model: string, apiFormat: "openai" | "gemini") {
+function isGeminiLikeFormat(apiFormat: string) {
+    return apiFormat === "gemini" || apiFormat === "vertex";
+}
+
+export function usesAspectRatioImageParams(model: string, apiFormat: string) {
     const name = model.split("::").pop()?.toLowerCase() || "";
-    return apiFormat === "gemini" || name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
+    return isGeminiLikeFormat(apiFormat) || name.includes("nano-banana") || (name.includes("gemini") && name.includes("image"));
 }
 
 export function supportsGeminiImageSize(model: string) {
@@ -24,15 +28,15 @@ export function supportsGeminiImageSize(model: string) {
     return value.includes("gemini-3") || value.includes("3.1") || value.includes("3-pro") || value.includes("nano-banana-2") || value.includes("nano-banana-pro");
 }
 
-export function mediaScaleOptionsForModel(model: string, apiFormat: "openai" | "gemini") {
+export function mediaScaleOptionsForModel(model: string, apiFormat: string) {
     return usesAspectRatioImageParams(model, apiFormat) && !supportsGeminiImageSize(model) ? (["1k", "auto"] as const) : mediaScaleOptions;
 }
 
-export function mediaRatioOptionsForModel(model: string, apiFormat: "openai" | "gemini") {
+export function mediaRatioOptionsForModel(model: string, apiFormat: string) {
     return usesAspectRatioImageParams(model, apiFormat) ? mediaRatioOptions.filter((item) => geminiCompatibleRatioValues.has(item.value)) : mediaRatioOptions;
 }
 
-export function adaptMediaSizeToModel(size: string, model: string, apiFormat: "openai" | "gemini") {
+export function adaptMediaSizeToModel(size: string, model: string, apiFormat: string) {
     const options = mediaRatioOptionsForModel(model, apiFormat);
     const scaleOptions = mediaScaleOptionsForModel(model, apiFormat);
     const ratio = inferMediaRatio(size || "auto");

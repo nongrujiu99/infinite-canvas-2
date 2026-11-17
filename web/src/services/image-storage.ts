@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { withLocalProxy } from "@/stores/use-config-store";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
+import { normalizeDataUrlMime } from "@/lib/image-mime";
 
 export type UploadedImage = {
     url: string;
@@ -29,6 +30,7 @@ const IMAGE_REMOTE_LOAD_TIMEOUT_MS = 10 * 60_000;
 const IMAGE_DECODE_TIMEOUT_MS = 10_000;
 const IMAGE_RESPONSE_ERROR = "ImageResponseError";
 const IMAGE_TIMEOUT_ERROR = "ImageTimeoutError";
+const IMAGE_FETCH_ERROR = "ImageFetchError";
 
 type StoredImagePreview = { version: number; blob?: Blob };
 
@@ -93,11 +95,28 @@ async function fetchImageBlob(url: string, options?: ImageReadOptions) {
     } catch (error) {
         if (timedOut) throw namedError(IMAGE_TIMEOUT_ERROR);
         if (options?.signal?.aborted) throw abortReason(options.signal);
-        throw error;
+        throw describeImageFetchError(url, error);
     } finally {
         window.clearTimeout(timer);
         options?.signal?.removeEventListener("abort", abort);
     }
+}
+
+/**
+ * fetch 抛 TypeError（浏览器里就是 `Failed to fetch`）时换成能读懂的原因。
+ * 最常见的是 `blob:` 地址过期——页面刷新后上一轮生成的 object URL 全部作废，
+ * 而历史附件 / 历史结果图里存的正是这种地址。别把这个英文原生错误直接弹给用户。
+ */
+function describeImageFetchError(url: string, error: unknown) {
+    if (!(error instanceof TypeError)) return error;
+    const detail = error.message || "Failed to fetch";
+    const failure = new Error(
+        url.startsWith("blob:")
+            ? i18n.t("common.imageUrlExpired")
+            : i18n.t("common.imageFetchFailed", { detail }),
+    );
+    failure.name = IMAGE_FETCH_ERROR;
+    return failure;
 }
 
 function loadImageMeta(url: string, options?: ImageReadOptions, timeoutMs = IMAGE_DECODE_TIMEOUT_MS) {
@@ -232,8 +251,22 @@ export async function setImageBlob(storageKey: string, blob: Blob) {
 
 export async function imageToDataUrl(image: { url?: string; dataUrl?: string; storageKey?: string }, options?: ImageReadOptions) {
     const url = image.dataUrl || (await resolveImageUrl(image.storageKey, image.url || ""));
-    if (!url || url.startsWith("data:")) return url;
-    return blobToDataUrl(await fetchImageBlob(url, options));
+    if (!url) return url;
+    // 历史数据里可能存着 data:application/octet-stream;base64,…（Blob 的 type 丢失导致），
+    // 这类 data URL 会被 Gemini 拒收，统一按文件头纠正成真实图片类型。
+    if (url.startsWith("data:")) return normalizeDataUrlMime(url);
+    try {
+        return normalizeDataUrlMime(await blobToDataUrl(await fetchImageBlob(url, options)));
+    } catch (error) {
+        // 取消（用户点了停止）时不要再补一次取图。
+        if (options?.signal?.aborted) throw error;
+        // `.dataUrl` 常常是上一轮 `URL.createObjectURL` 出来的 blob 地址，页面一刷新就整体作废
+        // （Agent 的历史附件、历史结果图都是这种存法）。这时别急着报错，按 storageKey 从
+        // IndexedDB 里重新取一份原图、重新造一个地址再试一次——用户不需要知道 blob 会过期。
+        const recovered = image.storageKey ? await resolveImageUrl(image.storageKey, "") : "";
+        if (!recovered || recovered === url) throw error;
+        return normalizeDataUrlMime(await blobToDataUrl(await fetchImageBlob(recovered, options)));
+    }
 }
 
 export async function deleteStoredImages(keys: Iterable<string>) {

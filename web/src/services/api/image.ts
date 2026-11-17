@@ -5,6 +5,7 @@ import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalPr
 import { normalizeScriptImages, runModelScript } from "./model-script";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
+import { normalizeImageMimeType } from "@/lib/image-mime";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import { adaptMediaSizeToModel, imageSizePresets, inferMediaRatio, inferMediaScale, supportsGeminiImageSize, usesAspectRatioImageParams } from "@/lib/media-size";
@@ -27,7 +28,12 @@ type ResponseToolCall = {
 type AssistantToolCallMessage = {
     role: "assistant";
     content: string | null;
-    tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+    /**
+     * thoughtSignature 只在 Gemini 通道里用：Gemini 3 系列的 functionCall 必须原样带回签名，
+     * 否则下一次请求会被 400 拒绝（Function call is missing a thought_signature）。
+     * OpenAI 兼容通道下发前会把该字段剥掉，避免中转站校验未知字段报错。
+     */
+    tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string }; thoughtSignature?: string }>;
 };
 
 export type ResponseInputMessage =
@@ -55,7 +61,10 @@ type ResponseFunctionTool = {
 type ToolResponseResult = {
     content: string;
     toolCalls: ResponseToolCall[];
+    thinking?: string;
     incompleteReason?: string;
+    /** 本次响应里出现的 thoughtSignature（Gemini 3 工具调用必带），用于回填历史。 */
+    thoughtSignatures?: string[];
 };
 
 type ToolChoice = "auto" | "required" | { type: "function"; name: string };
@@ -95,6 +104,7 @@ type ImageApiResponse = {
 };
 type GeminiPart = {
     text?: string;
+    thought?: boolean;
     inlineData?: { mimeType?: string; data?: string };
     inline_data?: { mime_type?: string; mimeType?: string; data?: string };
     fileData?: { mimeType?: string; fileUri?: string };
@@ -110,7 +120,7 @@ type GeminiPayload = {
     error?: { message?: string };
     promptFeedback?: { blockReason?: string };
 };
-type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
+type GeminiStreamState = { buffer: string; text: string; thinking?: string; toolCalls: ResponseToolCall[]; error?: string; pendingThoughtSignature?: string };
 type RequestOptions = { signal?: AbortSignal; mask?: ReferenceImage; maskPrompt?: string; strictFunction?: StrictFunctionOutput; maxOutputTokens?: number };
 
 export class StructuredOutputError extends Error {
@@ -346,15 +356,54 @@ function readApiErrorMessage(value: unknown): string {
     );
 }
 
+/** 从 axios 网络错误里提取底层真实原因（cause 链 / message），供错误框展示。 */
+function readNetworkCause(error: unknown): string {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4 && current; depth += 1) {
+        const message = (current as { message?: unknown })?.message;
+        if (typeof message === "string" && message.trim()) return message.trim();
+        current = (current as { cause?: unknown })?.cause;
+    }
+    return "";
+}
+
+/**
+ * Google 鉴权类错误的可操作解释。
+ * `aiplatform.googleapis.com` 收到放在 Authorization: Bearer 里的 API Key 时会回
+ * "API keys are not supported by this API. Expected OAuth2 access token..."，
+ * 但原文没有告诉用户该怎么做——这里换成能直接执行的中文指引。
+ */
+function explainGoogleAuthError(message: string) {
+    if (!message) return message;
+    if (/API keys are not supported by this API/i.test(message) || /ACCESS_TOKEN_TYPE_UNSUPPORTED/i.test(message)) {
+        return apiText("vertexKeySurfaceMismatch");
+    }
+    // 带着 Bearer 但令牌不被认可（过期、非 OAuth 令牌、或误把 API Key 放进 Bearer）。
+    if (/invalid authentication credentials/i.test(message) || /Expected OAuth 2 access token/i.test(message)) {
+        return apiText("vertexOAuthTokenInvalid");
+    }
+    // 鉴权方式已被接受、但密钥本身不被认可（失效、被限制，或这把其实是 AI Studio 的密钥）。
+    if (/API key not valid/i.test(message)) {
+        return apiText("vertexKeyRejected");
+    }
+    return message;
+}
+
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return apiText("requestCanceled");
     if (axios.isAxiosError(error)) {
         if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") return apiText("imageTimeout");
-        if (!error.response && error.code === "ERR_NETWORK") return apiText("requestFailed");
+        // 网络层失败（CORS 拦截、代理未启动、连接被重置等）没有 HTTP 响应体，
+        // 此前只回一句笼统的「请求失败」，把真实原因吞掉了。这里把底层错误原文带出来，
+        // 前端可直接把它显示在画布错误框里（如 "Network Error"、"Failed to fetch" 等）。
+        if (!error.response && error.code === "ERR_NETWORK") {
+            const cause = readNetworkCause(error);
+            return cause ? apiText("networkErrorDetail", { detail: cause }) : apiText("requestFailed");
+        }
         const responseData = error.response?.data;
         // Prefer the API error from the response body.
         const apiMsg = readApiErrorMessage(responseData);
-        if (apiMsg) return apiMsg;
+        if (apiMsg) return explainGoogleAuthError(apiMsg);
         // Infer the error from the HTTP status when the response body has no usable message.
         const statusMsg = readStatusError(error.response?.status, fallback);
         if (statusMsg) return statusMsg;
@@ -415,27 +464,148 @@ function aiHeaders(config: AiConfig, contentType?: string) {
     };
 }
 
-function geminiBaseUrl(config: Pick<AiConfig, "baseUrl">) {
+function geminiBaseUrl(config: Pick<AiConfig, "baseUrl" | "apiFormat" | "apiKey">) {
     const normalizedBaseUrl = config.baseUrl.trim().replace(/\/+$/, "");
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
+    // Vertex AI 的 baseUrl 已包含版本与 projects/locations 前缀（如 https://aiplatform.googleapis.com/v1/projects/x/locations/y），直接沿用，不追加版本段。
+    if (isVertexFormat(config)) {
+        // Express Mode（API Key）只走 global 端点：Gemini 生图/文本模型大多只在 global 提供，
+        // 误填区域（如 asia-northeast1）会 404；带 projects/locations 的路径也不被 API Key 接受。
+        if (isVertexExpressMode(config)) {
+            return vertexExpressBaseUrl(normalizedBaseUrl);
+        }
+        return normalizedBaseUrl;
+    }
     return lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/v1beta") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1beta`;
 }
 
 function geminiModelName(model: string) {
-    return model.trim().replace(/^models\//, "");
+    return model.trim().replace(/^models\//, "").replace(/^publishers\/google\/models\//, "");
 }
 
-function geminiApiUrl(config: Pick<AiConfig, "baseUrl" | "model">, action?: "generateContent" | "streamGenerateContent") {
+/** 是否为 Vertex AI 协议（aiplatform.googleapis.com）。请求体与 Gemini 一致，仅 URL 前缀与鉴权不同。 */
+function isVertexFormat(config: Pick<AiConfig, "apiFormat">) {
+    return config.apiFormat === "vertex";
+}
+
+/**
+ * 是否为真正的 OAuth2 访问令牌。
+ * Google 的访问令牌只有两种常见形态：`gcloud auth print-access-token` 输出的 `ya29.xxx`，
+ * 以及服务账号签发的 JWT（`eyJ...`）。除这两种以外的一律按 API Key 处理——
+ * 宁可把可疑字符串当 API Key 走 `?key=`，也不要把它塞进 Bearer（那是必然失败的写法）。
+ */
+function isOAuthAccessToken(apiKey: string) {
+    const key = apiKey.trim();
+    return /^ya29\./i.test(key) || /^eyJ[A-Za-z0-9_-]*\./.test(key);
+}
+
+/**
+ * Vertex AI Express Mode：只要不是 OAuth2 访问令牌，就按 API Key 鉴权（`AQ.` / `AIza` / 其他自定义 Key）。
+ * 关键点：API Key 绝对不能放进 Authorization: Bearer——Vertex 会把 Bearer 里的内容当 OAuth 令牌校验，
+ * 回「Request had invalid authentication credentials. Expected OAuth 2 access token...」或
+ * 「API keys are not supported by this API」。
+ */
+function isVertexExpressMode(config: Pick<AiConfig, "apiKey">) {
+    return !isOAuthAccessToken(config.apiKey);
+}
+
+/**
+ * Express Mode（API Key）只支持 global 端点，且不接受 projects/locations 路径段。
+ * 用户从提示里照抄 https://aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION 时，
+ * 这里统一收敛成 https://aiplatform.googleapis.com/v1，否则会 404 或鉴权失败。
+ */
+function vertexExpressBaseUrl(baseUrl: string) {
+    const withoutProject = baseUrl.replace(/\/projects\/.*$/i, "").replace(/\/+$/, "");
+    const globalHost = withoutProject.replace(/^(https?:\/\/)[a-z0-9-]+-aiplatform\.googleapis\.com/i, "$1aiplatform.googleapis.com");
+    return /\/v1(beta\d*)?$/i.test(globalHost) ? globalHost : `${globalHost}/v1`;
+}
+
+/** Gemini 与 Vertex AI 共用同一套请求体与响应解析，仅在 URL/鉴权上有差异。 */
+function isGeminiLikeFormat(config: Pick<AiConfig, "apiFormat">) {
+    return config.apiFormat === "gemini" || config.apiFormat === "vertex";
+}
+
+/** 安全追加查询参数：已有 ? 时用 & 续接，避免把 ?key= 的值污染成 "AQ.xxx?alt=sse"。 */
+function withApiQuery(url: string, params: Record<string, string>) {
+    const query = Object.entries(params)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join("&");
+    if (!query) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}${query}`;
+}
+
+function geminiApiUrl(config: Pick<AiConfig, "baseUrl" | "model" | "apiFormat" | "apiKey">, action?: "generateContent" | "streamGenerateContent") {
     const baseUrl = geminiBaseUrl(config);
-    if (!action) return withLocalProxy(`${baseUrl}/models`);
-    return withLocalProxy(`${baseUrl}/models/${encodeURIComponent(geminiModelName(config.model))}:${action}`);
+    if (!action) {
+        // 仅 Gemini 支持模型列表；Vertex AI（含 Express Mode）严禁调用 /models，此处只返回 Gemini 列表端点。
+        return withLocalProxy(`${baseUrl}/models`);
+    }
+    const model = geminiModelName(config.model);
+    const modelPath = isVertexFormat(config) ? `publishers/google/models/${encodeURIComponent(model)}` : `models/${encodeURIComponent(model)}`;
+    let url = `${baseUrl}/${modelPath}:${action}`;
+    // Express Mode（API Key）把密钥放到 URL 查询参数 ?key=，且绝不发 Authorization: Bearer：
+    // ① Bearer 里放 API Key 会被 Vertex 判为「API keys are not supported by this API」；
+    // ② 自定义头 x-goog-api-key 会触发浏览器 CORS 预检（OPTIONS），aiplatform 不响应预检会被拦；
+    // 查询参数属于「简单请求」范畴，可绕过预检，与官方 ?key= 鉴权一致。
+    if (isVertexFormat(config) && isVertexExpressMode(config)) {
+        url = `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(config.apiKey)}`;
+    }
+    return withLocalProxy(url);
 }
 
-function geminiHeaders(config: Pick<AiConfig, "apiKey">) {
-    return {
-        "x-goog-api-key": config.apiKey,
-        "Content-Type": "application/json",
-    };
+function geminiHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl">): Record<string, string> {
+    // Express Mode：密钥已在 URL ?key= 里，这里既不加 Bearer 也不加 x-goog-api-key。
+    if (isVertexFormat(config) && isVertexExpressMode(config)) {
+        return { "Content-Type": "application/json" };
+    }
+    // 标准 Vertex：只有真正的 OAuth2 访问令牌（不以 AQ. / AIza 开头）才用 Bearer。
+    if (isVertexFormat(config)) {
+        return { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" };
+    }
+    return { "x-goog-api-key": config.apiKey, "Content-Type": "application/json" };
+}
+
+/**
+ * 用最小生成请求验证 Vertex AI 渠道连通性强弱，并**返回实测可用的文本模型**。
+ *
+ * 为什么要返回模型名：Vertex 各项目/区域开放的型号并不一致（例如 `gemini-2.5-flash` 在
+ * `locations/asia-southeast1` 下会直接 404 "Publisher model ... was not found"），
+ * 靠猜型号填进渠道必然反复踩 404。这里把候选逐个探一遍，把真正返回 200 的型号注册成文本模型，
+ * 默认文本模型就一定可用。
+ */
+async function probeVertexConnectivity(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat" | "model">): Promise<string[]> {
+    // 候选按「便宜→强」排列；只有真正返回 200 的才会被注册成文本模型。
+    // 这里同时覆盖当前主力型号与少量旧型号，避免某个区域只开放其中几款时全都探不到。
+    const probeModels = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash",
+        "gemini-3.1-pro",
+        "gemini-3-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+    ];
+    // 并行探测：每个都是 maxOutputTokens: 1 的最小请求，串行会让人等太久。
+    const results = await Promise.allSettled(
+        probeModels.map((model) =>
+            axios.post(
+                geminiApiUrl({ ...config, model }, "generateContent"),
+                { contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 1 } },
+                { headers: geminiHeaders(config), timeout: 15000 },
+            ),
+        ),
+    );
+    const working = probeModels.filter((_, index) => results[index].status === "fulfilled");
+    if (working.length) return working;
+
+    // 全军覆没：只有「全部 404」才说明端点可达、鉴权通过、只是没有可用文本型号；
+    // 一旦出现鉴权/网络错误，必须原样抛出——那不是换型号能绕过的问题。
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    const nonNotFound = failures.find((result) => statusOf(result.reason) !== 404);
+    if (nonNotFound) throw nonNotFound.reason;
+    if (/aiplatform\.googleapis\.com/i.test(config.baseUrl)) return [];
+    throw failures[0]?.reason;
 }
 
 function withSystemMessage<T extends ResponseInputMessage>(config: AiConfig, messages: T[]): ResponseInputMessage[] {
@@ -515,10 +685,23 @@ async function readFetchError(response: Response, fallback: string) {
     const text = await response.text();
     if (!text) return readStatusError(response.status, fallback);
     try {
-        return responseErrorMessage(JSON.parse(text)) || readStatusError(response.status, fallback);
+        return explainGoogleAuthError(responseErrorMessage(JSON.parse(text))) || readStatusError(response.status, fallback);
     } catch {
-        return text.slice(0, 300) || readStatusError(response.status, fallback);
+        return explainGoogleAuthError(text.slice(0, 300)) || readStatusError(response.status, fallback);
     }
+}
+
+/**
+ * 把原生 fetch 抛出的网络层错误（如 TypeError: Failed to fetch、AbortError）翻译成友好文案。
+ *
+ * 流式请求（chat/completions、responses、gemini）走原生 fetch 而非 axios，因此不经过 readAxiosError。
+ * 当本地转发代理进程崩溃/断连、上游在长流式过程中中断、或被 CORS 拦截时，fetch 会直接抛出
+ * 裸的 "Failed to fetch"，之前会原样冒泡到 UI。这里统一转成可读的中文提示。
+ */
+function readFetchNetworkError(error: unknown, fallback: string) {
+    if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
+    if (error instanceof TypeError) return apiText("networkInterrupted");
+    return fallback;
 }
 
 function consumeResponseStreamBlock(block: string, state: ResponseStreamState, onDelta?: (text: string) => void) {
@@ -563,12 +746,14 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
     }
 }
 
-async function requestChatCompletionsStreaming(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+async function requestChatCompletionsStreaming(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, onThinking?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
     const response = await fetch(aiApiUrl(config, "/chat/completions"), {
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
         body: JSON.stringify({ ...body, stream: true }),
         signal: options?.signal,
+    }).catch((error) => {
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     });
     if (!response.ok) {
         const errorMsg = await readFetchError(response, apiText("requestFailed"));
@@ -583,58 +768,71 @@ async function requestChatCompletionsStreaming(config: AiConfig, body: Record<st
     const decoder = new TextDecoder();
     let buffer = "";
     let text = "";
+    let thinking = "";
     const toolCallMap = new Map<number, { id: string; function: { name: string; arguments: string } }>();
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith("data:")) continue;
-            const data = trimmed.slice(5).trim();
-            if (data === "[DONE]") continue;
-            try {
-                const event = JSON.parse(data) as Record<string, unknown>;
-                const choices = (event.choices as Array<Record<string, unknown>>) || [];
-                const delta = choices[0]?.delta as Record<string, unknown> | undefined;
-                if (delta?.content && typeof delta.content === "string") {
-                    text += delta.content;
-                    onDelta?.(text);
-                }
-                const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
-                if (Array.isArray(deltaToolCalls)) {
-                    for (const tc of deltaToolCalls) {
-                        const index = (tc.index as number) ?? 0;
-                        const func = tc.function as Record<string, unknown> | undefined;
-                        let entry = toolCallMap.get(index);
-                        if (!entry) {
-                            entry = { id: (tc.id as string) || nanoid(), function: { name: "", arguments: "" } };
-                            toolCallMap.set(index, entry);
-                        }
-                        if (func?.name && typeof func.name === "string") entry.function.name = func.name;
-                        if (func?.arguments && typeof func.arguments === "string") entry.function.arguments += func.arguments;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith("data:")) continue;
+                const data = trimmed.slice(5).trim();
+                if (data === "[DONE]") continue;
+                try {
+                    const event = JSON.parse(data) as Record<string, unknown>;
+                    const choices = (event.choices as Array<Record<string, unknown>>) || [];
+                    const delta = choices[0]?.delta as Record<string, unknown> | undefined;
+                    // 推理模型（如 deepseek-r1 系列）通过 reasoning_content 流式返回思考过程，捕获并透出
+                    const reasoning = delta?.reasoning_content ?? delta?.reasoning;
+                    if (typeof reasoning === "string" && reasoning) {
+                        thinking += reasoning;
+                        onThinking?.(thinking);
                     }
-                }
-                const finishReason = choices[0]?.finish_reason as string | undefined;
-                if (finishReason === "tool_calls" && toolCallMap.size === 0) {
-                    const message = choices[0]?.message as Record<string, unknown> | undefined;
-                    const calls = (message?.tool_calls as Array<Record<string, unknown>>) || [];
-                    for (const call of calls) {
-                        const func = call.function as Record<string, unknown> | undefined;
-                        if (func?.name && typeof func.arguments === "string") {
-                            toolCallMap.set(toolCallMap.size, {
-                                id: (call.id as string) || nanoid(),
-                                function: { name: func.name as string, arguments: func.arguments as string },
-                            });
+                    if (delta?.content && typeof delta.content === "string") {
+                        text += delta.content;
+                        onDelta?.(text);
+                    }
+                    const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+                    if (Array.isArray(deltaToolCalls)) {
+                        for (const tc of deltaToolCalls) {
+                            const index = (tc.index as number) ?? 0;
+                            const func = tc.function as Record<string, unknown> | undefined;
+                            let entry = toolCallMap.get(index);
+                            if (!entry) {
+                                entry = { id: (tc.id as string) || nanoid(), function: { name: "", arguments: "" } };
+                                toolCallMap.set(index, entry);
+                            }
+                            if (func?.name && typeof func.name === "string") entry.function.name = func.name;
+                            if (func?.arguments && typeof func.arguments === "string") entry.function.arguments += func.arguments;
                         }
                     }
+                    const finishReason = choices[0]?.finish_reason as string | undefined;
+                    if (finishReason === "tool_calls" && toolCallMap.size === 0) {
+                        const message = choices[0]?.message as Record<string, unknown> | undefined;
+                        const calls = (message?.tool_calls as Array<Record<string, unknown>>) || [];
+                        for (const call of calls) {
+                            const func = call.function as Record<string, unknown> | undefined;
+                            if (func?.name && typeof func.arguments === "string") {
+                                toolCallMap.set(toolCallMap.size, {
+                                    id: (call.id as string) || nanoid(),
+                                    function: { name: func.name as string, arguments: func.arguments as string },
+                                });
+                            }
+                        }
+                    }
+                } catch {
+                    // Ignore malformed SSE chunks
                 }
-            } catch {
-                // Ignore malformed SSE chunks
             }
         }
+    } catch (error) {
+        // 流式读取过程中连接被中断（代理断连/上游关闭）时，reader.read() 也会抛 TypeError: Failed to fetch，
+        // 统一转成可读文案，避免裸英文报错冒泡到 UI。
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     }
     const toolCalls = Array.from(toolCallMap.values()).map((entry) => ({ ...entry, type: "function" as const }));
     return { content: text, toolCalls };
@@ -644,6 +842,7 @@ function parseChatCompletionsPayload(payload: Record<string, unknown>): ToolResp
     const choices = (payload.choices as Array<Record<string, unknown>>) || [];
     const message = choices[0]?.message as Record<string, unknown> | undefined;
     const content = (message?.content as string) || "";
+    const thinking = (message?.reasoning_content as string) || (message?.reasoning as string) || "";
     const toolCalls: ResponseToolCall[] = [];
     const calls = (message?.tool_calls as Array<Record<string, unknown>>) || [];
     for (const call of calls) {
@@ -656,7 +855,7 @@ function parseChatCompletionsPayload(payload: Record<string, unknown>): ToolResp
             });
         }
     }
-    return { content, toolCalls };
+    return { content, thinking, toolCalls };
 }
 
 async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
@@ -665,6 +864,8 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
         body: JSON.stringify({ ...body, stream: true }),
         signal: options?.signal,
+    }).catch((error) => {
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     });
     if (!response.ok) throw new Error(await readFetchError(response, apiText("requestFailed")));
     if (!response.body) {
@@ -676,14 +877,19 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const state: ResponseStreamState = { buffer: "", text: "" };
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        consumeResponseStreamText(state, decoder.decode(value, { stream: true }), onDelta);
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            consumeResponseStreamText(state, decoder.decode(value, { stream: true }), onDelta);
+            if (state.error) throw new Error(state.error);
+        }
+        consumeResponseStreamText(state, decoder.decode(), onDelta, true);
         if (state.error) throw new Error(state.error);
+    } catch (error) {
+        if (error instanceof Error && error.message === state.error) throw error;
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     }
-    consumeResponseStreamText(state, decoder.decode(), onDelta, true);
-    if (state.error) throw new Error(state.error);
     if (!state.payload) return { content: state.text, toolCalls: [] };
     validateResponsePayload(state.payload);
     const result = parseToolResponse(state.payload);
@@ -697,7 +903,7 @@ function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?
     ]
         .filter(Boolean)
         .join("\n\n");
-    const contents = toGeminiContents(messages.filter((message) => ("type" in message ? true : message.role !== "system")));
+    const contents = toGeminiContents(messages.filter((message) => ("type" in message ? true : message.role !== "system")), { requireThoughtSignature: needsThoughtSignature(config) });
     return {
         contents,
         ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
@@ -705,9 +911,18 @@ function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?
     };
 }
 
-function toGeminiContents(messages: ResponseInputMessage[]): GeminiContent[] {
+/**
+ * Gemini 3 系列对 functionCall 强制校验 thoughtSignature（缺了就整条请求 400），
+ * 2.5 及更早版本不要求，所以只有 3.x 才需要做「缺签名就降级」的兜底。
+ */
+function needsThoughtSignature(config: AiConfig): boolean {
+    // 模型名可能是裸名、也可能是 publishers/google/models/... 这类路径，所以不锚定开头。
+    return /(^|[^\w])gemini-3([.\-]|$)/i.test((config.model || "").trim());
+}
+
+function toGeminiContents(messages: ResponseInputMessage[], options?: { requireThoughtSignature?: boolean }): GeminiContent[] {
     const callNameById = new Map<string, string>();
-    return messages.flatMap((message): GeminiContent[] => {
+    const contents = messages.flatMap((message): GeminiContent[] => {
         if ("type" in message) {
             callNameById.set(message.call_id, message.name);
             return [{ role: "model", parts: [{ functionCall: { id: message.call_id, name: message.name, args: jsonObject(message.arguments) }, ...(message.thoughtSignature ? { thoughtSignature: message.thoughtSignature } : {}) }] }];
@@ -717,14 +932,65 @@ function toGeminiContents(messages: ResponseInputMessage[]): GeminiContent[] {
             return [{ role: "user", parts: [{ functionResponse: { id: message.tool_call_id, name, response: { result: jsonValue(message.content) } } }] }];
         }
         if (message.role === "assistant" && "tool_calls" in message && Array.isArray(message.tool_calls)) {
-            return message.tool_calls.flatMap((call): GeminiContent[] => {
+            // 同一条 assistant 消息里的并行工具调用必须落进同一个 model turn（多个 functionCall part），
+            // 否则 Gemini 会把它看成「连续多个 model 轮次」，签名校验和 functionResponse 配对都会错乱。
+            const parts = message.content ? toGeminiParts(message.content) : [];
+            const calls = message.tool_calls.map((call): GeminiPart => {
                 callNameById.set(call.id, call.function.name);
-                const contentParts = message.content ? toGeminiParts(message.content) : [];
-                return [{ role: "model", parts: [...contentParts, { functionCall: { id: call.id, name: call.function.name, args: jsonObject(call.function.arguments) } }] }];
+                return {
+                    functionCall: { id: call.id, name: call.function.name, args: jsonObject(call.function.arguments) },
+                    ...(call.thoughtSignature ? { thoughtSignature: call.thoughtSignature } : {}),
+                };
             });
+            return [{ role: "model", parts: [...parts, ...calls] }];
         }
         return [{ role: message.role === "assistant" ? "model" : "user", parts: toGeminiParts(message.content) }];
     });
+    return mergeGeminiContents(options?.requireThoughtSignature ? dropUnsignedFunctionCalls(contents) : contents);
+}
+
+/**
+ * 没有 thoughtSignature 的 functionCall 一律降级成普通文本：
+ * Gemini 3 只接受带签名的 functionCall，直接发会整个请求 400；
+ * 而降级成文本后模型仍然知道「上一步调用过什么工具」，对话可以继续。
+ * 与它配对的 functionResponse 也必须同步降级，否则会出现「没有对应调用的工具结果」。
+ */
+function dropUnsignedFunctionCalls(contents: GeminiContent[]): GeminiContent[] {
+    const downgraded = new Set<string>();
+    return contents.map((content) => {
+        const parts = content.parts.flatMap((part): GeminiPart[] => {
+            if (content.role === "model" && part.functionCall) {
+                if (part.thoughtSignature) return [part];
+                const call = part.functionCall;
+                if (call.id) downgraded.add(call.id);
+                const args = call.args && Object.keys(call.args).length ? `，参数 ${JSON.stringify(call.args)}` : "";
+                return [{ text: `[已调用工具 ${call.name || "unknown"}${args}]` }];
+            }
+            if (part.functionResponse) {
+                const id = part.functionResponse.id;
+                if (id && downgraded.has(id)) {
+                    const name = part.functionResponse.name || "unknown";
+                    return [{ text: `[工具 ${name} 返回：${JSON.stringify(part.functionResponse.response ?? {})}]` }];
+                }
+            }
+            return [part];
+        });
+        return { role: content.role, parts };
+    }).filter((content) => content.parts.length > 0);
+}
+
+/** 合并相邻的同角色内容，避免出现连续两个 model / user 轮次。 */
+function mergeGeminiContents(contents: GeminiContent[]): GeminiContent[] {
+    const merged: GeminiContent[] = [];
+    for (const content of contents) {
+        const last = merged[merged.length - 1];
+        if (last && last.role === content.role) {
+            last.parts = [...last.parts, ...content.parts];
+            continue;
+        }
+        merged.push({ role: content.role, parts: [...content.parts] });
+    }
+    return merged;
 }
 
 function toGeminiParts(content: ResponseMessageContent | null): GeminiPart[] {
@@ -733,8 +999,13 @@ function toGeminiParts(content: ResponseMessageContent | null): GeminiPart[] {
 }
 
 function toGeminiImagePart(url: string): GeminiPart {
-    const match = url.match(/^data:([^;,]+);base64,(.+)$/);
-    if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+    // data URL 的 MIME 可能是 application/octet-stream（Blob 的 type 丢失时 FileReader 会写成这样），
+    // Gemini 会直接拒绝，所以这里统一按文件头纠正成真实图片类型。
+    const match = url.match(/^data:([^;,]*);base64,(.+)$/s);
+    if (match) {
+        const data = match[2].replace(/\s+/g, "");
+        return { inlineData: { mimeType: normalizeImageMimeType(match[1], data), data } };
+    }
     return { fileData: { fileUri: url, mimeType: "image/png" } };
 }
 
@@ -773,14 +1044,23 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
     };
 }
 
-async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
-    const response = await fetch(`${geminiApiUrl(config, "streamGenerateContent")}?alt=sse`, {
+async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, onThinking?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+    // 注意：geminiApiUrl 在 Express Mode 下已把密钥拼成 ?key=xxx，
+    // 这里若直接接 "?alt=sse" 会变成 ?key=AQ.xxx?alt=sse，密钥被污染导致 401「鉴权失败」。
+    const streamUrl = withApiQuery(geminiApiUrl(config, "streamGenerateContent"), { alt: "sse" });
+    const response = await fetch(streamUrl, {
         method: "POST",
         headers: geminiHeaders(config),
         body: JSON.stringify(body),
         signal: options?.signal,
+    }).catch((error) => {
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     });
-    if (!response.ok) throw new Error(await readFetchError(response, apiText("requestFailed")));
+    if (!response.ok) {
+        const message = await readFetchError(response, apiText("requestFailed"));
+        // 404 在 Vertex 渠道多半不是「地址错」而是「这个型号在该账号/区域不可用」，把模型名带出来便于直接换型号。
+        throw new Error(response.status === 404 ? `${message}（模型：${config.model}）` : message);
+    }
     if (!response.body) {
         const payload = (await response.json()) as GeminiPayload;
         return parseGeminiToolResponse(payload);
@@ -789,33 +1069,38 @@ async function requestGeminiStreamingResponse(config: AiConfig, body: Record<str
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const state: GeminiStreamState = { buffer: "", text: "", toolCalls: [] };
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        consumeGeminiStreamText(state, decoder.decode(value, { stream: true }), onDelta);
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            consumeGeminiStreamText(state, decoder.decode(value, { stream: true }), onDelta, onThinking);
+            if (state.error) throw new Error(state.error);
+        }
+        consumeGeminiStreamText(state, decoder.decode(), onDelta, onThinking, true);
         if (state.error) throw new Error(state.error);
+    } catch (error) {
+        if (error instanceof Error && error.message === state.error) throw error;
+        throw new Error(readFetchNetworkError(error, apiText("requestFailed")));
     }
-    consumeGeminiStreamText(state, decoder.decode(), onDelta, true);
-    if (state.error) throw new Error(state.error);
     return { content: state.text, toolCalls: state.toolCalls };
 }
 
-function consumeGeminiStreamText(state: GeminiStreamState, text: string, onDelta?: (text: string) => void, flush = false) {
+function consumeGeminiStreamText(state: GeminiStreamState, text: string, onDelta?: (text: string) => void, onThinking?: (text: string) => void, flush = false) {
     state.buffer += text;
     for (;;) {
         const match = state.buffer.match(/\r?\n\r?\n/);
         if (!match) break;
         const index = match.index ?? 0;
-        consumeGeminiStreamBlock(state.buffer.slice(0, index), state, onDelta);
+        consumeGeminiStreamBlock(state.buffer.slice(0, index), state, onDelta, onThinking);
         state.buffer = state.buffer.slice(index + match[0].length);
     }
     if (flush && state.buffer.trim()) {
-        consumeGeminiStreamBlock(state.buffer, state, onDelta);
+        consumeGeminiStreamBlock(state.buffer, state, onDelta, onThinking);
         state.buffer = "";
     }
 }
 
-function consumeGeminiStreamBlock(block: string, state: GeminiStreamState, onDelta?: (text: string) => void) {
+function consumeGeminiStreamBlock(block: string, state: GeminiStreamState, onDelta?: (text: string) => void, onThinking?: (text: string) => void) {
     const data = block
         .split(/\r?\n/)
         .filter((line) => line.startsWith("data:"))
@@ -824,17 +1109,70 @@ function consumeGeminiStreamBlock(block: string, state: GeminiStreamState, onDel
         .trim();
     if (!data || data === "[DONE]") return;
     const result = parseGeminiToolResponse(JSON.parse(data) as GeminiPayload);
+    if (result.thinking) {
+        state.thinking = (state.thinking || "") + result.thinking;
+        onThinking?.(state.thinking);
+    }
     if (result.content) {
         state.text += result.content;
         onDelta?.(state.text);
     }
-    state.toolCalls.push(...result.toolCalls);
+    mergeGeminiStreamToolCalls(state, result.toolCalls, result.thoughtSignatures || []);
+}
+
+/**
+ * 流式响应里的 functionCall / thoughtSignature 可能分块到达，这里按 id 合并，
+ * 并把「单独成块先到」的签名暂存下来，等对应的 functionCall 到达时补上。
+ */
+function mergeGeminiStreamToolCalls(state: GeminiStreamState, calls: ResponseToolCall[], signatures: string[]) {
+    if (!calls.length) {
+        if (signatures.length !== 1) return;
+        // 签名单独成块（常见于 functionCall 的下一个分块）：场上恰好只有一个未签名调用时才敢补给
+        // 它——补错签名会被 Google 判 invalid thought signature，比不补更糟；判别不了就先存着。
+        if (state.toolCalls.length === 1 && !state.toolCalls[0].thoughtSignature) {
+            state.toolCalls[0].thoughtSignature = signatures[0];
+            state.pendingThoughtSignature = undefined;
+            return;
+        }
+        state.pendingThoughtSignature = signatures[0];
+        return;
+    }
+    // 只有在「本块恰好一个调用、且最多一个签名」时才敢把签名直接挂过去，多调用的归属无法判定，宁可不挂。
+    const borrowed = calls.length === 1 && signatures.length <= 1 ? signatures[0] || state.pendingThoughtSignature : undefined;
+    for (const call of calls) {
+        const signature = call.thoughtSignature || borrowed;
+        // Gemini 的 functionCall 往往不带 id（我们本地补了 nanoid），同一个调用被分块重复推送时
+        // 光比 id 会认不出来，所以再按「同名工具 + 参数互为前缀」认一次。
+        const existing =
+            state.toolCalls.find((item) => item.id === call.id) ||
+            state.toolCalls.find((item) => item.function.name === call.function.name && isSameStreamedCall(item.function.arguments, call.function.arguments));
+        if (existing) {
+            // 同一个调用可能被重复推送（部分中转会分块吐参数），取更完整的一份，别产生重复调用。
+            if (call.function.arguments && call.function.arguments.length >= existing.function.arguments.length) existing.function.arguments = call.function.arguments;
+            if (!existing.function.name && call.function.name) existing.function.name = call.function.name;
+            if (!existing.thoughtSignature && signature) existing.thoughtSignature = signature;
+            continue;
+        }
+        state.toolCalls.push(signature ? { ...call, thoughtSignature: signature } : call);
+    }
+    state.pendingThoughtSignature = undefined;
+}
+
+/** 两次推送的参数是否属于同一个调用：缺失、相等或互为前缀都算同一次（流式参数是逐段累加的）。 */
+function isSameStreamedCall(a: string, b: string): boolean {
+    if (!a || !b) return true;
+    return a === b || a.startsWith(b) || b.startsWith(a);
 }
 
 function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
     validateGeminiPayload(payload);
     const parts = payload.candidates?.flatMap((candidate) => candidate.content?.parts || []) || [];
     const content = parts.map((part) => part.text || "").join("");
+    const thinking = parts
+        .filter((part) => part.thought === true)
+        .map((part) => part.text || "")
+        .join("");
+    const thoughtSignatures = parts.map((part) => part.thoughtSignature || part.thought_signature || "").filter(Boolean);
     const toolCalls = parts
         .map((part) => part.functionCall)
         .filter((call): call is NonNullable<GeminiPart["functionCall"]> => Boolean(call?.name))
@@ -848,15 +1186,46 @@ function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
                 ...(thoughtSignature ? { thoughtSignature } : {}),
             };
         });
-    return { content, toolCalls };
+    return { content, thinking, toolCalls, thoughtSignatures };
 }
+
+/**
+ * 一次生图请求的 responseModalities 候选。
+ *
+ * 纯 `["IMAGE"]` 是最省事也最省 token 的写法，但部分 Gemini 生图模型/端点只允许
+ * `["TEXT", "IMAGE"]`，只点名 IMAGE 时请求虽然 200、candidates 却只有空 parts
+ * （或只有 thought），本地就只能报「没有返回图片」。所以第一轮用 IMAGE，拿不到图
+ * 再退回 TEXT+IMAGE 重来一次——这时模型既能出图，也能在被拒绝时把原因写成文字，
+ * 我们就能把真实原因回显给用户，而不是一句无从下手的「没有返回图片」。
+ */
+const GEMINI_IMAGE_MODALITIES: string[][] = [["IMAGE"], ["TEXT", "IMAGE"]];
 
 async function requestGeminiImages(config: AiConfig, prompt: string, references: ReferenceImage[], count: number, options?: RequestOptions) {
-    const requests = Array.from({ length: count }, () => requestGeminiImagesOnce(config, prompt, references, options));
-    return (await Promise.all(requests)).flat();
+    // 多张图是并发发多次请求（count 来自偏好里的「张数」），其中一次被限流/拒答不该
+    // 把另外几张已经拿到的图一起丢掉，所以用 allSettled，只有全军覆没才把错误抛出去。
+    const settled = await Promise.allSettled(Array.from({ length: count }, () => requestGeminiImagesOnceWithFallback(config, prompt, references, options)));
+    const images = settled.flatMap((item) => (item.status === "fulfilled" ? item.value : []));
+    if (images.length) return images;
+    const failure = settled.find((item): item is PromiseRejectedResult => item.status === "rejected");
+    throw failure?.reason ?? new Error(apiText("geminiNoImage"));
 }
 
-async function requestGeminiImagesOnce(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+async function requestGeminiImagesOnceWithFallback(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    let lastError: unknown;
+    for (const modalities of GEMINI_IMAGE_MODALITIES) {
+        try {
+            return await requestGeminiImagesOnce(config, prompt, references, options, modalities);
+        } catch (error) {
+            // 只有「请求成功但没有图片」值得换一组 responseModalities 再试；
+            // 鉴权、参数、尺寸这类错误换个模态也是同样结果，白烧配额。
+            if (!isGeminiNoImageError(error)) throw error;
+            lastError = error;
+        }
+    }
+    throw lastError ?? new Error(apiText("geminiNoImage"));
+}
+
+async function requestGeminiImagesOnce(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions, responseModalities: string[] = GEMINI_IMAGE_MODALITIES[0]) {
     const parts: GeminiPart[] = [{ text: prompt }];
     for (const image of references) {
         parts.push(toGeminiImagePart(await imageToDataUrl(image)));
@@ -864,12 +1233,57 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
     const response = await axios.post<GeminiPayload>(
         geminiApiUrl(config, "generateContent"),
         {
-            ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"], ...resolveGeminiImageConfig(config) } }),
+            ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: buildGeminiImageGenerationConfig(config, responseModalities) }),
             contents: [{ role: "user", parts }],
         },
         { headers: geminiHeaders(config), signal: options?.signal, timeout: IMAGE_REQUEST_TIMEOUT_MS },
     );
     return parseGeminiImagePayload(response.data);
+}
+
+/**
+ * 生图专用的 generationConfig。
+ * 纯生图模型（gemini-3.1-flash-image / gemini-3-pro-image）只接受 responseModalities + imageConfig，
+ * 严禁携带 seed / temperature / topP / topK 等文本采样参数——这些参数会导致请求被拒或行为异常。
+ * 这里显式只保留生图所需的字段，imageSize 必须是大写 "1K" / "2K" / "4K"。
+ */
+function buildGeminiImageGenerationConfig(config: AiConfig, responseModalities: string[] = GEMINI_IMAGE_MODALITIES[0]): Record<string, unknown> {
+    // resolveGeminiImageConfig 返回 { imageConfig: { aspectRatio?, imageSize? } } 或 {}。
+    return { responseModalities, ...resolveGeminiImageConfig(config) };
+}
+
+/** 「请求成功但没图」的专用错误名，用于决定是否换 responseModalities 重试。 */
+const GEMINI_NO_IMAGE = "GeminiNoImageError";
+
+function isGeminiNoImageError(error: unknown) {
+    return error instanceof Error && error.name === GEMINI_NO_IMAGE;
+}
+
+/**
+ * 拼出「为什么没图」的诊断信息：被安全策略拦下的原因、候选的结束原因、以及模型实际
+ * 说了什么（生图模型拒答时往往会给一句话）。这些信息对排查至关重要——
+ * 只报「没有返回图片」，用户既分不清是提示词被拒、参考图不合规，还是模型压根没开通。
+ */
+function describeEmptyGeminiPayload(payload: GeminiPayload) {
+    const parts = payload.candidates?.flatMap((candidate) => candidate.content?.parts || []) || [];
+    const text = parts
+        .map((part) => part.text || "")
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim();
+    const reasons = [
+        payload.promptFeedback?.blockReason ? `拦截原因 ${payload.promptFeedback.blockReason}` : "",
+        ...(payload.candidates || []).map((candidate) => (candidate.finishReason ? `结束原因 ${candidate.finishReason}` : "")),
+    ].filter(Boolean);
+    const snippet = text ? `模型回复「${text.slice(0, 160)}」` : "";
+    return [...new Set([...reasons, snippet])].filter(Boolean).join("；");
+}
+
+function geminiNoImageError(payload: GeminiPayload) {
+    const detail = describeEmptyGeminiPayload(payload);
+    const error = new Error(detail ? apiText("geminiNoImageDetail", { detail }) : apiText("geminiNoImage"));
+    error.name = GEMINI_NO_IMAGE;
+    return error;
 }
 
 function parseGeminiImagePayload(payload: GeminiPayload) {
@@ -884,7 +1298,7 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
             })
             .filter((value): value is string => Boolean(value))
             .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
-    if (!images.length) throw new Error(apiText("geminiNoImage"));
+    if (!images.length) throw geminiNoImageError(payload);
     return images;
 }
 
@@ -917,7 +1331,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
             throw toApiError(error, apiText("requestFailed"));
         }
     }
-    if (requestConfig.apiFormat === "gemini") {
+    if (isGeminiLikeFormat(requestConfig)) {
         try {
             return await requestGeminiImages(requestConfig, prompt, options?.references || [], n, options);
         } catch (error) {
@@ -990,7 +1404,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             throw toApiError(error, apiText("requestFailed"));
         }
     }
-    if (requestConfig.apiFormat === "gemini") {
+    if (isGeminiLikeFormat(requestConfig)) {
         try {
             return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
         } catch (error) {
@@ -1063,8 +1477,8 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
         }
     }
     try {
-        if (requestConfig.apiFormat === "gemini") {
-            const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(tools, toolChoice)), onDelta, options);
+        if (isGeminiLikeFormat(requestConfig)) {
+            const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(tools, toolChoice)), onDelta, undefined, options);
             if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
             const answer = result.content || apiText("noContent");
             if (answer === apiText("noContent")) onDelta(answer);
@@ -1080,7 +1494,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
             messages: chatMessages,
             ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
             ...(strictFunction ? { tools: tools.map((tool) => ({ type: "function", function: tool.function })), tool_choice: toolChoice } : {}),
-        }, onDelta, options);
+        }, onDelta, undefined, options);
         if (strictFunction) return requireStrictFunctionArguments(result, strictFunction.name);
         const answer = result.content || apiText("noContent");
         if (answer === apiText("noContent")) onDelta(answer);
@@ -1107,27 +1521,37 @@ export type ChatToolCallResult = {
  * 通用工具调用对话：暴露多工具 + tool_choice auto，并支持工具结果回填后的多轮往返。
  * 与 requestImageQuestion 共用底层流式能力，但额外透出 tools 与 tool 消息，供 Agent 编排循环使用。
  */
-export async function requestChatWithTools(config: AiConfig, messages: ResponseInputMessage[], tools: ChatToolDefinition[], onDelta: (text: string) => void, options?: RequestOptions): Promise<ChatToolCallResult> {
+export async function requestChatWithTools(config: AiConfig, messages: ResponseInputMessage[], tools: ChatToolDefinition[], onDelta: (text: string) => void, options?: RequestOptions & { onThinking?: (text: string) => void }): Promise<ChatToolCallResult> {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     const toolList: ResponseFunctionTool[] = tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }));
     const toolChoice: ToolChoice = "auto";
-    if (requestConfig.apiFormat === "gemini") {
-        const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(toolList, toolChoice)), onDelta, options);
+    if (isGeminiLikeFormat(requestConfig)) {
+        const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(toolList, toolChoice)), onDelta, options?.onThinking, options);
         return { content: result.content, toolCalls: result.toolCalls };
     }
     const chatMessages = withSystemMessage(requestConfig, messages).map((msg) => {
         if ("type" in msg) return msg;
         if (msg.role === "tool") return msg;
-        if (msg.role === "assistant" && "tool_calls" in msg && Array.isArray(msg.tool_calls)) return msg;
+        // thoughtSignature 是 Gemini 专有字段，OpenAI 兼容通道必须剥掉，否则严格校验的中转站会拒绝，
+        if (msg.role === "assistant" && "tool_calls" in msg && Array.isArray(msg.tool_calls)) {
+            return {
+                role: "assistant" as const,
+                content: msg.content,
+                tool_calls: msg.tool_calls.map((call) => ({ id: call.id, type: "function" as const, function: call.function })),
+            };
+        }
         return { role: msg.role, content: msg.content };
     });
     const result = await requestChatCompletionsStreaming(requestConfig, {
         model: requestConfig.model,
         messages: chatMessages,
-        tools: toolList.map((tool) => ({ type: "function", function: tool.function })),
-        tool_choice: toolChoice,
+        // 仅在确实提供了工具时才带上 tools/tool_choice：部分中转站对「带 tools + 带图片」的请求兼容性差，
+        // 会误报 image is required。无工具时走与 requestImageQuestion 一致的纯对话路径。
+        ...(toolList.length
+            ? { tools: toolList.map((tool) => ({ type: "function", function: tool.function })), tool_choice: toolChoice }
+            : {}),
         ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
-    }, onDelta, options);
+    }, onDelta, options?.onThinking, options);
     return { content: result.content, toolCalls: result.toolCalls };
 }
 
@@ -1171,11 +1595,18 @@ function extractOpenAiModelNames(payload: unknown): string[] {
 
 export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
     try {
-        if (config.apiFormat === "gemini") {
+        if (config.apiFormat === "gemini" || config.apiFormat === "vertex") {
+            // Vertex AI（尤其 Express Mode AQ. 密钥）没有公开的模型列表接口，改用最小生成请求探测：
+            // 既能验证连通性，又能把真正可用的文本型号带回来。gemini 仍走标准列表接口。
+            if (config.apiFormat === "vertex") {
+                // 探针会返回实测可用的文本型号，直接当成「已发现的模型」交给渠道注册，
+                // 避免把项目里根本没开通的型号（如 gemini-2.5-flash）写进渠道后一直 404。
+                return await probeVertexConnectivity({ ...defaultGeminiConfig, ...config });
+            }
             const response = await axios.get<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });
             validateGeminiPayload(response.data);
             return (response.data.models || [])
-                .map((model) => model.name?.replace(/^models\//, ""))
+                .map((model) => model.name?.replace(/^models\//, "").replace(/^.*\/publishers\/google\/models\//, ""))
                 .filter((id): id is string => Boolean(id))
                 .sort((a, b) => a.localeCompare(b));
         }
@@ -1186,8 +1617,20 @@ export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKe
         });
         return extractOpenAiModelNames(response.data);
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("modelReadFailed")));
+        throw new Error(withVertexAuthDebug(readAxiosError(error, apiText("modelReadFailed")), config));
     }
+}
+
+/**
+ * 渠道测试专用诊断：把「这次实际用的鉴权方式 + 密钥指纹」附在 Vertex 报错后面。
+ * 只显示前 4 位和长度，足够判断前缀识别是否正确、密钥是否被截断，又不会泄露完整密钥。
+ */
+function withVertexAuthDebug(message: string, config: Pick<AiConfig, "apiKey" | "apiFormat">) {
+    if (config.apiFormat !== "vertex") return message;
+    const key = config.apiKey.trim();
+    const fingerprint = key ? `${key.slice(0, 4)}…（${key.length} 字符）` : "空";
+    const mode = isVertexExpressMode(config) ? "?key= 查询参数" : "Authorization: Bearer";
+    return `${message}（鉴权方式：${mode}；密钥：${fingerprint}）`;
 }
 
 export async function fetchChannelModels(channel: ModelChannel) {

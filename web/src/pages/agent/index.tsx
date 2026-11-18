@@ -566,7 +566,7 @@ export default function AgentPage() {
 
                         {/* 右：结果 */}
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <AgentResultPanel conversationId={activeId} onInsert={handleInsertToCanvas} />
+                            <AgentResultPanel conversationId={activeId} generating={running} onInsert={handleInsertToCanvas} />
                         </div>
                     </div>
                 </div>

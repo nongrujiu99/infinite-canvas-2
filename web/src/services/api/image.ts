@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import i18n from "@/i18n";
-import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, withLocalProxy, type AiConfig, type ModelChannel, type ReasoningEffort } from "@/stores/use-config-store";
 import { normalizeScriptImages, runModelScript } from "./model-script";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
@@ -1518,6 +1518,30 @@ export type ChatToolCallResult = {
 };
 
 /**
+ * 思考强度 → OpenAI 兼容通道的 reasoning_effort。
+ * auto 表示交给模型/中转站默认处理，不发送该字段（避免对不支持的中转站造成 400）。
+ */
+function openAiReasoningEffort(effort: ReasoningEffort | undefined): string | undefined {
+    return effort && effort !== "auto" ? effort : undefined;
+}
+
+/**
+ * 思考强度 → Gemini 的 thinkingConfig。
+ * - Gemini 3 系列用 thinkingLevel（LOW / MEDIUM / HIGH），不支持 thinkingBudget；
+ * - Gemini 2.5 系列用 thinkingBudget（token 数），取递增固定预算让「低/高」有可感知差异。
+ * auto 不发送，交给模型默认。两者不可同时出现，否则请求会被拒。
+ */
+function geminiThinkingConfig(config: AiConfig, effort: ReasoningEffort | undefined): Record<string, unknown> | undefined {
+    if (!effort || effort === "auto") return undefined;
+    if (needsThoughtSignature(config)) {
+        const level = effort === "xhigh" || effort === "high" ? "HIGH" : effort === "medium" ? "MEDIUM" : "LOW";
+        return { thinkingConfig: { thinkingLevel: level } };
+    }
+    const budget = effort === "low" ? 1024 : effort === "medium" ? 4096 : effort === "high" ? 8192 : 16384;
+    return { thinkingConfig: { thinkingBudget: budget } };
+}
+
+/**
  * 通用工具调用对话：暴露多工具 + tool_choice auto，并支持工具结果回填后的多轮往返。
  * 与 requestImageQuestion 共用底层流式能力，但额外透出 tools 与 tool 消息，供 Agent 编排循环使用。
  */
@@ -1526,7 +1550,12 @@ export async function requestChatWithTools(config: AiConfig, messages: ResponseI
     const toolList: ResponseFunctionTool[] = tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }));
     const toolChoice: ToolChoice = "auto";
     if (isGeminiLikeFormat(requestConfig)) {
-        const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(toolList, toolChoice)), onDelta, options?.onThinking, options);
+        const thinking = geminiThinkingConfig(requestConfig, requestConfig.reasoningEffort);
+        const extra = {
+            ...toGeminiToolOptions(toolList, toolChoice),
+            ...(thinking ? { generationConfig: thinking } : {}),
+        };
+        const result = await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, extra), onDelta, options?.onThinking, options);
         return { content: result.content, toolCalls: result.toolCalls };
     }
     const chatMessages = withSystemMessage(requestConfig, messages).map((msg) => {
@@ -1542,6 +1571,7 @@ export async function requestChatWithTools(config: AiConfig, messages: ResponseI
         }
         return { role: msg.role, content: msg.content };
     });
+    const reasoningEffort = openAiReasoningEffort(requestConfig.reasoningEffort);
     const result = await requestChatCompletionsStreaming(requestConfig, {
         model: requestConfig.model,
         messages: chatMessages,
@@ -1550,6 +1580,7 @@ export async function requestChatWithTools(config: AiConfig, messages: ResponseI
         ...(toolList.length
             ? { tools: toolList.map((tool) => ({ type: "function", function: tool.function })), tool_choice: toolChoice }
             : {}),
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         ...(options?.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
     }, onDelta, options?.onThinking, options);
     return { content: result.content, toolCalls: result.toolCalls };

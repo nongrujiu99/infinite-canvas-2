@@ -1,5 +1,5 @@
-import { App, Button, Image, Input, Popconfirm, Spin, Tooltip } from "antd";
-import { Check, ChevronDown, ChevronRight, ImagePlus, Pencil, Plus, Send, Square, Trash2, X } from "lucide-react";
+import { App, Button, Dropdown, Image, Input, Popconfirm, Tooltip } from "antd";
+import { Brain, Check, ChevronDown, ChevronRight, ImagePlus, Loader2, Pencil, Plus, Send, Sparkles, Square, Trash2, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,9 +7,11 @@ import { AgentQuestionNav } from "@/components/agent/agent-question-nav";
 import { AgentResultPanel } from "@/components/agent/agent-result-panel";
 import { StoredImage } from "@/components/agent/stored-image";
 import { uploadImage } from "@/services/image-storage";
-import { runAgentTurn, type AgentLogEntry } from "@/services/api/agent";
+import { polishAgentText, runAgentTurn, type AgentLogEntry } from "@/services/api/agent";
 import { useAgentStore } from "@/stores/agent/use-agent-store";
-import { isModelChannelConfigured, modelCapabilityOf, modelOptionLabel, useEffectiveConfig } from "@/stores/use-config-store";
+import { isModelChannelConfigured, modelCapabilityOf, modelOptionLabel, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { reasoningEffortLabel } from "@/components/text-settings-panel";
+import type { ReasoningEffort } from "@/stores/use-config-store";
 import type { AgentMessage } from "@/types/agent";
 import type { ReferenceImage } from "@/types/image";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ const MAX_REFERENCE_IMAGES = 6;
 /** 单张上传图片的字节上限，超出直接跳过并提示；MB 数从字节推导，避免提示文案与实际阈值不一致。 */
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / 1024 / 1024;
+const REASONING_EFFORTS: ReasoningEffort[] = ["auto", "low", "medium", "high", "xhigh"];
 
 /** 把毫秒耗时格式化为易读文本，如 850ms、3.2s、1分12秒。 */
 function formatDuration(ms: number): string {
@@ -33,6 +36,8 @@ export default function AgentPage() {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const config = useEffectiveConfig();
+    const updateConfig = useConfigStore((state) => state.updateConfig);
+    const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
 
     const conversations = useAgentStore((state) => state.conversations);
     const activeId = useAgentStore((state) => state.activeConversationId);
@@ -45,6 +50,8 @@ export default function AgentPage() {
 
     const [input, setInput] = useState("");
     const [attachments, setAttachments] = useState<ReferenceImage[]>([]);
+    const [optimizing, setOptimizing] = useState(false);
+    const [optimizeUndo, setOptimizeUndo] = useState<string>();
     const [dragging, setDragging] = useState(false);
     const dragDepthRef = useRef(0);
     const [running, setRunning] = useState(false);
@@ -171,6 +178,7 @@ export default function AgentPage() {
         addMessage(activeId, userMessage);
         setInput("");
         setAttachments([]);
+        setOptimizeUndo(undefined);
 
         // 用首条用户消息作为会话标题
         if (activeConversation && activeConversation.messages.length === 0) {
@@ -271,6 +279,38 @@ export default function AgentPage() {
             setThinkOpen(false);
         }
     }, [activeConversation, activeId, activeModel, addMessage, addResults, attachments, channelReady, config, createConversation, input, message, running, t, updateConversationTitle]);
+
+    // 优化表达：用当前对话的文本模型把输入润色得更清晰，替换后保留原文供撤销。
+    const handleOptimize = useCallback(async () => {
+        const source = input.trim();
+        if (!source) {
+            message.info(t("agent.optimizeEmpty"));
+            return;
+        }
+        if (optimizing || running) return;
+        if (!channelReady) {
+            message.warning(t("agent.noChannelHint"));
+            openConfigDialog(true);
+            return;
+        }
+        setOptimizing(true);
+        try {
+            const polished = await polishAgentText(config, activeModel, source);
+            setOptimizeUndo(source);
+            setInput(polished);
+            message.success(t("agent.optimizeDone"), 4);
+        } catch {
+            message.error(t("agent.optimizeFailed"));
+        } finally {
+            setOptimizing(false);
+        }
+    }, [input, optimizing, running, channelReady, message, t, openConfigDialog, config, activeModel]);
+
+    const undoOptimize = useCallback(() => {
+        if (optimizeUndo === undefined) return;
+        setInput(optimizeUndo);
+        setOptimizeUndo(undefined);
+    }, [optimizeUndo]);
 
     const handleCancel = useCallback(() => {
         abortRef.current?.abort();
@@ -578,61 +618,107 @@ export default function AgentPage() {
                             {/* 右缘提问导航：细刻度常驻，hover 浮出提问文本 */}
                             <AgentQuestionNav items={questions} activeIndex={activeQuestionIndex} onJump={handleJumpToMessage} />
 
-                            {/* 输入区：选文件入口；拖拽/粘贴在整个工作区统一生效 */}
-                            <div className="shrink-0 border-t border-border/60 p-4">
-                                {attachments.length ? (
-                                    <div className="mb-3 flex flex-wrap gap-2">
-                                        {attachments.map((attachment) => (
-                                            <div key={attachment.id} className="group/att relative">
-                                                <div className="size-14 overflow-hidden rounded-lg border border-border">
-                                                    <Image
-                                                        src={attachment.dataUrl}
-                                                        alt={attachment.name}
-                                                        className="size-full object-cover"
-                                                        style={{ width: "100%", height: "100%" }}
-                                                        preview={{ mask: t("agent.previewImage") }}
-                                                    />
+                            {/* 输入区：卡片式 composer；拖拽/粘贴在整个工作区统一生效 */}
+                            <div className="shrink-0 border-t border-border/60 p-3 sm:p-4">
+                                <div className="rounded-xl border border-border transition focus-within:border-primary/50">
+                                    {attachments.length ? (
+                                        <div className="flex flex-wrap gap-2 px-3 pt-3">
+                                            {attachments.map((attachment) => (
+                                                <div key={attachment.id} className="group/att relative">
+                                                    <div className="size-14 overflow-hidden rounded-lg border border-border">
+                                                        <Image
+                                                            src={attachment.dataUrl}
+                                                            alt={attachment.name}
+                                                            className="size-full object-cover"
+                                                            style={{ width: "100%", height: "100%" }}
+                                                            preview={{ mask: t("agent.previewImage") }}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        title={t("common.delete")}
+                                                        onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
+                                                        className="absolute -right-1.5 -top-1.5 z-10 inline-flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition hover:bg-red-500 hover:text-white"
+                                                    >
+                                                        <X className="size-3" />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    title={t("common.delete")}
-                                                    onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
-                                                    className="absolute -right-1.5 -top-1.5 z-10 inline-flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition hover:bg-red-500 hover:text-white"
-                                                >
-                                                    <X className="size-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : null}
-                                <div className="flex items-center gap-2.5">
-                                    <label title={t("common.upload")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
-                                        <ImagePlus className="size-4" />
-                                        <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => {
-                                            void handleFiles(Array.from(event.target.files || []));
-                                            event.target.value = "";
-                                        }} />
-                                    </label>
+                                            ))}
+                                        </div>
+                                    ) : null}
                                     <Input.TextArea
                                         value={input}
-                                        onChange={(event) => setInput(event.target.value)}
+                                        onChange={(event) => {
+                                            setInput(event.target.value);
+                                            if (optimizeUndo !== undefined) setOptimizeUndo(undefined);
+                                        }}
                                         placeholder={t("agent.inputPlaceholder")}
-                                        autoSize={{ minRows: 1, maxRows: 6 }}
+                                        autoSize={{ minRows: 3, maxRows: 10 }}
                                         onPressEnter={(event) => {
                                             if (!event.shiftKey) {
                                                 event.preventDefault();
                                                 void handleSend();
                                             }
                                         }}
-                                        className="flex-1"
+                                        variant="borderless"
+                                        className="!resize-none !bg-transparent !px-3 !py-2.5 !text-[13px] !leading-[1.6]"
                                     />
-                                    <Tooltip title={running ? t("agent.stop") : t("agent.send")}>
-                                        {running ? (
-                                            <Button type="primary" danger size="large" className="!h-9 !w-9 !p-0" icon={<Square className="size-3.5" />} onClick={handleCancel} />
-                                        ) : (
-                                            <Button type="primary" size="large" className="!h-9 !w-9 !p-0" disabled={!input.trim() && !attachments.length} icon={<Send className="size-3.5" />} onClick={() => void handleSend()} />
-                                        )}
-                                    </Tooltip>
+                                    {/* 工具栏：左侧能力入口，右侧发送；位置固定、状态清晰 */}
+                                    <div className="flex items-center justify-between gap-2 border-t border-border/60 px-2 py-1.5">
+                                        <div className="flex min-w-0 items-center gap-0.5">
+                                            <Tooltip title={t("common.upload")}>
+                                                <label className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
+                                                    <ImagePlus className="size-4" />
+                                                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => {
+                                                        void handleFiles(Array.from(event.target.files || []));
+                                                        event.target.value = "";
+                                                    }} />
+                                                </label>
+                                            </Tooltip>
+                                            <Tooltip title={t("agent.reasoningEffortHint")}>
+                                                <Dropdown
+                                                    trigger={["click"]}
+                                                    menu={{
+                                                        selectedKeys: [config.reasoningEffort || "auto"],
+                                                        items: REASONING_EFFORTS.map((value) => ({ key: value, label: reasoningEffortLabel(value) })),
+                                                        onClick: ({ key }) => updateConfig("reasoningEffort", key as ReasoningEffort),
+                                                    }}
+                                                >
+                                                    <button type="button" className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10">
+                                                        <Brain className="size-4" />
+                                                        <span className="hidden sm:inline">{reasoningEffortLabel(config.reasoningEffort || "auto")}</span>
+                                                        <ChevronDown className="size-3" />
+                                                    </button>
+                                                </Dropdown>
+                                            </Tooltip>
+                                            <span className="mx-1 h-4 w-px shrink-0 bg-border/60" />
+                                            <Tooltip title={t("agent.optimizeExpression")}>
+                                                <button
+                                                    type="button"
+                                                    aria-label={t("agent.optimizeExpression")}
+                                                    disabled={optimizing || running}
+                                                    onClick={() => void handleOptimize()}
+                                                    className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] text-muted-foreground transition hover:bg-black/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/10"
+                                                >
+                                                    {optimizing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                                                    <span className="hidden sm:inline">{optimizing ? t("agent.optimizing") : t("agent.optimizeExpression")}</span>
+                                                </button>
+                                            </Tooltip>
+                                            {optimizeUndo !== undefined ? (
+                                                <button type="button" onClick={undoOptimize} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] text-primary transition hover:bg-primary/10">
+                                                    <Undo2 className="size-3.5" />
+                                                    <span className="hidden sm:inline">{t("agent.optimizeUndo")}</span>
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                        <Tooltip title={running ? t("agent.stop") : t("agent.send")}>
+                                            {running ? (
+                                                <Button type="primary" danger size="large" className="!h-9 !w-9 !p-0" icon={<Square className="size-3.5" />} onClick={handleCancel} />
+                                            ) : (
+                                                <Button type="primary" size="large" className="!h-9 !w-9 !p-0" disabled={!input.trim() && !attachments.length} icon={<Send className="size-3.5" />} onClick={() => void handleSend()} />
+                                            )}
+                                        </Tooltip>
+                                    </div>
                                 </div>
                             </div>
                         </div>

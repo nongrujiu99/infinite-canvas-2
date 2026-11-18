@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 
-import { requestChatWithTools, requestGeneration, requestEdit, type ChatToolDefinition, type ResponseInputMessage } from "@/services/api/image";
+import { requestChatWithTools, requestGeneration, requestEdit, requestImageQuestion, type AiTextMessage, type ChatToolDefinition, type ResponseInputMessage } from "@/services/api/image";
 import { imageToDataUrl, uploadImage } from "@/services/image-storage";
 import { resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { AGENT_DEFAULT_STEPS, AGENT_MAX_STEPS, type AgentResult } from "@/types/agent";
@@ -387,4 +387,35 @@ export async function runAgentTurn(options: AgentRunOptions): Promise<AgentTurnR
 export function isAgentModelReady(config: AiConfig, model: string) {
     const requestConfig = resolveModelRequestConfig(config, model);
     return Boolean(model.trim() && requestConfig.baseUrl.trim() && requestConfig.apiKey.trim());
+}
+
+/**
+ * 「优化表达」：把用户输入润色成更清晰、具体、可直接执行的描述。
+ *
+ * 与画布的 optimizeCanvasPrompt 不同——那个专补生图参数、固定产出英文；这里处理的是
+ * 对话里的自然语言提问，必须保留用户的语言、原意和关键约束，只把含糊处说明白。
+ * 用当前配置的文本模型，单轮无工具调用，20 秒超时，避免按钮一直转。
+ */
+export async function polishAgentText(config: AiConfig, model: string, text: string): Promise<string> {
+    const requestConfig: AiConfig = { ...config, model };
+    const system = [
+        "你是表达优化助手。把用户的需求描述改写得更清晰、具体、有条理，让它更容易被执行。",
+        "严格规则：使用与用户输入相同的语言（中文输入就输出中文）；保留原意、事实、数字、专有名词和所有明确要求，不得新增未经用户说明的事实或要求；不改变用户要做的任务类型。",
+        "只修正含糊、口语化、重复和语病，必要时补上让指令更可执行的措辞（如对象、目标、范围），但不要替用户做决定。",
+        "只输出改写后的文本本身：不要解释、不要前后缀、不要引号、不要 Markdown 代码块。",
+    ].join("\n");
+    const messages: AiTextMessage[] = [
+        { role: "system", content: system },
+        { role: "user", content: text },
+    ];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+        const raw = await requestImageQuestion(requestConfig, messages, () => {}, { signal: controller.signal });
+        const polished = raw.trim().replace(/^["'「"]+|["'」"]+$/g, "").trim();
+        if (!polished) throw new Error("empty polish result");
+        return polished;
+    } finally {
+        clearTimeout(timer);
+    }
 }

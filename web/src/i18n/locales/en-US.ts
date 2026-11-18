@@ -905,6 +905,7 @@ export default {
         inputPlaceholder: "Describe what to generate or edit — you can also drop or paste images…",
         defaultImagePrompt: "Please analyze this image",
         dropImageHint: "Release to add images",
+        previewImage: "View full size",
         nonImageFile: "Ignored {{count}} non-image file(s); only images are supported",
         imageTooLarge: "Ignored {{count}} image(s) over {{limit}}MB",
         send: "Send",

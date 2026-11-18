@@ -892,6 +892,7 @@ export default {
         inputPlaceholder: "描述你想要生成或编辑的内容，也可拖入或粘贴图片…",
         defaultImagePrompt: "请分析这张图片",
         dropImageHint: "松开即可添加图片",
+        previewImage: "查看大图",
         nonImageFile: "已忽略 {{count}} 个非图片文件，仅支持添加图片",
         imageTooLarge: "已忽略 {{count}} 张超过 {{limit}}MB 的图片",
         send: "发送",

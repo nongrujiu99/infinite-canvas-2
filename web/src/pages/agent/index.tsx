@@ -1,4 +1,4 @@
-import { App, Button, Input, Popconfirm, Spin, Tooltip } from "antd";
+import { App, Button, Image, Input, Popconfirm, Spin, Tooltip } from "antd";
 import { Check, ChevronDown, ChevronRight, ImagePlus, Pencil, Plus, Send, Square, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -312,9 +312,9 @@ export default function AgentPage() {
         if (added.length) setAttachments((prev) => [...prev, ...added]);
     }, [message, t]);
 
-    // 剪贴板：只在真的含文件时接管，纯文本仍走 TextArea 默认粘贴，不破坏文本输入。
-    // dataTransfer 里的文件也可能是非图片，交给 handleFiles 统一提示，而不是静默忽略。
-    const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+    // 剪贴板：绑在工作区根节点，域内任意位置粘贴都生效。只在真的含文件时接管，
+    // 纯文本仍走浏览器默认粘贴；非图片文件交给 handleFiles 统一提示。
+    const handlePaste = useCallback((event: ClipboardEvent<HTMLElement>) => {
         const files = Array.from(event.clipboardData?.items || [])
             .filter((item) => item.kind === "file")
             .map((item) => item.getAsFile())
@@ -363,7 +363,22 @@ export default function AgentPage() {
     }, [message, t]);
 
     return (
-        <div className="flex h-full flex-col overflow-hidden">
+        <div
+            className={cn("relative flex h-full flex-col overflow-hidden", dragging && "ring-2 ring-inset ring-primary/60")}
+            onPaste={handlePaste}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {dragging ? (
+                <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
+                    <div className="flex flex-col items-center gap-2 rounded-xl border border-primary/40 bg-card/95 px-8 py-6 shadow-lg">
+                        <ImagePlus className="size-7 text-primary" strokeWidth={1.5} />
+                        <p className="text-[13px] font-medium text-foreground">{t("agent.dropImageHint")}</p>
+                    </div>
+                </div>
+            ) : null}
             <div className="min-h-0 flex-1 overflow-hidden">
                 <div className="mx-auto flex h-full w-full max-w-[100rem] flex-col px-4 pt-4 pb-5 sm:px-6">
                     <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
@@ -578,27 +593,26 @@ export default function AgentPage() {
                             {/* 右缘提问导航：细刻度常驻，hover 浮出提问文本 */}
                             <AgentQuestionNav items={questions} activeIndex={activeQuestionIndex} onJump={handleJumpToMessage} />
 
-                            {/* 输入区：支持选文件、拖入图片、粘贴图片三种入口 */}
-                            <div
-                                className={cn("relative shrink-0 border-t border-border/60 p-4 transition-all", dragging && "bg-primary/[0.06] ring-2 ring-inset ring-primary/60")}
-                                onDragEnter={handleDragEnter}
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
-                                onDrop={handleDrop}
-                            >
-                                {dragging ? (
-                                    <p className="pointer-events-none absolute inset-x-4 -top-1 z-10 -translate-y-full rounded-md bg-primary px-2 py-0.5 text-center text-[11px] font-medium text-primary-foreground">{t("agent.dropImageHint")}</p>
-                                ) : null}
+                            {/* 输入区：选文件入口；拖拽/粘贴在整个工作区统一生效 */}
+                            <div className="shrink-0 border-t border-border/60 p-4">
                                 {attachments.length ? (
                                     <div className="mb-3 flex flex-wrap gap-2">
                                         {attachments.map((attachment) => (
                                             <div key={attachment.id} className="group/att relative">
-                                                <img src={attachment.dataUrl} alt={attachment.name} className="size-14 rounded-lg object-cover" />
+                                                <div className="size-14 overflow-hidden rounded-lg bg-muted">
+                                                    <Image
+                                                        src={attachment.dataUrl}
+                                                        alt={attachment.name}
+                                                        className="size-full object-cover"
+                                                        style={{ width: "100%", height: "100%" }}
+                                                        preview={{ mask: t("agent.previewImage") }}
+                                                    />
+                                                </div>
                                                 <button
                                                     type="button"
                                                     title={t("common.delete")}
                                                     onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
-                                                    className="absolute -right-1.5 -top-1.5 inline-flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition hover:bg-red-500 hover:text-white"
+                                                    className="absolute -right-1.5 -top-1.5 z-10 inline-flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition hover:bg-red-500 hover:text-white"
                                                 >
                                                     <X className="size-3" />
                                                 </button>
@@ -617,7 +631,6 @@ export default function AgentPage() {
                                     <Input.TextArea
                                         value={input}
                                         onChange={(event) => setInput(event.target.value)}
-                                        onPaste={handlePaste}
                                         placeholder={t("agent.inputPlaceholder")}
                                         autoSize={{ minRows: 1, maxRows: 6 }}
                                         onPressEnter={(event) => {

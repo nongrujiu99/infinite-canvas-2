@@ -1,10 +1,11 @@
-import { Image } from "antd";
-import { Download, ImagePlus, Maximize2 } from "lucide-react";
+import { App, Image, Tooltip } from "antd";
+import { BookmarkPlus, Download, FolderPlus, ImagePlus, Maximize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 import { resolveImageUrl } from "@/services/image-storage";
+import { useAssetStore } from "@/stores/use-asset-store";
 import type { AgentResult } from "@/types/agent";
 
 /** 与生图工作台结果卡一致的操作按钮样式。 */
@@ -21,13 +22,16 @@ function aspectOf(result: AgentResult) {
  * 生成结果的 dataUrl 是 blob: URL，刷新后失效；这里用 storageKey 还原成
  * 可长期访问的 URL，缩略图和下载都走还原后的地址。
  */
-export function AgentResultCard({ result, onInsert, generating, fresh }: {
+export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, fresh }: {
     result: AgentResult;
     onInsert: (id: string) => void;
+    onSaveTemplate: (result: AgentResult) => void;
     generating?: boolean;
     fresh?: boolean;
 }) {
     const { t } = useTranslation();
+    const { message } = App.useApp();
+    const addAsset = useAssetStore((state) => state.addAsset);
     const [src, setSrc] = useState<string>(result.dataUrl);
 
     useEffect(() => {
@@ -39,6 +43,26 @@ export function AgentResultCard({ result, onInsert, generating, fresh }: {
             mounted = false;
         };
     }, [result.storageKey, result.dataUrl]);
+
+    const saveToAssets = () => {
+        addAsset({
+            kind: "image",
+            title: `${result.prompt.slice(0, 20) || "对话生成"} · ${result.width}×${result.height}`,
+            coverUrl: result.dataUrl,
+            tags: ["对话工作台", "AI 生成"],
+            source: "agent",
+            data: {
+                dataUrl: result.dataUrl,
+                storageKey: result.storageKey,
+                width: result.width,
+                height: result.height,
+                bytes: result.bytes,
+                mimeType: result.mimeType,
+            },
+            metadata: { prompt: result.prompt, conversationId: result.conversationId },
+        });
+        message.success(t("agent.savedToAssets"));
+    };
 
     return (
         <figure className={cn("group overflow-hidden rounded-xl border border-border bg-card transition", fresh && "result-card-in")}>
@@ -53,17 +77,26 @@ export function AgentResultCard({ result, onInsert, generating, fresh }: {
                 />
                 {/* 静止状态只留图，hover 或键盘聚焦才露出操作 */}
                 <div className="absolute inset-x-0 bottom-0 flex justify-end gap-0.5 p-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                    <a href={src} download className={ACTION} title={t("common.download")}>
-                        <Download className="size-3.5" />
-                    </a>
-                    <button
-                        type="button"
-                        onClick={() => onInsert(result.id)}
-                        className={ACTION}
-                        title={t("agent.insertToCanvas")}
-                    >
-                        <ImagePlus className="size-3.5" />
-                    </button>
+                    <Tooltip title={t("agent.saveToPrompt")}>
+                        <button type="button" className={ACTION} onClick={() => onSaveTemplate(result)}>
+                            <BookmarkPlus className="size-3.5" />
+                        </button>
+                    </Tooltip>
+                    <Tooltip title={t("agent.saveToAssets")}>
+                        <button type="button" className={ACTION} onClick={saveToAssets}>
+                            <FolderPlus className="size-3.5" />
+                        </button>
+                    </Tooltip>
+                    <Tooltip title={t("common.download")}>
+                        <a href={src} download className={ACTION}>
+                            <Download className="size-3.5" />
+                        </a>
+                    </Tooltip>
+                    <Tooltip title={t("agent.insertToCanvas")}>
+                        <button type="button" className={ACTION} onClick={() => onInsert(result.id)}>
+                            <ImagePlus className="size-3.5" />
+                        </button>
+                    </Tooltip>
                 </div>
             </div>
             <figcaption className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">

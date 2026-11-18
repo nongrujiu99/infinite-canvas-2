@@ -1,9 +1,13 @@
+import { App } from "antd";
 import { Images, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AgentResultCard } from "@/components/agent/agent-result-card";
+import { PromptTemplateDialog, type PromptTemplateDraft } from "@/components/prompts/prompt-template-dialog";
 import { useAgentStore } from "@/stores/agent/use-agent-store";
+import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
+import type { AgentResult } from "@/types/agent";
 
 /** 标签行的相对高度（约 26px 除以 170px 列宽），估算列高用。 */
 const LABEL_RATIO = 0.16;
@@ -77,6 +81,9 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
     onInsert: (resultId: string) => void;
 }) {
     const { t } = useTranslation();
+    const { message } = App.useApp();
+    const addPrompt = usePromptLibraryStore((state) => state.addPrompt);
+    const [templateOf, setTemplateOf] = useState<AgentResult>();
     const results = useAgentStore((state) => state.results);
     // 只显示当前会话产生的结果；老数据没有 conversationId 时回退到全部显示
     const visible = conversationId ? results.filter((r) => r.conversationId === conversationId) : results;
@@ -102,6 +109,22 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
         ];
         return distribute(cells, 2);
     }, [pending, visible]);
+
+    // 缩略图直接复用这张结果的 storageKey，不另存一份；删除会话时回收器仍会保留它
+    const saveAsTemplate = ({ title, prompt, category, tags }: PromptTemplateDraft) => {
+        const item = templateOf;
+        if (!item) return;
+        addPrompt({
+            title,
+            prompt,
+            category,
+            tags,
+            coverUrl: item.dataUrl,
+            coverStorageKey: item.storageKey,
+        });
+        setTemplateOf(undefined);
+        message.success(t("agent.savedToPrompt"));
+    };
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -129,6 +152,7 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
                                             key={cell.key}
                                             result={cell.item}
                                             onInsert={onInsert}
+                                            onSaveTemplate={setTemplateOf}
                                             generating={generating}
                                             fresh={freshIds.has(cell.item.id)}
                                         />
@@ -148,6 +172,19 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
             {generating ? (
                 <p className="shrink-0 px-3.5 pb-2 text-[11px] leading-4 text-muted-foreground">{t("agent.resultWorkingHint")}</p>
             ) : null}
+
+            <PromptTemplateDialog
+                open={Boolean(templateOf)}
+                coverUrl={templateOf?.dataUrl || ""}
+                value={{
+                    title: templateOf ? `${templateOf.prompt.slice(0, 20) || "对话生成"} · ${templateOf.width}×${templateOf.height}` : "",
+                    prompt: templateOf?.prompt || "",
+                    category: "",
+                    tags: ["对话工作台"],
+                }}
+                onSave={saveAsTemplate}
+                onClose={() => setTemplateOf(undefined)}
+            />
         </div>
     );
 }

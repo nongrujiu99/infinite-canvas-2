@@ -1,10 +1,10 @@
-import { App, AutoComplete, Button, Input, Segmented, Tag } from "antd";
+import { App, Button, Input, Segmented, Tag } from "antd";
 import { ArrowLeft, CheckCircle2, RefreshCw, Save, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { fetchChannelModels } from "@/services/api/image";
-import { mergeVertexModels, vertexPresetCapability, VERTEX_DEFAULT_MODEL, VERTEX_PRESET_MODELS } from "@/lib/vertex-models";
+import { mergeVertexModels, parseVertexModelInput, vertexPresetCapability, VERTEX_DEFAULT_MODEL, VERTEX_PRESET_MODELS } from "@/lib/vertex-models";
 import { defaultBaseUrlForApiFormat, guessCapability, normalizeChannelModels, type ApiCallFormat, type ChannelModel, type ModelCapability, type ModelChannel } from "@/stores/use-config-store";
 
 type TestSummary = { total: number; counts: Record<ModelCapability, number> };
@@ -21,11 +21,11 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  const [draft, setDraft] = useState<ModelChannel>(channel);
  const [testing, setTesting] = useState(false);
  const [testSummary, setTestSummary] = useState<TestSummary | null>(null);
- const [manualModel, setManualModel] = useState(channel.models[0]?.name || (channel.apiFormat === "vertex" ? VERTEX_DEFAULT_MODEL : ""));
+ const [manualModel, setManualModel] = useState(() => initialManualModel(channel));
 
  useEffect(() => {
  setDraft(channel);
- setManualModel(channel.models[0]?.name || (channel.apiFormat === "vertex" ? VERTEX_DEFAULT_MODEL : ""));
+ setManualModel(initialManualModel(channel));
  setTestSummary(channel.models.length ? summarizeModels(channel.models) : null);
  }, [channel]);
 
@@ -51,7 +51,7 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  // Vertex 拉不到模型列表：names 是探针实测可用的文本型号，注册时排在文本候选首位，
  // 这样默认文本模型一定是这个项目里真正跑得通的型号，而不是可能 404 的猜测值。
  const listed = draft.apiFormat === "vertex"
- ? mergeVertexModels([manualModel], guessCapability, names)
+ ? mergeVertexModels(parseVertexModelInput(manualModel), guessCapability, names)
  : names.map((name) => ({ name, capability: guessCapability(name) }));
  const existing = new Map(draft.models.map((model) => [model.name, model]));
  const models = normalizeChannelModels(listed.map((item) => {
@@ -121,17 +121,34 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  <Input.Password value={draft.apiKey} onChange={(event) => { setDraft((current) => ({ ...current, apiKey: event.target.value })); setTestSummary(null); }} placeholder={draft.apiFormat === "vertex" ? t("config.channelEditor.vertexTokenPlaceholder") : "sk-..."} />
  </label>
 
- {draft.apiFormat === "vertex" ? <label className="mt-3 block">
+ {draft.apiFormat === "vertex" ? <div className="mt-3">
  <span className="mb-1 block text-sm font-medium">{t("config.channelEditor.vertexModelName")}</span>
- <AutoComplete
+ <Input
  value={manualModel}
- options={VERTEX_PRESET_MODELS.map((model) => ({ value: model.name, label: `[${t(`config.channelEditor.capabilities.${model.capability}`)}] ${model.label}（${model.name}）` }))}
- onChange={(value) => { setManualModel(value); setTestSummary(null); }}
+ onChange={(event) => { setManualModel(event.target.value); setTestSummary(null); }}
  placeholder={t("config.channelEditor.vertexModelPlaceholder")}
  />
+ {/* 内置清单本来就会自动注入，这里点一下只是把它填进输入框（去重），方便用户看清/删改，不是重复注册 */}
+ <div className="mt-2 flex flex-wrap items-center gap-1.5">
+ <span className="text-xs text-muted-foreground">{t("config.channelEditor.vertexPresetQuickAdd")}</span>
+ {VERTEX_PRESET_MODELS.map((model) => {
+ const checked = parseVertexModelInput(manualModel).includes(model.name);
+ return <Tag
+ key={model.name}
+ className={"mr-0 cursor-pointer select-none " + (checked ? "border-primary text-primary" : "")}
+ onClick={() => {
+ const names = parseVertexModelInput(manualModel);
+ setManualModel((checked ? names.filter((name) => name !== model.name) : [...names, model.name]).join(", "));
+ setTestSummary(null);
+ }}
+ title={model.label}
+ >
+ {checked ? "✓ " : "+ "}{model.name}
+ </Tag>;
+ })}
+ </div>
  <div className="mt-1.5 text-xs text-muted-foreground">{t("config.channelEditor.vertexModelHint")}</div>
-
- </label> : null}
+ </div> : null}
 
  {testSummary ? <div className="mt-4 rounded-xl bg-emerald-500/10 p-3">
  <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="size-4" />{t("config.channelEditor.connected")}</div>
@@ -148,6 +165,12 @@ export function ChannelEditorInline({ channel, onSave, onBack }: { channel: Mode
  </div>
  </div>
  );
+}
+
+/** 回填输入框：内置清单会自动注入，输入框只显示用户手填过的额外型号，避免打开就塞满 5 个内置名。 */
+function initialManualModel(channel: ModelChannel) {
+ const extra = channel.models.map((model) => model.name).filter((name) => !vertexPresetCapability(name));
+ return extra.length ? extra.join(", ") : (channel.apiFormat === "vertex" ? VERTEX_DEFAULT_MODEL : "");
 }
 
 function baseUrlPlaceholder(apiFormat: ApiCallFormat) {

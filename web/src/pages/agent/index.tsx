@@ -1,6 +1,6 @@
 import { App, Button, Input, Popconfirm, Spin, Tooltip } from "antd";
 import { Check, ChevronDown, ChevronRight, ImagePlus, Pencil, Plus, Send, Square, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AgentQuestionNav } from "@/components/agent/agent-question-nav";
@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 
 /** 单轮请求传给模型的参考图数量上限，防止多轮累积的 base64 大图撑爆请求体导致中转站报错。 */
 const MAX_REFERENCE_IMAGES = 6;
+/** 单张上传图片的字节上限，超出直接跳过并提示；MB 数从字节推导，避免提示文案与实际阈值不一致。 */
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+const MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / 1024 / 1024;
 
 /** 把毫秒耗时格式化为易读文本，如 850ms、3.2s、1分12秒。 */
 function formatDuration(ms: number): string {
@@ -43,6 +46,8 @@ export default function AgentPage() {
 
     const [input, setInput] = useState("");
     const [attachments, setAttachments] = useState<ReferenceImage[]>([]);
+    const [dragging, setDragging] = useState(false);
+    const dragDepthRef = useRef(0);
     const [running, setRunning] = useState(false);
     const [streamText, setStreamText] = useState("");
     const [activeTool, setActiveTool] = useState<string>();
@@ -272,15 +277,76 @@ export default function AgentPage() {
         abortRef.current?.abort();
     }, []);
 
-    const handleUpload = useCallback(async (file: File) => {
-        try {
-            const uploaded = await uploadImage(file);
-            setAttachments((prev) => [...prev, { id: `${Date.now()}-${file.name}`, name: file.name, type: file.type, dataUrl: uploaded.url, storageKey: uploaded.storageKey, url: uploaded.url }]);
-        } catch {
-            message.error(t("common.imageReadFailed"));
+    // 文件选择、拖拽、粘贴三条入口共用：先按类型/大小过滤并汇总提示，再并发落库。
+    const handleFiles = useCallback(async (files: File[]) => {
+        if (!files.length) return;
+        const images: File[] = [];
+        let rejectedType = 0;
+        let rejectedSize = 0;
+        for (const file of files) {
+            if (!file.type.startsWith("image/")) rejectedType += 1;
+            else if (file.size > MAX_ATTACHMENT_BYTES) rejectedSize += 1;
+            else images.push(file);
         }
-        return false;
+        if (rejectedType) message.warning(t("agent.nonImageFile", { count: rejectedType }));
+        if (rejectedSize) message.warning(t("agent.imageTooLarge", { count: rejectedSize, limit: MAX_ATTACHMENT_MB }));
+        if (!images.length) return;
+
+        const results = await Promise.all(images.map(async (file) => {
+            try {
+                const uploaded = await uploadImage(file);
+                return {
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    name: file.name || "pasted-image",
+                    type: file.type,
+                    dataUrl: uploaded.url,
+                    storageKey: uploaded.storageKey,
+                    url: uploaded.url,
+                } as ReferenceImage;
+            } catch {
+                return undefined;
+            }
+        }));
+        const added = results.filter((item): item is ReferenceImage => Boolean(item));
+        if (added.length !== images.length) message.error(t("common.imageReadFailed"));
+        if (added.length) setAttachments((prev) => [...prev, ...added]);
     }, [message, t]);
+
+    // 剪贴板：只在真的含文件时接管，纯文本仍走 TextArea 默认粘贴，不破坏文本输入。
+    // dataTransfer 里的文件也可能是非图片，交给 handleFiles 统一提示，而不是静默忽略。
+    const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+        const files = Array.from(event.clipboardData?.items || [])
+            .filter((item) => item.kind === "file")
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => Boolean(file));
+        if (!files.length) return;
+        event.preventDefault();
+        void handleFiles(files);
+    }, [handleFiles]);
+
+    // 拖拽：Files 类型才接管文本/链接拖拽；用深度计数避免划过子元素时浮层闪烁。
+    const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+        if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+        event.preventDefault();
+        dragDepthRef.current += 1;
+        setDragging(true);
+    }, []);
+    const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+        if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+    }, []);
+    const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) setDragging(false);
+    }, []);
+    const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        dragDepthRef.current = 0;
+        setDragging(false);
+        void handleFiles(Array.from(event.dataTransfer.files || []));
+    }, [handleFiles]);
 
     const handleInsertToCanvas = useCallback((resultId: string) => {
         const result = useAgentStore.getState().results.find((item) => item.id === resultId);
@@ -512,8 +578,17 @@ export default function AgentPage() {
                             {/* 右缘提问导航：细刻度常驻，hover 浮出提问文本 */}
                             <AgentQuestionNav items={questions} activeIndex={activeQuestionIndex} onJump={handleJumpToMessage} />
 
-                            {/* 输入区 */}
-                            <div className="shrink-0 border-t border-border/60 p-4">
+                            {/* 输入区：支持选文件、拖入图片、粘贴图片三种入口 */}
+                            <div
+                                className={cn("relative shrink-0 border-t border-border/60 p-4 transition-all", dragging && "bg-primary/[0.06] ring-2 ring-inset ring-primary/60")}
+                                onDragEnter={handleDragEnter}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
+                                {dragging ? (
+                                    <p className="pointer-events-none absolute inset-x-4 -top-1 z-10 -translate-y-full rounded-md bg-primary px-2 py-0.5 text-center text-[11px] font-medium text-primary-foreground">{t("agent.dropImageHint")}</p>
+                                ) : null}
                                 {attachments.length ? (
                                     <div className="mb-3 flex flex-wrap gap-2">
                                         {attachments.map((attachment) => (
@@ -535,14 +610,14 @@ export default function AgentPage() {
                                     <label title={t("common.upload")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
                                         <ImagePlus className="size-4" />
                                         <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => {
-                                            const files = Array.from(event.target.files || []);
-                                            files.forEach((file) => void handleUpload(file));
+                                            void handleFiles(Array.from(event.target.files || []));
                                             event.target.value = "";
                                         }} />
                                     </label>
                                     <Input.TextArea
                                         value={input}
                                         onChange={(event) => setInput(event.target.value)}
+                                        onPaste={handlePaste}
                                         placeholder={t("agent.inputPlaceholder")}
                                         autoSize={{ minRows: 1, maxRows: 6 }}
                                         onPressEnter={(event) => {

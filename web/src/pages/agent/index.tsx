@@ -406,7 +406,7 @@ export default function AgentPage() {
 
                         {/* 中：对话流 */}
                         <div className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <div ref={scrollRef} onScroll={syncActiveQuestion} className="min-h-0 flex-1 overflow-y-auto p-4">
+                            <div ref={scrollRef} onScroll={syncActiveQuestion} className="hover-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
                                 {activeConversation && activeConversation.messages.length ? (
                                     <div className="space-y-4">
                                         {activeConversation.messages.map((item) => {

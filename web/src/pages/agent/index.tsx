@@ -566,7 +566,8 @@ export default function AgentPage() {
 
                         {/* 右：结果 */}
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <AgentResultPanel conversationId={activeId} generating={running} onInsert={handleInsertToCanvas} />
+                            {/* 只有真正调用生图/编辑工具时才算「出图中」；纯文本问答不触发骨架与计时 */}
+                            <AgentResultPanel conversationId={activeId} generating={running && Boolean(activeTool)} onInsert={handleInsertToCanvas} />
                         </div>
                     </div>
                 </div>

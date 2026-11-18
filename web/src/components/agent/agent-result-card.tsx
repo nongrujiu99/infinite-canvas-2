@@ -86,7 +86,7 @@ export function AgentResultCard({ result, onSaveTemplate, generating, fresh }: {
     };
 
     return (
-        <figure className={cn("group overflow-hidden rounded-xl border border-border bg-card transition", fresh && "result-card-in")}>
+        <figure className={cn("group overflow-hidden rounded-xl border border-border transition", fresh && "result-card-in")}>
             {/* 容器按真实比例撑开，图就不必裁；antd 根节点也要给足 100% */}
             <div className="relative bg-muted" style={{ aspectRatio: aspectOf(result) }}>
                 <Image

@@ -63,8 +63,8 @@ function PendingCard() {
     const { t } = useTranslation();
 
     return (
-        <figure className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="relative aspect-square overflow-hidden bg-muted/60">
+        <figure className="overflow-hidden rounded-xl border border-border">
+            <div className="relative aspect-square overflow-hidden border-b border-border/60">
                 <div className="result-pending-sweep absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-foreground/8 to-transparent" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                     <Sparkles className="size-4 animate-pulse text-muted-foreground/70" strokeWidth={1.5} />

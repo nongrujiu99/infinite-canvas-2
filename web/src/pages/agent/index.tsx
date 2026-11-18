@@ -375,14 +375,14 @@ export default function AgentPage() {
                             {running ? (
                                 <span className={cn(
                                     "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                                    activeTool ? "border-primary/40 bg-primary/15 text-primary" : "border-primary/25 bg-primary/[0.08] text-primary",
+                                    activeTool ? "border-primary/50 text-primary" : "border-primary/30 text-primary",
                                 )}>
                                     <span className={activeTool ? "thinking-dots" : "thinking-dots thinking-dots-muted"} />
                                     {activeTool ? (activeTool === "generate_image" ? t("agent.toolGenerating") : t("agent.toolEditing")) : t("agent.thinking")}
                                 </span>
                             ) : null}
                             <Tooltip title={channelReady ? t("agent.model") : t("agent.noChannelHint")}>
-                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
+                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
                                     <span className={cn("size-1.5 rounded-full", channelReady ? "bg-emerald-500" : "bg-amber-500")} />
                                     <span className="max-w-[9rem] truncate">{modelOptionLabel(config, activeModel)}</span>
                                 </span>
@@ -392,7 +392,7 @@ export default function AgentPage() {
 
                     <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,17rem)]">
                         {/* 左：会话列表 */}
-                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border">
                             <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
                                 <span className="text-[12px] font-medium text-foreground">{t("agent.newConversation")}</span>
                                 <Button size="small" type="text" icon={<Plus className="size-3.5" />} onClick={() => createConversation()} />
@@ -471,7 +471,7 @@ export default function AgentPage() {
                         </div>
 
                         {/* 中：对话流 */}
-                        <div className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border">
                             <div ref={scrollRef} onScroll={syncActiveQuestion} className="hover-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
                                 {activeConversation && activeConversation.messages.length ? (
                                     <div className="space-y-4">
@@ -489,7 +489,7 @@ export default function AgentPage() {
                                                 )}
                                             >
                                                 {item.role === "user" ? (
-                                                    <div className="max-w-[80%] rounded-2xl bg-muted px-4 py-2.5 text-[13px] leading-[1.4] text-foreground">
+                                                    <div className="max-w-[80%] rounded-2xl border border-border px-4 py-2.5 text-[13px] leading-[1.4] text-foreground">
                                                         {item.attachments?.length ? (
                                                             <div className="mb-1.5 flex flex-wrap gap-1.5">
                                                                 {item.attachments.map((attachment) => (
@@ -529,7 +529,7 @@ export default function AgentPage() {
                                         })}
                                         {thinkLog.length ? (
                                             <div className="flex justify-start">
-                                                <div className="max-w-[80%] overflow-hidden rounded-xl border border-border/60 bg-muted/20">
+                                                <div className="max-w-[80%] overflow-hidden rounded-xl border border-border">
                                                     <button
                                                         type="button"
                                                         onClick={() => setThinkOpen((v) => !v)}
@@ -553,7 +553,7 @@ export default function AgentPage() {
                                         ) : null}
                                         {running ? (
                                             <div className="flex justify-start">
-                                                <div className="max-w-[80%] overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.06] px-3.5 pt-3 pb-2 text-[13px] text-foreground">
+                                                <div className="max-w-[80%] overflow-hidden rounded-xl border border-primary/30 px-3.5 pt-3 pb-2 text-[13px] text-foreground">
                                                     <div className="mb-1.5 flex items-center gap-2 text-[11px] font-medium text-primary">
                                                         <span className={activeTool ? "thinking-dots" : "thinking-dots thinking-dots-muted"} />
                                                         <span>{activeTool ? (activeTool === "generate_image" ? t("agent.toolGenerating") : t("agent.toolEditing")) : t("agent.thinking")}</span>
@@ -584,7 +584,7 @@ export default function AgentPage() {
                                     <div className="mb-3 flex flex-wrap gap-2">
                                         {attachments.map((attachment) => (
                                             <div key={attachment.id} className="group/att relative">
-                                                <div className="size-14 overflow-hidden rounded-lg bg-muted">
+                                                <div className="size-14 overflow-hidden rounded-lg border border-border">
                                                     <Image
                                                         src={attachment.dataUrl}
                                                         alt={attachment.name}
@@ -606,7 +606,7 @@ export default function AgentPage() {
                                     </div>
                                 ) : null}
                                 <div className="flex items-center gap-2.5">
-                                    <label title={t("common.upload")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
+                                    <label title={t("common.upload")} className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
                                         <ImagePlus className="size-4" />
                                         <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => {
                                             void handleFiles(Array.from(event.target.files || []));
@@ -638,7 +638,7 @@ export default function AgentPage() {
                         </div>
 
                         {/* 右：结果 */}
-                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border">
                             {/* 只有真正调用生图/编辑工具时才算「出图中」；纯文本问答不触发骨架与计时 */}
                             <AgentResultPanel conversationId={activeId} generating={running && Boolean(activeTool)} />
                         </div>

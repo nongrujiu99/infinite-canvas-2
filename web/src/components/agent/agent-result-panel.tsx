@@ -76,10 +76,9 @@ function PendingCard() {
     );
 }
 
-export function AgentResultPanel({ conversationId, generating, onInsert }: {
+export function AgentResultPanel({ conversationId, generating }: {
     conversationId?: string;
     generating?: boolean;
-    onInsert: (resultId: string) => void;
 }) {
     const { t } = useTranslation();
     const { message } = App.useApp();
@@ -163,7 +162,6 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
                                         <AgentResultCard
                                             key={cell.key}
                                             result={cell.item}
-                                            onInsert={onInsert}
                                             onSaveTemplate={(result, previewUrl) => setTemplateOf({ result, previewUrl })}
                                             generating={generating}
                                             fresh={freshIds.has(cell.item.id)}

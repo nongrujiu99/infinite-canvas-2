@@ -1,5 +1,5 @@
 import { App, Image, Tooltip } from "antd";
-import { BookmarkPlus, Download, FolderPlus, ImagePlus, Maximize2 } from "lucide-react";
+import { BookmarkPlus, Download, FolderPlus, Maximize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,6 +13,14 @@ import type { AgentResult } from "@/types/agent";
 /** 与生图工作台结果卡一致的操作按钮样式。 */
 const ACTION = "flex size-6 items-center justify-center rounded-lg bg-background/85 text-foreground/80 backdrop-blur-sm transition hover:bg-background hover:text-foreground";
 
+/** 下载走 JS 触发，与生图工作台保持一致：统一用 button，避免 <a> 继承链接色导致图标风格不一。 */
+function downloadResult(src: string, prompt: string) {
+    const link = document.createElement("a");
+    link.href = src;
+    link.download = `${prompt.slice(0, 20) || "agent-result"}.png`;
+    link.click();
+}
+
 /** 图片按真实宽高比撑开容器，缺失尺寸时兜正方形，避免竖图被裁掉。 */
 function aspectOf(result: AgentResult) {
     return result.width > 0 && result.height > 0 ? result.width / result.height : 1;
@@ -24,9 +32,8 @@ function aspectOf(result: AgentResult) {
  * 生成结果的 dataUrl 是 blob: URL，刷新后失效；这里用 storageKey 还原成
  * 可长期访问的 URL，缩略图和下载都走还原后的地址。
  */
-export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, fresh }: {
+export function AgentResultCard({ result, onSaveTemplate, generating, fresh }: {
     result: AgentResult;
-    onInsert: (id: string) => void;
     onSaveTemplate: (result: AgentResult, previewUrl: string) => void;
     generating?: boolean;
     fresh?: boolean;
@@ -93,23 +100,18 @@ export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, 
                 {/* 静止状态只留图，hover 或键盘聚焦才露出操作 */}
                 <div className="absolute inset-x-0 bottom-0 flex justify-end gap-0.5 p-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                     <Tooltip title={t("agent.saveToPrompt")}>
-                        <button type="button" className={ACTION} disabled={saving} onClick={() => onSaveTemplate(result, src)}>
+                        <button type="button" aria-label={t("agent.saveToPrompt")} className={ACTION} disabled={saving} onClick={() => onSaveTemplate(result, src)}>
                             <BookmarkPlus className="size-3.5" />
                         </button>
                     </Tooltip>
                     <Tooltip title={t("agent.saveToAssets")}>
-                        <button type="button" className={ACTION} disabled={saving} onClick={saveToAssets}>
+                        <button type="button" aria-label={t("agent.saveToAssets")} className={ACTION} disabled={saving} onClick={saveToAssets}>
                             <FolderPlus className="size-3.5" />
                         </button>
                     </Tooltip>
                     <Tooltip title={t("common.download")}>
-                        <a href={src} download className={ACTION}>
+                        <button type="button" aria-label={t("common.download")} className={ACTION} onClick={() => downloadResult(src, result.prompt)}>
                             <Download className="size-3.5" />
-                        </a>
-                    </Tooltip>
-                    <Tooltip title={t("agent.insertToCanvas")}>
-                        <button type="button" className={ACTION} onClick={() => onInsert(result.id)}>
-                            <ImagePlus className="size-3.5" />
                         </button>
                     </Tooltip>
                 </div>

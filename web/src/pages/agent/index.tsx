@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { AgentQuestionNav } from "@/components/agent/agent-question-nav";
 import { AgentResultPanel } from "@/components/agent/agent-result-panel";
 import { StoredImage } from "@/components/agent/stored-image";
-import { insertAgentResultToProject, latestProjectId } from "@/lib/canvas/canvas-agent-bridge";
 import { uploadImage } from "@/services/image-storage";
 import { runAgentTurn, type AgentLogEntry } from "@/services/api/agent";
 import { useAgentStore } from "@/stores/agent/use-agent-store";
@@ -348,20 +347,6 @@ export default function AgentPage() {
         void handleFiles(Array.from(event.dataTransfer.files || []));
     }, [handleFiles]);
 
-    const handleInsertToCanvas = useCallback((resultId: string) => {
-        const result = useAgentStore.getState().results.find((item) => item.id === resultId);
-        if (!result) return;
-        const projectId = latestProjectId();
-        if (!projectId) {
-            message.warning(t("agent.noProject"));
-            return;
-        }
-        const nodeId = insertAgentResultToProject(projectId, result);
-        if (nodeId) {
-            message.success(t("agent.inserted"));
-        }
-    }, [message, t]);
-
     return (
         <div
             className={cn("relative flex h-full flex-col overflow-hidden", dragging && "ring-2 ring-inset ring-primary/60")}
@@ -655,7 +640,7 @@ export default function AgentPage() {
                         {/* 右：结果 */}
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
                             {/* 只有真正调用生图/编辑工具时才算「出图中」；纯文本问答不触发骨架与计时 */}
-                            <AgentResultPanel conversationId={activeId} generating={running && Boolean(activeTool)} onInsert={handleInsertToCanvas} />
+                            <AgentResultPanel conversationId={activeId} generating={running && Boolean(activeTool)} />
                         </div>
                     </div>
                 </div>

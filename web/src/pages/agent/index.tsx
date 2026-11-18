@@ -4,14 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AgentResultPanel } from "@/components/agent/agent-result-panel";
-import { AgentTaskPanel } from "@/components/agent/agent-task-panel";
 import { StoredImage } from "@/components/agent/stored-image";
 import { insertAgentResultToProject, latestProjectId } from "@/lib/canvas/canvas-agent-bridge";
 import { uploadImage } from "@/services/image-storage";
 import { runAgentTurn, type AgentLogEntry } from "@/services/api/agent";
 import { useAgentStore } from "@/stores/agent/use-agent-store";
 import { isModelChannelConfigured, modelCapabilityOf, modelOptionLabel, useEffectiveConfig } from "@/stores/use-config-store";
-import type { AgentMessage, AgentTask } from "@/types/agent";
+import type { AgentMessage } from "@/types/agent";
 import type { ReferenceImage } from "@/types/image";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +39,6 @@ export default function AgentPage() {
     const updateConversationTitle = useAgentStore((state) => state.updateConversationTitle);
     const deleteConversation = useAgentStore((state) => state.deleteConversation);
     const addResults = useAgentStore((state) => state.addResults);
-    const addTask = useAgentStore((state) => state.addTask);
-    const updateTask = useAgentStore((state) => state.updateTask);
 
     const [input, setInput] = useState("");
     const [attachments, setAttachments] = useState<ReferenceImage[]>([]);
@@ -50,7 +47,6 @@ export default function AgentPage() {
     const [activeTool, setActiveTool] = useState<string>();
     const [thinkLog, setThinkLog] = useState<AgentLogEntry[]>([]);
     const [thinkOpen, setThinkOpen] = useState(false);
-    const [highlightId, setHighlightId] = useState<string>();
     const [renamingId, setRenamingId] = useState<string>();
     const [renameValue, setRenameValue] = useState("");
     const abortRef = useRef<AbortController | null>(null);
@@ -70,24 +66,6 @@ export default function AgentPage() {
         const el = scrollRef.current;
         if (el) el.scrollTop = el.scrollHeight;
     }, [activeConversation?.messages, streamText, activeTool]);
-
-    // 点击任务跳转到对应消息：滚动到消息锚点并短暂高亮。
-    // 老任务可能没有 messageId，回退用标题匹配消息内容的前缀来定位。
-    const handleJumpToMessage = useCallback((task: AgentTask) => {
-        const conversation = conversations.find((c) => c.id === task.conversationId);
-        let targetId = task.messageId;
-        if (!targetId && conversation) {
-            const hit = conversation.messages.find((m) => m.role === "user" && m.content && task.title && m.content.startsWith(task.title));
-            targetId = hit?.id;
-        }
-        if (!targetId) return;
-        const el = document.getElementById(`msg-${targetId}`);
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            setHighlightId(targetId);
-            window.setTimeout(() => setHighlightId(undefined), 1600);
-        }
-    }, [conversations]);
 
     // 开始重命名：填入当前标题并进入 inline 编辑态
     const startRename = useCallback((conversation: { id: string; title: string }) => {
@@ -195,17 +173,6 @@ export default function AgentPage() {
             (img, index, arr) => arr.findIndex((x) => x.id === img.id) === index,
         ).slice(0, MAX_REFERENCE_IMAGES);
 
-        const task: AgentTask = {
-            id: `${Date.now()}-task`,
-            title: effectiveText.slice(0, 30) || t("agent.defaultImagePrompt"),
-            status: "running",
-            conversationId: activeId,
-            resultIds: [],
-            messageId: userMessage.id,
-            createdAt: new Date().toISOString(),
-        };
-        addTask(task);
-
         const controller = new AbortController();
         abortRef.current = controller;
         setRunning(true);
@@ -246,10 +213,8 @@ export default function AgentPage() {
             };
             addMessage(activeId, assistantMessage);
             if (result.images.length) addResults(result.images);
-            updateTask(task.id, { status: "done", resultIds: result.images.map((image) => image.id), finishedAt: new Date().toISOString() });
         } catch (error) {
             const aborted = controller.signal.aborted;
-            updateTask(task.id, { status: "failed", finishedAt: new Date().toISOString() });
             if (!aborted) {
                 message.error(error instanceof Error ? error.message : t("agent.taskFailed"));
             }
@@ -261,7 +226,7 @@ export default function AgentPage() {
             // 思考结束后自动折叠，只留一行摘要（可点击展开查看完整过程）
             setThinkOpen(false);
         }
-    }, [activeConversation, activeId, activeModel, addMessage, addResults, addTask, attachments, channelReady, config, createConversation, input, message, running, t, updateConversationTitle, updateTask]);
+    }, [activeConversation, activeId, activeModel, addMessage, addResults, attachments, channelReady, config, createConversation, input, message, running, t, updateConversationTitle]);
 
     const handleCancel = useCallback(() => {
         abortRef.current?.abort();
@@ -410,11 +375,9 @@ export default function AgentPage() {
                                             return (
                                             <div
                                                 key={item.id}
-                                                id={`msg-${item.id}`}
                                                 className={cn(
                                                     "flex transition-all duration-300",
                                                     item.role === "user" ? "justify-end" : "justify-start",
-                                                    highlightId === item.id && "rounded-xl ring-2 ring-primary/60 ring-offset-2 ring-offset-background",
                                                 )}
                                             >
                                                 {item.role === "user" ? (
@@ -556,12 +519,9 @@ export default function AgentPage() {
                             </div>
                         </div>
 
-                        {/* 右：结果 + 任务 */}
+                        {/* 右：结果 */}
                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <div className="flex min-h-0 flex-col divide-y divide-border/60 overflow-hidden">
-                                <AgentResultPanel conversationId={activeId} onInsert={handleInsertToCanvas} />
-                                <AgentTaskPanel conversationId={activeId} onJumpToMessage={handleJumpToMessage} />
-                            </div>
+                            <AgentResultPanel conversationId={activeId} onInsert={handleInsertToCanvas} />
                         </div>
                     </div>
                 </div>

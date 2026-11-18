@@ -5,19 +5,16 @@ import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
 import {
     AGENT_CONVERSATION_MESSAGE_LIMIT,
-    AGENT_TASK_LIMIT,
     type AgentConversation,
     type AgentMessage,
     type AgentPreferences,
     type AgentResult,
-    type AgentTask,
 } from "@/types/agent";
 
 type AgentStore = {
     conversations: AgentConversation[];
     activeConversationId?: string;
     results: AgentResult[];
-    tasks: AgentTask[];
     preferences: AgentPreferences;
 
     createConversation: (title?: string) => string;
@@ -27,9 +24,6 @@ type AgentStore = {
     deleteConversation: (id: string) => void;
 
     addResults: (results: AgentResult[]) => void;
-
-    addTask: (task: AgentTask) => void;
-    updateTask: (id: string, patch: Partial<AgentTask>) => void;
 
     setPreferences: (patch: Partial<AgentPreferences>) => void;
 };
@@ -47,7 +41,6 @@ export const useAgentStore = create<AgentStore>()(
             conversations: [],
             activeConversationId: undefined,
             results: [],
-            tasks: [],
             preferences: {},
 
             createConversation: (title = "") => {
@@ -93,19 +86,14 @@ export const useAgentStore = create<AgentStore>()(
                     const deletingActive = state.activeConversationId === id;
                     return {
                         conversations: remaining,
-                        // 级联清理该会话产生的结果与任务，避免 IndexedDB 里残留孤儿数据。
+                        // 级联清理该会话产生的结果，避免 IndexedDB 里残留孤儿数据。
                         results: state.results.filter((result) => result.conversationId !== id),
-                        tasks: state.tasks.filter((task) => task.conversationId !== id),
                         // 删除的是当前会话时，切到剩余的第一个；删光则为 undefined，由 UI 兜底新建。
                         activeConversationId: deletingActive ? remaining[0]?.id : state.activeConversationId,
                     };
                 }),
 
             addResults: (results) => set((state) => ({ results: [...state.results, ...results] })),
-
-            addTask: (task) => set((state) => ({ tasks: trimTo([...state.tasks, task], AGENT_TASK_LIMIT) })),
-
-            updateTask: (id, patch) => set((state) => ({ tasks: state.tasks.map((task) => (task.id === id ? { ...task, ...patch } : task)) })),
 
             setPreferences: (patch) => set((state) => ({ preferences: { ...state.preferences, ...patch } })),
         }),
@@ -116,7 +104,6 @@ export const useAgentStore = create<AgentStore>()(
                 conversations: state.conversations,
                 activeConversationId: state.activeConversationId,
                 results: state.results,
-                tasks: state.tasks,
                 preferences: state.preferences,
             }),
         },

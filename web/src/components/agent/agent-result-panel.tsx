@@ -10,7 +10,7 @@ export function AgentResultPanel({ conversationId, onInsert }: { conversationId?
     const visible = conversationId ? results.filter((r) => r.conversationId === conversationId) : results;
 
     return (
-        <div className="flex min-h-0 max-h-[45%] flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
             <header className="flex shrink-0 items-center justify-between px-3.5 py-2.5">
                 <h2 className="text-[13px] font-semibold tracking-tight text-foreground">{t("agent.resultTitle")}</h2>
                 <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{visible.length}</span>

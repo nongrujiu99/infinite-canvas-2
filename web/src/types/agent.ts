@@ -36,20 +36,6 @@ export type AgentResult = {
     conversationId?: string;
 };
 
-export type AgentTaskStatus = "running" | "done" | "failed";
-
-export type AgentTask = {
-    id: string;
-    title: string;
-    status: AgentTaskStatus;
-    conversationId: string;
-    resultIds: string[];
-    /** 触发这条任务的用户消息 ID，用于点击任务时定位到对应消息。 */
-    messageId?: string;
-    createdAt: string;
-    finishedAt?: string;
-};
-
 export type AgentPreferences = {
     defaultModel?: string;
     defaultStyle?: string;
@@ -61,5 +47,3 @@ export const AGENT_MAX_STEPS = 20;
 export const AGENT_DEFAULT_STEPS = 12;
 /** 单会话最大消息条数，超限自动清理最旧的。 */
 export const AGENT_CONVERSATION_MESSAGE_LIMIT = 200;
-/** 任务列表最大条数，超限自动清理最旧的。 */
-export const AGENT_TASK_LIMIT = 50;

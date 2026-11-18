@@ -1,8 +1,9 @@
 import { App, Button, Input, Popconfirm, Spin, Tooltip } from "antd";
 import { Check, ChevronDown, ChevronRight, ImagePlus, Pencil, Plus, Send, Square, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { AgentQuestionNav } from "@/components/agent/agent-question-nav";
 import { AgentResultPanel } from "@/components/agent/agent-result-panel";
 import { StoredImage } from "@/components/agent/stored-image";
 import { insertAgentResultToProject, latestProjectId } from "@/lib/canvas/canvas-agent-bridge";
@@ -49,23 +50,62 @@ export default function AgentPage() {
     const [thinkOpen, setThinkOpen] = useState(false);
     const [renamingId, setRenamingId] = useState<string>();
     const [renameValue, setRenameValue] = useState("");
+    const [highlightId, setHighlightId] = useState<string>();
+    const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
     const abortRef = useRef<AbortController | null>(null);
     const scrollRef = useRef<HTMLDivElement | null>(null);
+    const highlightTimerRef = useRef<number | undefined>(undefined);
     /** 「对话模型是生图模型」的提醒每条会话只弹一次，别每发一句都打扰。 */
     const imageModelHintRef = useRef(false);
 
     const activeConversation = conversations.find((conversation) => conversation.id === activeId);
     const activeModel = config.textModel;
 
+    // 提问导航的数据源：只取有文本的用户消息，纯附件消息没有可定位的锚点文本，跳过
+    const questions = useMemo(
+        () => (activeConversation?.messages || [])
+            .filter((item) => item.role === "user" && item.content.trim())
+            .map((item) => ({ id: item.id, text: item.content.trim() })),
+        [activeConversation?.messages],
+    );
+
     useEffect(() => {
         if (!activeId && conversations.length) setActiveConversation(conversations[0].id);
     }, [activeId, conversations, setActiveConversation]);
 
-    // 消息、流式输出或结果变化时，自动滚到底部
+    // 消息、流式输出或结果变化时，自动滚到底部，当前提问指向最后一条
     useEffect(() => {
         const el = scrollRef.current;
         if (el) el.scrollTop = el.scrollHeight;
-    }, [activeConversation?.messages, streamText, activeTool]);
+        setActiveQuestionIndex(Math.max(0, questions.length - 1));
+    }, [activeConversation?.messages, streamText, activeTool, questions.length]);
+
+    // 点击提问导航：滚动到对应消息并短暂高亮，连续点击时重置计时避免提前取消高亮
+    const handleJumpToMessage = useCallback((id: string) => {
+        const el = document.getElementById(`msg-${id}`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightId(id);
+        if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = window.setTimeout(() => setHighlightId(undefined), 1600);
+    }, []);
+
+    useEffect(() => () => {
+        if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    }, []);
+
+    // 滚动时反推当前所在提问，让对应刻度更长更亮；取滚动区上方 1/3 处作为判定线
+    const syncActiveQuestion = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el || !questions.length) return;
+        const anchor = el.getBoundingClientRect().top + el.clientHeight * 0.35;
+        let index = 0;
+        questions.forEach((question, i) => {
+            const target = document.getElementById(`msg-${question.id}`);
+            if (target && target.getBoundingClientRect().top <= anchor) index = i;
+        });
+        setActiveQuestionIndex(index);
+    }, [questions]);
 
     // 开始重命名：填入当前标题并进入 inline 编辑态
     const startRename = useCallback((conversation: { id: string; title: string }) => {
@@ -365,8 +405,8 @@ export default function AgentPage() {
                         </div>
 
                         {/* 中：对话流 */}
-                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-                            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+                        <div className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+                            <div ref={scrollRef} onScroll={syncActiveQuestion} className="min-h-0 flex-1 overflow-y-auto p-4">
                                 {activeConversation && activeConversation.messages.length ? (
                                     <div className="space-y-4">
                                         {activeConversation.messages.map((item) => {
@@ -375,9 +415,11 @@ export default function AgentPage() {
                                             return (
                                             <div
                                                 key={item.id}
+                                                id={`msg-${item.id}`}
                                                 className={cn(
                                                     "flex transition-all duration-300",
                                                     item.role === "user" ? "justify-end" : "justify-start",
+                                                    highlightId === item.id && "rounded-xl ring-2 ring-primary/60 ring-offset-2 ring-offset-background",
                                                 )}
                                             >
                                                 {item.role === "user" ? (
@@ -466,6 +508,9 @@ export default function AgentPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* 右缘提问导航：细刻度常驻，hover 浮出提问文本 */}
+                            <AgentQuestionNav items={questions} activeIndex={activeQuestionIndex} onJump={handleJumpToMessage} />
 
                             {/* 输入区 */}
                             <div className="shrink-0 border-t border-border/60 p-4">

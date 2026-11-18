@@ -912,6 +912,7 @@ export default {
         toolEditing: "Editing images…",
         resultTitle: "Results",
         noResult: "No results yet",
+        questionNav: "Question navigation",
         taskFailed: "Failed",
         insertToCanvas: "Insert to canvas",
         inserted: "Inserted to canvas",

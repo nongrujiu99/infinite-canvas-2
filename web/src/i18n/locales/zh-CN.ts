@@ -899,6 +899,7 @@ export default {
         toolEditing: "正在编辑图片…",
         resultTitle: "生成结果",
         noResult: "暂无生成结果",
+        questionNav: "提问导航",
         taskFailed: "失败",
         insertToCanvas: "插回画布",
         inserted: "已插入画布",

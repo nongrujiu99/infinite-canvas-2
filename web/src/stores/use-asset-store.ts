@@ -99,12 +99,15 @@ export const useAssetStore = create<AssetStore>()(
                     const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
                     // 生图工作台的结果图不在 assets/projects 里，必须一起纳入保留集，否则会被当孤儿回收
                     const { useEcomStudioStore } = await import("@/stores/studio/use-ecom-studio-store");
+                    // 对话工作台的生成结果同样只靠 storageKey 活着：删素材 / 删项目时若漏掉，
+                    // 整批结果图会被当孤儿清空，刷新后右侧结果面板全是破图
+                    const { useAgentStore } = await import("@/stores/agent/use-agent-store");
                     // 提示词库的缩略图同样只靠 storageKey 活着，它既不属于素材也不属于任何画布项目，
                     // 漏掉这里就会在「删素材 / 删项目」时被清空，而且 coverUrl 是会话级 blob URL，删了就再也回不来
                     const { usePromptLibraryStore, persistentPromptStorageKeys } = await import("@/stores/use-prompt-library-store");
                     // 刷新后立刻删项目时提示词库可能还没 hydration 完，再从存储里取一份兜底
                     const promptKeys = await persistentPromptStorageKeys();
-                    const keep = [extra, useEcomStudioStore.getState().results, usePromptLibraryStore.getState().prompts];
+                    const keep = [extra, useEcomStudioStore.getState().results, useAgentStore.getState().results, usePromptLibraryStore.getState().prompts];
                     await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra: keep }, promptKeys);
                     await cleanupUnusedMedia({ assets: get().assets, projects: useCanvasStore.getState().projects, extra: keep }, promptKeys);
                 }, 0);

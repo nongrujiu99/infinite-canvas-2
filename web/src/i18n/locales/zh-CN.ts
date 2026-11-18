@@ -913,6 +913,7 @@ export default {
         saveToAssets: "存到我的素材",
         savedToAssets: "已存到我的素材",
         coverSaveFailed: "这张图片已失效，无法读取并保存封面，请重新生成后再试",
+        imageExpired: "图片已失效，请重新生成",
         inserted: "已插入画布",
         noProject: "还没有可插入的画布项目",
         truncated: "已达到最大步数，已停止",

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { persistResultCover } from "@/lib/agent/persist-result-cover";
+import { imageExpiredFallback } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { resolveImageUrl } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -84,6 +85,7 @@ export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, 
                 <Image
                     src={src}
                     alt={result.prompt}
+                    fallback={imageExpiredFallback(t("agent.imageExpired"))}
                     className="size-full object-cover"
                     style={{ width: "100%", height: "100%", ...(generating ? { opacity: 0.5 } : null) }}
                     preview={{ cover: <Maximize2 className="size-4" /> }}

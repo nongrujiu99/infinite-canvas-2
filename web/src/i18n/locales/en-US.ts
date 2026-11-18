@@ -926,6 +926,7 @@ export default {
         saveToAssets: "Save to assets",
         savedToAssets: "Saved to assets",
         coverSaveFailed: "This image is no longer readable, so its cover could not be saved. Please regenerate it and try again.",
+        imageExpired: "Image expired — please regenerate",
         inserted: "Inserted to canvas",
         noProject: "No canvas project to insert into yet",
         truncated: "Reached max steps, stopped",

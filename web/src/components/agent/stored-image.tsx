@@ -1,7 +1,9 @@
 import { Image } from "antd";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { resolveImageUrl } from "@/services/image-storage";
+import { imageExpiredFallback } from "@/lib/image-utils";
 
 /**
  * 从 IndexedDB 还原的图片。
@@ -23,6 +25,7 @@ export function StoredImage({
     width?: number;
     className?: string;
 }) {
+    const { t } = useTranslation();
     const [src, setSrc] = useState<string>(dataUrl);
 
     useEffect(() => {
@@ -35,5 +38,5 @@ export function StoredImage({
         };
     }, [storageKey, dataUrl]);
 
-    return <Image src={src} alt={alt} width={width} className={className} preview={{ mask: "查看大图" }} />;
+    return <Image src={src} alt={alt} width={width} fallback={imageExpiredFallback(t("agent.imageExpired"))} className={className} preview={{ mask: "查看大图" }} />;
 }

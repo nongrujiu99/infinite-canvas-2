@@ -868,3 +868,19 @@ html .ant-btn.ant-btn:not(:disabled):focus-visible {
     filter: brightness(0) invert(1);
     opacity: 0.9;
 }
+
+/* ---------------------------------------------------------------------------
+ * 对话工作台 composer：聚焦态由外层容器的 focus-within 蓝边统一表达。
+ * antd 6 的 borderless 文本域在 :focus-visible 时仍会自带一圈 outline，
+ * 文本域点击也会命中该状态，导致内外两层蓝边相邻/重叠、看起来变粗。
+ * 这里移除内部文本域的自带描边，只保留外层容器一条清晰边框。
+ * ------------------------------------------------------------------------- */
+.agent-composer-input.ant-input,
+.agent-composer-input.ant-input:hover,
+.agent-composer-input.ant-input:focus,
+.agent-composer-input.ant-input:focus-visible,
+.agent-composer-input.ant-input:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}

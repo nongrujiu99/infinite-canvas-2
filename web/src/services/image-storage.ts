@@ -178,6 +178,33 @@ export async function resolveImageUrl(storageKey?: string, fallback = "") {
     return url;
 }
 
+/**
+ * 同步读取内存里已缓存的图片地址。
+ *
+ * 组件首帧用它初始化 src：缓存命中时直接拿到可用地址，不必先渲染一帧已经失效的
+ * dataUrl（会话级 blob: 地址）再等异步 resolve 回填，从而消掉缩略图闪烁。
+ */
+export function peekImageUrl(storageKey?: string) {
+    return storageKey ? objectUrls.get(storageKey) : undefined;
+}
+
+/**
+ * 图片加载失败时的自愈：绕过可能已失效的内存缓存，从 IndexedDB 重新造一个 blob 地址。
+ *
+ * resolveImageUrl 命中缓存时不会校验地址是否已被 revoke，一旦缓存里留着失效地址，
+ * 组件会一直显示「图片已失效」占位，只有刷新（清空内存）才能恢复。这里强制新建地址
+ * 并刷新缓存；刷新后地址字符串必与旧的不同，rc-image 才会重置错误态重新加载。
+ * 不主动 revoke 旧地址，避免把仍在同一张图上显示的其他组件一起闪断。
+ */
+export async function rebuildImageUrl(storageKey?: string, fallback = "") {
+    if (!storageKey) return fallback;
+    const blob = await store.getItem<Blob>(storageKey);
+    if (!blob) return fallback;
+    const url = URL.createObjectURL(blob);
+    objectUrls.set(storageKey, url);
+    return url;
+}
+
 export async function getImageBlob(storageKey: string) {
     return store.getItem<Blob>(storageKey);
 }

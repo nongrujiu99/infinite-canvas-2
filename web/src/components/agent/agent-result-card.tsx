@@ -1,12 +1,12 @@
 import { App, Image, Tooltip } from "antd";
 import { BookmarkPlus, Download, FolderPlus, Maximize2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useResolvedImageSrc } from "@/components/agent/use-resolved-image-src";
 import { persistResultCover } from "@/lib/agent/persist-result-cover";
 import { imageExpiredFallback } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
-import { resolveImageUrl } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import type { AgentResult } from "@/types/agent";
 
@@ -41,18 +41,8 @@ export function AgentResultCard({ result, onSaveTemplate, generating, fresh }: {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const addAsset = useAssetStore((state) => state.addAsset);
-    const [src, setSrc] = useState<string>(result.dataUrl);
     const [saving, setSaving] = useState(false);
-
-    useEffect(() => {
-        let mounted = true;
-        void resolveImageUrl(result.storageKey, result.dataUrl).then((url) => {
-            if (mounted && url) setSrc(url);
-        });
-        return () => {
-            mounted = false;
-        };
-    }, [result.storageKey, result.dataUrl]);
+    const { src, handleError } = useResolvedImageSrc(result.dataUrl, result.storageKey);
 
     const saveToAssets = async () => {
         if (saving) return;
@@ -93,6 +83,7 @@ export function AgentResultCard({ result, onSaveTemplate, generating, fresh }: {
                     src={src}
                     alt={result.prompt}
                     fallback={imageExpiredFallback(t("agent.imageExpired"))}
+                    onError={handleError}
                     className="size-full object-cover"
                     style={{ width: "100%", height: "100%", ...(generating ? { opacity: 0.5 } : null) }}
                     preview={{ cover: <Maximize2 className="size-4" /> }}

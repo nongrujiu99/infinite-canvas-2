@@ -661,7 +661,7 @@ export default function AgentPage() {
                                             }
                                         }}
                                         variant="borderless"
-                                        className="!resize-none !bg-transparent !px-3 !py-2.5 !text-[13px] !leading-[1.6]"
+                                        className="agent-composer-input !resize-none !bg-transparent !px-3 !py-2.5 !text-[13px] !leading-[1.6]"
                                     />
                                     {/* 工具栏：左侧能力入口，右侧发送；位置固定、状态清晰 */}
                                     <div className="flex items-center justify-between gap-2 border-t border-border/60 px-2 py-1.5">

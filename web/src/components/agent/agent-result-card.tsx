@@ -3,6 +3,7 @@ import { BookmarkPlus, Download, FolderPlus, ImagePlus, Maximize2 } from "lucide
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { persistResultCover } from "@/lib/agent/persist-result-cover";
 import { cn } from "@/lib/utils";
 import { resolveImageUrl } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -25,7 +26,7 @@ function aspectOf(result: AgentResult) {
 export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, fresh }: {
     result: AgentResult;
     onInsert: (id: string) => void;
-    onSaveTemplate: (result: AgentResult) => void;
+    onSaveTemplate: (result: AgentResult, previewUrl: string) => void;
     generating?: boolean;
     fresh?: boolean;
 }) {
@@ -33,6 +34,7 @@ export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, 
     const { message } = App.useApp();
     const addAsset = useAssetStore((state) => state.addAsset);
     const [src, setSrc] = useState<string>(result.dataUrl);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -44,24 +46,35 @@ export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, 
         };
     }, [result.storageKey, result.dataUrl]);
 
-    const saveToAssets = () => {
-        addAsset({
-            kind: "image",
-            title: `${result.prompt.slice(0, 20) || "对话生成"} · ${result.width}×${result.height}`,
-            coverUrl: result.dataUrl,
-            tags: ["对话工作台", "AI 生成"],
-            source: "agent",
-            data: {
-                dataUrl: result.dataUrl,
-                storageKey: result.storageKey,
-                width: result.width,
-                height: result.height,
-                bytes: result.bytes,
-                mimeType: result.mimeType,
-            },
-            metadata: { prompt: result.prompt, conversationId: result.conversationId },
-        });
-        message.success(t("agent.savedToAssets"));
+    const saveToAssets = async () => {
+        if (saving) return;
+        setSaving(true);
+        try {
+            const cover = await persistResultCover(result);
+            if (!cover) {
+                message.error(t("agent.coverSaveFailed"));
+                return;
+            }
+            addAsset({
+                kind: "image",
+                title: `${result.prompt.slice(0, 20) || "对话生成"} · ${result.width}×${result.height}`,
+                coverUrl: cover.coverUrl,
+                tags: ["对话工作台", "AI 生成"],
+                source: "agent",
+                data: {
+                    dataUrl: cover.coverUrl,
+                    storageKey: cover.coverStorageKey,
+                    width: result.width,
+                    height: result.height,
+                    bytes: result.bytes,
+                    mimeType: result.mimeType,
+                },
+                metadata: { prompt: result.prompt, conversationId: result.conversationId },
+            });
+            message.success(t("agent.savedToAssets"));
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -78,12 +91,12 @@ export function AgentResultCard({ result, onInsert, onSaveTemplate, generating, 
                 {/* 静止状态只留图，hover 或键盘聚焦才露出操作 */}
                 <div className="absolute inset-x-0 bottom-0 flex justify-end gap-0.5 p-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                     <Tooltip title={t("agent.saveToPrompt")}>
-                        <button type="button" className={ACTION} onClick={() => onSaveTemplate(result)}>
+                        <button type="button" className={ACTION} disabled={saving} onClick={() => onSaveTemplate(result, src)}>
                             <BookmarkPlus className="size-3.5" />
                         </button>
                     </Tooltip>
                     <Tooltip title={t("agent.saveToAssets")}>
-                        <button type="button" className={ACTION} onClick={saveToAssets}>
+                        <button type="button" className={ACTION} disabled={saving} onClick={saveToAssets}>
                             <FolderPlus className="size-3.5" />
                         </button>
                     </Tooltip>

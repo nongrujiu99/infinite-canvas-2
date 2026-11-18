@@ -925,6 +925,7 @@ export default {
         savedToPrompt: "Saved to your prompt library",
         saveToAssets: "Save to assets",
         savedToAssets: "Saved to assets",
+        coverSaveFailed: "This image is no longer readable, so its cover could not be saved. Please regenerate it and try again.",
         inserted: "Inserted to canvas",
         noProject: "No canvas project to insert into yet",
         truncated: "Reached max steps, stopped",

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { AgentResultCard } from "@/components/agent/agent-result-card";
 import { PromptTemplateDialog, type PromptTemplateDraft } from "@/components/prompts/prompt-template-dialog";
+import { persistResultCover } from "@/lib/agent/persist-result-cover";
 import { useAgentStore } from "@/stores/agent/use-agent-store";
 import { usePromptLibraryStore } from "@/stores/use-prompt-library-store";
 import type { AgentResult } from "@/types/agent";
@@ -83,7 +84,8 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const addPrompt = usePromptLibraryStore((state) => state.addPrompt);
-    const [templateOf, setTemplateOf] = useState<AgentResult>();
+    const [templateOf, setTemplateOf] = useState<{ result: AgentResult; previewUrl: string }>();
+    const [savingTemplate, setSavingTemplate] = useState(false);
     const results = useAgentStore((state) => state.results);
     // 只显示当前会话产生的结果；老数据没有 conversationId 时回退到全部显示
     const visible = conversationId ? results.filter((r) => r.conversationId === conversationId) : results;
@@ -110,20 +112,30 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
         return distribute(cells, 2);
     }, [pending, visible]);
 
-    // 缩略图直接复用这张结果的 storageKey，不另存一份；删除会话时回收器仍会保留它
-    const saveAsTemplate = ({ title, prompt, category, tags }: PromptTemplateDraft) => {
-        const item = templateOf;
-        if (!item) return;
-        addPrompt({
-            title,
-            prompt,
-            category,
-            tags,
-            coverUrl: item.dataUrl,
-            coverStorageKey: item.storageKey,
-        });
-        setTemplateOf(undefined);
-        message.success(t("agent.savedToPrompt"));
+    // 封面必须落库成可还原的本地图，否则刷新后提示词库里的缩略图就是破图
+    const saveAsTemplate = async ({ title, prompt, category, tags }: PromptTemplateDraft) => {
+        const source = templateOf;
+        if (!source || savingTemplate) return;
+        setSavingTemplate(true);
+        try {
+            const cover = await persistResultCover(source.result);
+            if (!cover) {
+                message.error(t("agent.coverSaveFailed"));
+                return;
+            }
+            addPrompt({
+                title,
+                prompt,
+                category,
+                tags,
+                coverUrl: cover.coverUrl,
+                coverStorageKey: cover.coverStorageKey,
+            });
+            setTemplateOf(undefined);
+            message.success(t("agent.savedToPrompt"));
+        } finally {
+            setSavingTemplate(false);
+        }
     };
 
     return (
@@ -152,7 +164,7 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
                                             key={cell.key}
                                             result={cell.item}
                                             onInsert={onInsert}
-                                            onSaveTemplate={setTemplateOf}
+                                            onSaveTemplate={(result, previewUrl) => setTemplateOf({ result, previewUrl })}
                                             generating={generating}
                                             fresh={freshIds.has(cell.item.id)}
                                         />
@@ -175,10 +187,10 @@ export function AgentResultPanel({ conversationId, generating, onInsert }: {
 
             <PromptTemplateDialog
                 open={Boolean(templateOf)}
-                coverUrl={templateOf?.dataUrl || ""}
+                coverUrl={templateOf?.previewUrl || ""}
                 value={{
-                    title: templateOf ? `${templateOf.prompt.slice(0, 20) || "对话生成"} · ${templateOf.width}×${templateOf.height}` : "",
-                    prompt: templateOf?.prompt || "",
+                    title: templateOf ? `${templateOf.result.prompt.slice(0, 20) || "对话生成"} · ${templateOf.result.width}×${templateOf.result.height}` : "",
+                    prompt: templateOf?.result.prompt || "",
                     category: "",
                     tags: ["对话工作台"],
                 }}
